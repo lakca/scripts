@@ -1,8 +1,9 @@
+__DIR__=$(dirname $0)
+
 #n
 export N_PREFIX="$HOME/n"; [[ :$PATH: == *":$N_PREFIX/bin:"* ]] || PATH+=":$N_PREFIX/bin"  # Added by n-install (see http://git.io/n-install-repo).
 
-# man 用 Safari 打开
-export PAGER="col -b  | open -a /Applications/Safari.app -f"
+# export PAGER="col -b  | open -a /Applications/Safari.app -f"
 
 alias cnpm='npm --registry=http://registry.npm.taobao.org'
 alias chrome='/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome'
@@ -90,13 +91,13 @@ c.r() {
   c.reload
 }
 function c.translate() { # 翻译，同 `c.t`
-  python3 ~/Documents/backward/translate.py "$@"
+  python3 $__DIR__/py/translate.py "$@"
 }
 c.t() {
   c.translate $@
 }
 function c.resou() { # 热搜
-  python3 ~/Documents/backward/resou.py "$@"
+  python3 $__DIR__/py/resou.py "$@"
 }
 function c.baidu() { # 百度搜索，同 `c.b`
   open "https://www.baidu.com/s?wd=$*"
@@ -138,7 +139,7 @@ function c.github() { # github搜索，同 `c.git`
   # 是否已归档   : `archived:true`, `archived:false`
   #
   # 更多见：https://docs.github.com/en/github/searching-for-information-on-github/searching-on-github
-  open "https://github.com/search?q=$1&l=$2"
+  open "https://github.com/search?q=$*"
 }
 c.git() {
   c.github $@
