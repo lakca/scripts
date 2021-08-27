@@ -99,10 +99,16 @@ c.t() {
 function c.resou() { # 热搜
   python3 $__DIR__/py/resou.py "$@"
 }
+function c.mdn() { # 搜索 MDN
+  python3 $__DIR__/py/mdn.py "$@"
+}
 function c.baidu() { # 百度搜索，同 `c.b`
   open "https://www.baidu.com/s?wd=$*"
 }
 c.b() {
+  c.baidu $@
+}
+baidu() {
   c.baidu $@
 }
 function c.google() { # 谷歌搜索，同 `c.g`
@@ -111,6 +117,9 @@ function c.google() { # 谷歌搜索，同 `c.g`
 c.g() {
  c.google $@
 }
+s() {
+  c.google "$@"
+}
 function c.gt() { # 谷歌翻译
   open "https://translate.google.cn/?sl=auto&tl=zh-CN&text=$*&op=translate"
 }
@@ -118,6 +127,9 @@ function c.bing() { # bing搜索，同 `c.bi`
   open "https://cn.bing.com/search?q=$*"
 }
 c.bi() {
+  c.bing $@
+}
+bing() {
   c.bing $@
 }
 function c.github() { # github搜索，同 `c.git`
@@ -143,4 +155,10 @@ function c.github() { # github搜索，同 `c.git`
 }
 c.git() {
   c.github $@
+}
+c.hub() {
+  c.github $@
+}
+hub() {
+  c.github "$@"
 }

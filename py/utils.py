@@ -1,5 +1,8 @@
 
 from wcwidth import wcswidth
+from os import environ
+
+browserCmd = environ.get('BROWSER', 'open')
 
 
 def silence(fn, default):
@@ -17,12 +20,13 @@ def colorful(s, color='red'):
 
 
 def print_list(rows, cols, titleIndex=0):
-    maxWidth = max(*[wcswidth(col) for col in cols])
+    maxWidth = max([wcswidth(col) for col in cols])
     for row in rows:
-        print()
         for i, col in enumerate(cols):
-            l = maxWidth - wcswidth(col) + len(col)
-            l = colorful(col.ljust(l), 'magenta')
-            r = colorful(row[i]) if i == titleIndex else colorful(
-                row[i], 'green')
-            print(f'{l}: {r}')
+            if len(row) > i:
+                l = maxWidth - wcswidth(col) + len(col)
+                l = colorful(col.ljust(l), 'magenta')
+                r = colorful(row[i]) if i == titleIndex else colorful(
+                    row[i], 'green')
+                print(f'{l}: {r}')
+        print()

@@ -1,0 +1,17 @@
+{
+  "name": "tampermonkey",
+  "version": "1.0.0",
+  "description": "",
+  "main": "action.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "browserify -e userscript.js -p tinyify -o dist/userscript.min.js && cat tampermonkey-comment.js >> dist/userscript.min.js",
+    "build2": "browserify -e search.userscript.js -p tinyify -o dist/search.userscript.min.js && cat tampermonkey-comment.js >> dist/search.userscript.min.js"
+  },
+  "author": "lakca",
+  "license": "ISC",
+  "devDependencies": {
+    "browserify": "^17.0.0",
+    "tinyify": "^3.0.0"
+  }
+}

@@ -4,8 +4,9 @@ if len(argv) < 2:
     exit()
 
 from wcwidth import wcswidth
-from translators import baidu, google, youdao, deepl
-from utils import print_list, silence
+from utils import colorful, silence
+import translators
+from threading import Thread
 
 
 def to_language(text):
@@ -16,28 +17,25 @@ def to_language(text):
     return 'zh'
 
 
-words = []
-headers = {
-    'text': '源文本',
-    'google': '谷歌',
-    'youdao': '有道',
-    'baidu': '百度',
-    # 'deepl': 'deepl',
-}
-max = 0
+headers = [
+    ['google', '谷歌'],
+    ['youdao', '有道'],
+    ['baidu', '百度'],
+    ['deepl', 'deepl'],
+    ['tencent', '腾讯'],
+    ['alibaba', '阿里巴巴'],
+    ['sogou', '搜狗'],
+]
 
-for word in argv[1:]:
-    max = len(word)
-    lang = to_language(word)
-    text = [word]
-    words.append(text)
-    if 'google' in headers:
-        text.append(silence(lambda: google(word, to_language=lang), ''))
-    if 'youdao' in headers:
-        text.append(silence(lambda: youdao(word, to_language=lang), ''))
-    if 'baidu' in headers:
-        text.append(silence(lambda: baidu(word, to_language=lang), ''))
-    if 'deepl' in headers:
-        text.append(silence(lambda: deepl(word, to_language=lang), ''))
 
-print_list(words, headers.values())
+word = ' '.join(argv[1:]).strip()
+lang = to_language(word)
+width = max([wcswidth(e[1]) for e in headers])
+
+print()
+print(colorful(word, 'magenta'))
+print()
+
+for [k, col] in headers:
+    Thread(target=lambda col: print(colorful(col.ljust(width - wcswidth(col) + len(col)), 'green') + ': ' + colorful(silence(lambda: getattr(translators, k)
+           (word, to_language=lang), ''), 'red')), args=(col,)).start()
