@@ -1,0 +1,258 @@
+{
+  "$schema": "https://raw.githubusercontent.com/JanDeDobbeleer/oh-my-posh/main/themes/schema.json",
+  "blocks": [
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "newline": true,
+      "segments": [
+        {
+          "type": "os",
+          "foreground": "#0bf1d3",
+          "style": "plain",
+          "properties": {
+            "prefix": "",
+            "postfix": " ",
+            "display_distro_name": true,
+            "alpine": "\uf300",
+            "arch": "\uf303",
+            "centos": "\uf304",
+            "debian": "\uf306",
+            "elementary": "\uf309",
+            "fedora": "\uf30a",
+            "gentoo": "\uf30d",
+            "linux": "\ue712",
+            "macos": "\ue711",
+            "manjaro": "\uf312",
+            "mint": "\uf30f",
+            "opensuse": "\uf314",
+            "raspbian": "\uf315",
+            "ubuntu": "\uf31c",
+            "wsl": "\ue712",
+            "windows": "\ue70f"
+          }
+        },
+        {
+          "type": "root",
+          "style": "plain",
+          "foreground": "red",
+          "properties": {
+            "root_icon": ""
+          }
+        },
+        {
+          "type": "session",
+          "style": "plain",
+          "properties": {
+            "user_info_separator": " <darkGray>@</> <lightYellow></> ",
+            "prefix": "",
+            "user_color": "lightCyan",
+            "host_color": "lightGreen"
+          }
+        },
+        {
+          "type": "path",
+          "style": "plain",
+          "foreground": "lightYellow",
+          "properties": {
+            "prefix": "<darkGray>in</> ",
+            "home_icon": "",
+            "folder_icon": " ",
+            "folder_separator_icon": "/",
+            "style": "full"
+          }
+        },
+        {
+          "type": "git",
+          "style": "powerline",
+          "properties": {
+            "display_status": true,
+            "display_stash_count": true,
+            "display_upstream_icon": true,
+            "display_branch_status": true,
+            "display_status_detail": true,
+            "status_colors_enabled": true,
+            "color_background": false,
+            "local_changes_color": "#ffeb3b",
+            "working_color": "#E84855",
+            "staging_color": "#2FDA4E",
+            "ahead_color": "#2EC4B6",
+            "behind_color": "#8A4FFF",
+            "prefix": "<darkGray>on</> ",
+            "git_icon": " ",
+            "tag_icon": " ",
+            "merge_icon": " ",
+            "commit_icon": " ",
+            "branch_icon": ":",
+            "github_icon": " ",
+            "gitlab_icon": " ",
+            "rebase_icon": " ",
+            "revert_icon": " ",
+            "bitbucket_icon": " ",
+            "no_commits_icon": " ",
+            "cherry_pick_icon": " ",
+            "branch_gone_icon": "≢ ",
+            "stash_count_icon": " ",
+            "branch_ahead_icon": "↑ ",
+            "local_staged_icon": "",
+            "branch_behind_icon": "↓ ",
+            "local_working_icon": "",
+            "branch_identical_icon": "≡ ",
+            "status_separator_icon": " ",
+            "azure_devops_icon": "ﴃ "
+          }
+        },
+        {
+          "type": "time",
+          "style": "plain",
+          "foreground": "darkGray",
+          "properties": {
+            "prefix": "[",
+            "postfix": "]"
+          }
+        },
+        {
+          "type": "exit",
+          "style": "plain",
+          "foreground": "red",
+          "properties": {
+            "prefix": " C:",
+            "always_numeric": true
+          }
+        }
+      ]
+    },
+    {
+      "type": "prompt",
+      "alignment": "right",
+      "segments": [
+        {
+          "type": "node",
+          "style": "diamond",
+          "trailing_diamond": "\uE0B4",
+          "leading_diamond": " \uE0B6",
+          "background": "#424242",
+          "foreground": "#42E66C",
+          "properties": {
+            "prefix": "\uE718",
+            "postfix": "",
+            "display_version": false
+          }
+        },
+        {
+          "type": "rust",
+          "style": "diamond",
+          "trailing_diamond": "\uE0B4",
+          "leading_diamond": " \uE0B6",
+          "background": "#424242",
+          "foreground": "#E64747",
+          "properties": {
+            "prefix": "\uE7a8",
+            "postfix": "",
+            "display_version": false
+          }
+        },
+        {
+          "type": "python",
+          "style": "diamond",
+          "trailing_diamond": "\uE0B4",
+          "leading_diamond": " \uE0B6",
+          "background": "#424242",
+          "foreground": "#E4F34A",
+          "properties": {
+            "prefix": "\uE235",
+            "postfix": "",
+            "display_version": false
+          }
+        },
+        {
+          "type": "go",
+          "style": "diamond",
+          "trailing_diamond": "\uE0B4",
+          "leading_diamond": " \uE0B6",
+          "background": "#424242",
+          "foreground": "#7FD5EA",
+          "properties": {
+            "prefix": "\uFCD1",
+            "postfix": "",
+            "display_version": false
+          }
+        },
+        {
+          "type": "java",
+          "style": "diamond",
+          "trailing_diamond": "\uE0B4",
+          "leading_diamond": " \uE0B6",
+          "background": "#424242",
+          "foreground": "#E64747",
+          "properties": {
+            "prefix": "\uE738",
+            "postfix": "",
+            "display_version": false
+          }
+        },
+        {
+          "type": "kubectl",
+          "style": "diamond",
+          "trailing_diamond": "\uE0B4",
+          "leading_diamond": " \uE0B6",
+          "background": "#424242",
+          "foreground": "#316ce6",
+          "properties": {
+            "prefix": "\uFD31",
+            "postfix": "",
+            "template": "{{if .Namespace}} :: {{.Namespace}}{{end}}"
+          }
+        },
+        {
+          "type": "memory",
+          "style": "diamond",
+          "leading_diamond": " \uE0B6",
+          "foreground": "#26C6DA",
+          "background": "#424242",
+          "properties": {
+            "precision": 1,
+            "prefix": "\uf85a ",
+            "postfix": "%"
+          }
+        },
+        {
+          "type": "battery",
+          "style": "diamond",
+          "trailing_diamond": "\uE0B4",
+          "foreground": "#26C6DA",
+          "background": "#424242",
+          "properties": {
+            "battery_icon": "",
+            "discharging_icon": "\uE231 ",
+            "charging_icon": "\uE234 ",
+            "charged_icon": "\uE22F ",
+            "charged_color": "#4caf50",
+            "charging_color": "#40c4ff",
+            "discharging_color": "#ff5722",
+            "postfix": "\uF295",
+            "display_charging": true
+          }
+        }
+      ]
+    },
+    {
+      "type": "prompt",
+      "alignment": "left",
+      "newline": true,
+      "segments": [
+        {
+          "type": "text",
+          "style": "plain",
+          "foreground": "#0bf1d3",
+          "properties": {
+            "text": "",
+            "postfix": "",
+            "prefix": ""
+          }
+        }
+      ]
+    }
+  ],
+  "final_space": true
+}
