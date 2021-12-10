@@ -1,40 +1,38 @@
 /* eslint-disable indent */
 
-const getStyle = id =>  `
-#${id} ul {
-  padding: 0;
-  margin: 0;
-  list-style-type: none;
-}
-#${id} li {
-  padding: 5px 0;
-}
-#${id} li li {
-  margin-left: 2em;
-}
-#${id} .host {
-  font-weight: bold;
-  font-style: italic;
-}
-#${id} button {
-  padding: 5px 10px;
-  margin: 5px 10px;
-  border-radius: 2px;
-  border: none;
-  cursor: pointer;
-  background-color: #eee;
-}
-#${id} button[data-like=link] {
-  border: none;
-  background: none;
-  padding: 0;
-  margin: 0 2px;
-  color: #1967d2;
-}
-`
-
-
-module.exports = function({g, randomId, deleteElement}) {
+module.exports = function({g, randomId, deleteElement, draggable}) {
+  const getStyle = id =>  `
+  #${id} ul {
+    padding: 0;
+    margin: 0;
+    list-style-type: none;
+  }
+  #${id} li {
+    padding: 5px 0;
+  }
+  #${id} li li {
+    margin-left: 2em;
+  }
+  #${id} .host {
+    font-weight: bold;
+    font-style: italic;
+  }
+  #${id} button {
+    padding: 5px 10px;
+    margin: 5px 10px;
+    border-radius: 2px;
+    border: none;
+    cursor: pointer;
+    background-color: #eee;
+  }
+  #${id} button[data-like=link] {
+    border: none;
+    background: none;
+    padding: 0;
+    margin: 0 2px;
+    color: #1967d2;
+  }
+  `
   return function popup(gelements, options = {}) {
     const {
       destroy = true,
@@ -46,21 +44,19 @@ module.exports = function({g, randomId, deleteElement}) {
     const id = 's' + randomId()
     const overlayStyle = `
     position: fixed;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     width: 100%;
-    padding: 100%;
+    height: 100%;
     left: 0;
     top: 0;
     z-index: 9999;
     background: rgba(0,0,0,0.2);
     `
     const modalStyle = `
-    position: fixed;
-    z-index: 9999;
     width: 500px;
     padding: 20px;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
     background: white;
     border-radius: 4px;
     box-shadow: 5px 5px 20px grey;
@@ -76,12 +72,12 @@ module.exports = function({g, randomId, deleteElement}) {
       }
     }
     instance.root.style(overlay ? overlayStyle : modalStyle)
-      .down('div')
+      .down('div').key('modal')
         .if(overlay)
         .style(modalStyle)
         .class('overlay')
       .down('div').key('content').class('content')
-        .down(gelements)
+        .down(typeof gelements === 'string' ? g('span').text(gelements) : gelements)
         .down()
       .next('div').if(closable || confirmable).class('footer').style('margin-top: 20px; text-align: center;')
         .down('button')
@@ -95,9 +91,10 @@ module.exports = function({g, randomId, deleteElement}) {
           .data('action', 'confirm')
           .on('click', () => {})
         .down()
-      .next('style').text(getStyle(id)).text(style(id))
+      .next('style').text(getStyle(id)).text(style)
       .start
     document.body.appendChild(instance.root.el)
+    draggable(instance.root.node('modal').el, 'popup')
     return instance
   }
 }

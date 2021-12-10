@@ -6,7 +6,7 @@ from urllib.parse import urljoin
 from bs4 import BeautifulSoup
 from tabulate import tabulate
 import wcwidth
-from utils import browserCmd, print_list, colorful
+from utils import browserCmd, print_list, colorful, fuzzyMatch
 
 
 def lower(*s):
@@ -108,7 +108,7 @@ class Query:
             name = e.text.strip()
             url = urljoin(resp.url, e.attrs.get('href'))
             lowername, lowerquery = lower(name, query)
-            if (opts.get('exact') and lowerquery == lowername) or (not opts.get('exact') and lowerquery in lowername):
+            if (opts.get('exact') and lowerquery == lowername) or (not opts.get('exact') and fuzzyMatch(lowerquery, lowername)):
                 rows.append({
                     'name': name,
                     'url': url,

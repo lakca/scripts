@@ -1,6 +1,7 @@
 
 from wcwidth import wcswidth
 from os import environ
+import re
 
 browserCmd = environ.get('BROWSER', 'open')
 
@@ -30,3 +31,16 @@ def print_list(rows, cols, titleIndex=0):
                     row[i], 'green')
                 print(f'{l}: {r}')
         print()
+
+
+def fuzzyMatch(s: str, patternStr: str) -> bool:
+
+    rs = fuzzyMatch.cache[s] if s in fuzzyMatch.cache else re.sub(pattern=r'(^|.)', repl=r'\1.*', string=s,
+                                                                  count=0, flags=re.IGNORECASE | re.DOTALL)
+
+    fuzzyMatch.cache[s] = rs
+
+    return not not re.search(pattern=rf'{rs}', string=patternStr, flags=re.DOTALL | re.IGNORECASE)
+
+
+fuzzyMatch.cache = {}

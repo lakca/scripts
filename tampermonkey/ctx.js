@@ -1,6 +1,7 @@
 /* eslint-disable new-cap */
 module.exports = function({ Value, GM_getValue, GM_setValue }) {
   Value.addon({
+    prevent(ev) { ev.preventDefault && ev.preventDefault() },
     attr(el, key, value) {
       if (typeof key === 'string') {
         if (value === false) el.removeAttribute(key)
@@ -185,6 +186,37 @@ module.exports = function({ Value, GM_getValue, GM_setValue }) {
     }
   }
 
+  function draggable(el, id) {
+    if (!el) return
+    el.draggable = true
+    const storeKey = id ? 'STORE_POSITION_OF_' + id : null
+    const prevent = ev => ev.preventDefault()
+    el.addEventListener('dragstart', function(e) {
+      document.addEventListener('dragover', prevent, false)
+      const rect = this.getBoundingClientRect()
+      this.dataset.dx = rect.x - e.clientX
+      this.dataset.dy = rect.y - e.clientY
+    })
+    el.addEventListener('drag', prevent)
+    el.addEventListener('dragend', function(e) {
+      document.removeEventListener('dragover', prevent, false)
+      const x = e.clientX + +this.dataset.dx
+      const y = e.clientY + +this.dataset.dy
+      this.style.left = x + 'px'
+      this.style.top = y + 'px'
+      if (storeKey) GM_setValue(storeKey, { x: x, y: y })
+      this.dataset.dx = 0
+      this.dataset.dy = 0
+    })
+    if (storeKey) {
+      const pos = GM_getValue(storeKey)
+      if (pos) {
+        el.style.top = pos.y
+        el.style.left = pos.x
+      }
+    }
+  }
+
   return {
     NAME,
     SEARCHES,
@@ -199,6 +231,7 @@ module.exports = function({ Value, GM_getValue, GM_setValue }) {
     openTab,
     toggleValue,
     getQuery,
-    search
+    search,
+    draggable,
   }
 }

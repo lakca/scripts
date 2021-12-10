@@ -24,16 +24,11 @@
 
 ;(function(window) {
   'use strict';
-  const addon = {
-    prevent(a) { a.preventDefault() }
-  }
-  const Value = TheValue.addon(addon)
-  Object.assign(Value, addon)
 
-  const g = require('/Users/longpeng/Documents/GitHub/gelement/src/index.js')
+  const g = require('/Users/longpeng/Documents/GitHub/gelement/dist/index.min.js')
   const params = {
     g,
-    Value,
+    Value: TheValue.addon(),
     GM_addStyle,
     GM_addElement,
     GM_registerMenuCommand,

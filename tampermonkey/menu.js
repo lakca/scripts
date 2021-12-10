@@ -1,16 +1,14 @@
 /* eslint-disable new-cap */
-const g = require('/Users/longpeng/Documents/GitHub/gelement/src/index.js')
-
 const TOGGLES = [
   ['新标签打开链接', 'OPEN_LINK_IN_NEW_TAB']
 ]
 
 const STORE_SITES = 'STORE_SITES'
-const STORE_MENU_POSITION = 'STORE_MENU_POSITION'
 const STORE_TOGGLE_MENU = 'STORE_TOGGLE_MENU'
 const STORE_TOGGLE_OPEN_LINK_IN_NEW_TAB = 'STORE_TOGGLE_OPEN_LINK_IN_NEW_TAB'
 
 module.exports = function ({
+  g,
   NAME,
   SEARCHES,
   getQuery,
@@ -25,6 +23,8 @@ module.exports = function ({
   GM_addStyle,
   GM_addValueChangeListener,
   GM_registerMenuCommand,
+  popup,
+  draggable,
 }) {
   return {
     get style() {
@@ -89,16 +89,16 @@ module.exports = function ({
       switch (type) {
         case 'search':
           return g('li')
-            .attr('data-action', 'OPEN_URL')
-            .attr('data-url', item[1])
+            .data('action', 'OPEN_URL')
+            .data('actionTarget', item[1])
             .down('span')
             .text('🔎')
             .next('span')
             .text(item[0])
         case 'toggle':
           return g('li')
-            .attr('data-action', 'TOGGLE')
-            .attr('data-toggle', item[1])
+            .data('action', 'TOGGLE')
+            .data('actionTarget', item[1])
             .down('span')
             .text('🛠')
             .next('span')
@@ -107,16 +107,16 @@ module.exports = function ({
             .text(GM_getValue('STORE_TOGGLE_' + item[1]) ? '✅' : '❌')
         case 'site':
           return g('li')
-            .attr('data-action', 'OPEN_URL')
-            .attr('data-hostname', item[0])
-            .attr('data-url', item[1])
+            .data('action', 'OPEN_URL')
+            .data('actionTarget', item[1])
+            .data('hostname', item[0])
             .down('span')
             .text('🔗')
             .next('span')
             .text(item[0])
             .next('span')
             .text('🗑')
-            .attr('data-action', 'DEL_SITE')
+            .data('action', 'DEL_SITE')
         default:
           return ''
       }
@@ -142,19 +142,19 @@ module.exports = function ({
         .text(this.time)
         .next('li')
         .down('span')
-        .attr('data-action', 'TO_TOP')
+        .data('action', 'TO_TOP')
         .text('🔝')
         .next('span')
-        .attr('data-action', 'TO_BOTTOM')
+        .data('action', 'TO_BOTTOM')
         .style('float: right; display: inline-block; transform: rotate(180deg)')
         .text('🔝')
         .down()
         .next('li')
-        .attr('data-action', 'TOGGLE_MENU')
+        .data('action', 'TOGGLE_MENU')
         .style('font-weight: bold; margin-bottom: 8px')
         .text('收起/展开')
         .next('li')
-        .attr('data-action', 'SHOW_TEXT')
+        .data('action', 'SHOW_TEXT')
         .text('显示查询文本')
         .next(this.gap)
         .next(SEARCHES.map(e => this.getItem('search', e[1]).start))
@@ -163,11 +163,7 @@ module.exports = function ({
         .next(this.gap)
         .next(Object.entries(sites).map(e => this.getItem('site', e).start))
         .start.el
-      const pos = GM_getValue(STORE_MENU_POSITION, { x: 0, y: 0 })
       ul.id = NAME
-      ul.draggable = true
-      ul.style.left = pos.x + 'px'
-      ul.style.top = pos.y + 'px'
       if (GM_getValue(STORE_TOGGLE_MENU, false)) {
         ul.classList.add('fold')
       }
@@ -179,64 +175,41 @@ module.exports = function ({
           return t
         })(e.target)
         if (!target) return
-        const { action, actionType } = target.dataset
-        console.log(action, actionType)
+        const { action, actionTarget } = target.dataset
+        console.log(target.dataset)
         if (action) {
-          if (actionType) {
-            switch (actionType) {
-              case 'TOGGLE':
-                toggleValue(`STORE_TOGGLE_${action}`)
-                break
-              default:
-            }
-          } else {
-            switch (action) {
-              case 'DEL_SITE': {
-                const hostname = target.parentNode.dataset.hostname
-                delete sites[hostname]
-                GM_setValue(STORE_SITES, sites)
-                self.createMenu()
-              } break
-              case 'TOGGLE_MENU':
-                ul.classList.toggle('fold')
-                GM_setValue(STORE_TOGGLE_MENU, ul.classList.contains('fold'))
-                break
-              case 'SHOW_TEXT':
-                alert(getQuery())
-                break
-              case 'OPEN_URL':
-                search(target.dataset.url, true)
-                break
-              case 'TO_TOP':
-                window.scrollTo({ top: 0, behavior: 'auto' })
-                break
-              case 'TO_BOTTOM':
-                window.scrollTo({ top: 99999, behavior: 'auto' })
-                break
-              default:
-            }
+          switch (action) {
+            case 'TOGGLE':
+              toggleValue(`STORE_TOGGLE_${actionTarget}`)
+              self.createMenu()
+              break
+            case 'DEL_SITE': {
+              const hostname = target.parentNode.dataset.hostname
+              delete sites[hostname]
+              GM_setValue(STORE_SITES, sites)
+              self.createMenu()
+            } break
+            case 'TOGGLE_MENU':
+              ul.classList.toggle('fold')
+              GM_setValue(STORE_TOGGLE_MENU, ul.classList.contains('fold'))
+              break
+            case 'SHOW_TEXT':
+              popup(getQuery())
+              break
+            case 'OPEN_URL':
+              search(target.dataset.actionTarget, true)
+              break
+            case 'TO_TOP':
+              window.scrollTo({ top: 0, behavior: 'auto' })
+              break
+            case 'TO_BOTTOM':
+              window.scrollTo({ top: 99999, behavior: 'auto' })
+              break
+            default:
           }
         }
       }
-      ul.ondragstart = function (e) {
-        document.addEventListener('dragover', Value.prevent, false)
-        const rect = self.getBoundingClientRect()
-        this.dataset.dx = rect.x - e.clientX
-        this.dataset.dy = rect.y - e.clientY
-      }
-      ul.ondrag = function (e) {
-        Value.prevent(e)
-      }
-      ul.ondragend = function (e) {
-        document.removeEventListener('dragover', Value.prevent, false)
-        const x = e.clientX + +this.dataset.dx
-        const y = e.clientY + +this.dataset.dy
-        this.style.left = x + 'px'
-        this.style.top = y + 'px'
-        GM_setValue(STORE_MENU_POSITION, { x: x, y: y })
-        this.dataset.dx = 0
-        this.dataset.dy = 0
-      }
+      draggable(ul, 'menu')
     },
     mountCommands() {
       SEARCHES[1].forEach(e => GM_registerMenuCommand(e[0], search.bind(null, e[1])))

@@ -5,8 +5,11 @@
   "main": "action.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "help": "echo '\\033[0;31m build, build-copy, build2, build2-copy\\033[0m'",
     "build": "browserify -e userscript.js -p tinyify -o dist/userscript.min.js && cat tampermonkey-comment.js >> dist/userscript.min.js",
-    "build2": "browserify -e search.userscript.js -p tinyify -o dist/search.userscript.min.js && cat tampermonkey-comment.js >> dist/search.userscript.min.js"
+    "build2": "browserify -e search.userscript.js -p tinyify -o dist/search.userscript.min.js && cat tampermonkey-comment.js >> dist/search.userscript.min.js",
+    "build-copy": "npm run build && cat dist/userscript.min.js | pbcopy",
+    "build2-copy": "npm run build2 && cat dist/search.userscript.min.js | pbcopy"
   },
   "author": "lakca",
   "license": "ISC",
