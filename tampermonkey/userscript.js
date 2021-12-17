@@ -1,32 +1,11 @@
+// @ts-nocheck
 /* eslint-disable no-undef */
-
-// ==UserScript==
-// @name         New Userscript
-// @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  try to take over the world!
-// @author       You
-// @match        *://*/*
-// @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
-// @require      https://unpkg.com/the-value@1.1.1/dist/index.min.js
-// @grant        GM_setValue
-// @grant        GM_getValue
-// @grant        GM_deleteValue
-// @grant        GM_addStyle
-// @grant        GM_addElement
-// @grant        GM_setClipboard
-// @grant        window.location.href
-// @grant        GM_registerMenuCommand
-// @grant        GM_addValueChangeListener
-// @noframes
-// ==/UserScript==
-
 
 ;(function(window) {
   'use strict';
 
   const g = require('/Users/longpeng/Documents/GitHub/gelement/dist/index.min.js')
-  const params = {
+  const context = {
     g,
     Value: TheValue.addon(),
     GM_addStyle,
@@ -36,16 +15,18 @@
     GM_setValue,
     GM_getValue,
     GM_deleteValue,
+    GM_listValues,
     GM_setClipboard
   }
-  const ctx = require('./ctx')(params)
-  const popup = require('./popup')({...params, ...ctx})
-  const menu = require('./menu')({...params, ...ctx, popup})
-  const action = require('./action')({...params, ...ctx, popup})
+  unsafeWindow.context = context
+  Object.assign(context, require('./ctx')(context))
+  Object.assign(context, { popup: require('./popup')(context) })
+  Object.assign(context, require('./method')(context))
+  context.menu = require('./menu')(context)
+  context.action = require('./action')(context)
 
-  menu.mount()
-  action.mount()
-  unsafeWindow.popup = popup
+  context.menu.mount()
+  context.action.mount()
 })(window);
 
 

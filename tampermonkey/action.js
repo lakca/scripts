@@ -1,10 +1,13 @@
 /* eslint-disable new-cap */
 const STORE_ACTION_CLICK = 'STORE_ACTION_CLICK'
-
+/* eslint-disable new-cap */
+/**
+ * @param {ReturnType<import('./ctx')>} param0
+ */
 module.exports = function ({
   getDOMPath,
-  Value,
   later,
+  event,
   callOnElement,
   GM_registerMenuCommand,
   GM_setValue,
@@ -65,6 +68,8 @@ module.exports = function ({
       GM_registerMenuCommand('添加点击记忆', this.recordClick.bind(this))
       GM_registerMenuCommand('显示点击记忆', () => this.show())
       GM_registerMenuCommand('清空点击记忆', () => GM_deleteValue(STORE_ACTION_CLICK))
+      GM_registerMenuCommand('添加网站', () => event.fire('addSite'))
+      GM_registerMenuCommand('清空网站', () => event.fire('clearSites'))
       this.dispatch(GM_getValue(STORE_ACTION_CLICK, {})[location.host])
     }
   }

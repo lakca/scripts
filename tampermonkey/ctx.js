@@ -1,5 +1,5 @@
 /* eslint-disable new-cap */
-module.exports = function({ Value, GM_getValue, GM_setValue }) {
+module.exports = function({ Value, GM_getValue, GM_setValue, GM_addValueChangeListener, GM_removeValueChangeListener, GM_xmlhttpRequest }) {
   Value.addon({
     prevent(ev) { ev.preventDefault && ev.preventDefault() },
     attr(el, key, value) {
@@ -12,6 +12,118 @@ module.exports = function({ Value, GM_getValue, GM_setValue }) {
       }
     }
   })
+
+  function getStore(k) {
+    const val = GM_getValue(NAME)
+    return val[k]
+  }
+  function setStore(k, v) {
+    const val = GM_getValue(NAME)
+    val[k] = v
+    GM_setValue(NAME, val)
+    return v
+  }
+  function listStore() {
+    return GM_getValue(NAME)
+  }
+  function toggleStore(k) {
+    const val = GM_getValue(NAME)
+    val[k] = !val[k]
+    GM_setValue(NAME, val)
+    return val[k]
+  }
+
+  class EventEmitter {
+    static mount(obj) {
+      Object.assign(obj, new EventEmitter)
+    }
+    constructor() {
+      this._listeners = []
+      this._state = {}
+    }
+    on(name, listener) {
+      if (name && listener && !this._listeners.some(e => e.name === name && e.listener === listener)) {
+        this._listeners.push({ name, listener })
+        this._state[name] = true
+        return true
+      }
+      return false
+    }
+    once(name, listener) {
+      if (name && listener) {
+        this.on(name, (...data) => {
+          listener(...data)
+          this.off(name, listener)
+        })
+        return true
+      }
+      return false
+    }
+    off(name, listener) {
+      let count = 0
+      if (name) {
+        if (listener) {
+          let state = false
+          this._listeners = this._listeners.filter(e => {
+            if (e.name === name) {
+              if (e.listener === listener) {
+                count++
+                return false
+              } else {
+                state = true
+              }
+            }
+            return true
+          })
+          this._state[name] = state
+        } else {
+          this._listeners = this._listeners.filter(e => {
+            if (e.name === name) {
+              count++
+              return false
+            }
+            return true
+          })
+          this._state[name] = false
+        }
+      } else {
+        count += this._listeners.length
+        this._listeners = []
+        this._state = {}
+      }
+      return count
+    }
+    fire(name, ...data) {
+      let count = 0
+      if (name && this._state[name]) {
+        this._listeners.forEach(e => {
+          if (e.name === name) {
+            e.listener(...data)
+            count++
+          }
+        })
+      }
+      return count
+    }
+  }
+
+  const NAME = 'myuserscript2021'
+
+  const SEARCHES = [
+    { key: 'google', name: '谷歌', url: 'https://www.google.com/search?q=#keyword#' },
+    { key: 'baidu', name: '百度', url: 'https://www.baidu.com/s?wd=#keyword#' },
+    { key: 'bing', name: 'Bing', url: 'https://cn.bing.com/search?q=#keyword#' },
+    { key: 'github', name: 'GitHub', url: 'https://github.com/search?utf8=✓&q=#keyword#' },
+    { key: 'npmjs', name: 'NPM', url: 'https://www.npmjs.com/search?q=#keyword#' },
+    { key: 'stackoverflow', name: 'Stackoverflow', url: 'https://stackoverflow.com/search?q=#keyword#' },
+    { key: 'wikipedia', name: '维基百科', url: 'https://zh.wikipedia.org/wiki/#keyword#' },
+    { key: 'zhihu', name: '知乎搜索', url: 'https://www.zhihu.com/search?type=content&q=#keyword#' },
+    { key: 'google-translate', name: '谷歌翻译', url: 'https://translate.google.com/?hl=zh-CN&tab=wT0#view=home&op=translate&sl=auto&tl=zh-CN&text=#keyword#' },
+    { key: 'baidu-translate', name: '百度翻译', url: 'https://fanyi.baidu.com/#en/zh/#keyword#' },
+    { key: 'youdao', name: '有道词典', url: 'https://dict.youdao.com/w/#keyword#' },
+  ]
+
+  const event = new EventEmitter
 
   /** 获取页面选中的文本 */
   function getSelectionText() {
@@ -50,16 +162,11 @@ module.exports = function({ Value, GM_getValue, GM_setValue }) {
     } return false
   }
 
-  function inHostname(part) {
-    const hostname = window.location.hostname
-    if (
-      hostname.indexOf(part) === 0 ||
-      hostname.indexOf(part) === hostname.length - part.length
-    )
-      return true
-    if (part[0] !== '.') part = '.' + part
-    if (part[part.length - 1] !== '.') part += '.'
-    return hostname.indexOf(part) > -1
+  function openTab(href) {
+    const a = document.createElement('a')
+    a.href = href
+    a.target = '_blank'
+    a.click()
   }
 
   function getDOMPath(dom) {
@@ -116,98 +223,49 @@ module.exports = function({ Value, GM_getValue, GM_setValue }) {
   later.laterQueue = []
   later.timeout = null
 
-  function openTab(href) {
-    const a = document.createElement('a')
-    a.href = href
-    a.target = '_blank'
-    a.click()
-  }
-
-  function toggleValue(key) {
-    GM_setValue(key, !GM_getValue(key))
-  }
-
-  const NAME = 'myuserscript2021'
-
-  const SEARCHES = [
-    ['google', ['谷歌', 'https://www.google.com/search?q=#keyword#']],
-    ['baidu', ['百度', 'https://www.baidu.com/s?wd=#keyword#']],
-    ['bing', ['Bing', 'https://cn.bing.com/search?q=#keyword#']],
-    ['github', ['GitHub', 'https://github.com/search?utf8=✓&q=#keyword#']],
-    ['npmjs', ['NPM', 'https://www.npmjs.com/search?q=#keyword#']],
-    ['stackoverflow', ['Stackoverflow', 'https://stackoverflow.com/search?q=#keyword#']],
-    ['wikipedia', ['维基百科', 'https://zh.wikipedia.org/wiki/#keyword#']],
-    ['zhihu', ['知乎搜索', 'https://www.zhihu.com/search?type=content&q=#keyword#']],
-    ['google-translate', ['谷歌翻译', 'https://translate.google.com/?hl=zh-CN&tab=wT0#view=home&op=translate&sl=auto&tl=zh-CN&text=#keyword#']],
-    ['baidu-translate', ['百度翻译', 'https://fanyi.baidu.com/#en/zh/#keyword#']],
-    ['youdao', ['有道词典', 'https://dict.youdao.com/w/#keyword#']],
-  ]
-  const SEARCHES_DICT = Object.fromEntries(SEARCHES)
-
-  function getQuery() {
-    let text = getSelectionText().trim()
-    if (text) return text
-    if (inHostname('translate') || inHostname('fanyi')) {
-      text = document.querySelector('textarea').value
-    } else {
-      for (const input of document.querySelectorAll(
-        'input[type=search], input[type=text], input:not([type])'
-      )) {
-        if (input.type === 'search') {
-          text = input.value
-          break
-        } else if (!isElementInvisible(input)) {
-          text = input.value
-          break
-        }
-      }
-    }
-    if (!text.trim()) {
-      if (inHostname('github.')) {
-        text = document.querySelector('h1').innerText.replace(/\n/g, '')
-      } else {
-        const h1 = document.querySelector('h1')
-        if (h1) text = h1.innerText
-      }
-    }
-    return text.trim()
-  }
-
-  function search(url, newtab) {
-    if (url) {
-      const text = getQuery()
-      url = SEARCHES_DICT[url] ? SEARCHES_DICT[url][1] : url
-      url = url.replace('#keyword#', text)
-      if (newtab) {
-        openTab(url)
-      } else {
-        window.location.href = url
-      }
-    }
-  }
-
   function draggable(el, id) {
     if (!el) return
     el.draggable = true
-    const storeKey = id ? 'STORE_POSITION_OF_' + id : null
-    const prevent = ev => ev.preventDefault()
-    el.addEventListener('dragstart', function(e) {
-      document.addEventListener('dragover', prevent, false)
+    el.addEventListener('dragstart', dragstart)
+    el.addEventListener('drag', drag)
+    el.addEventListener('dragend', dragend)
+    draggable.setPosFromStore(el, id)
+    function dragstart(e) {
+      document.addEventListener('dragover', dragover, false)
       const rect = this.getBoundingClientRect()
       this.dataset.dx = rect.x - e.clientX
       this.dataset.dy = rect.y - e.clientY
-    })
-    el.addEventListener('drag', prevent)
-    el.addEventListener('dragend', function(e) {
-      document.removeEventListener('dragover', prevent, false)
+    }
+    function drag(e) {
+      e.preventDefault()
+    }
+    function dragend(e) {
+      document.removeEventListener('dragover', dragover, false)
       const x = e.clientX + +this.dataset.dx
       const y = e.clientY + +this.dataset.dy
       this.style.left = x + 'px'
       this.style.top = y + 'px'
+      const storeKey = draggable.getStoreKey(id)
       if (storeKey) GM_setValue(storeKey, { x: x, y: y })
       this.dataset.dx = 0
       this.dataset.dy = 0
-    })
+    }
+    function dragover(e) {
+      e.preventDefault()
+    }
+    return function undraggble() {
+      el.removeEventListener('dragstart', dragstart)
+      el.removeEventListener('drag', drag)
+      el.removeEventListener('dragend', dragend)
+    }
+  }
+
+  draggable.getStoreKey = function(id) {
+    return id ? 'STORE_POSITION_OF_' + id : null
+  }
+
+  draggable.setPosFromStore = function(el, id) {
+    const storeKey = draggable.getStoreKey(id)
     if (storeKey) {
       const pos = GM_getValue(storeKey)
       if (pos) {
@@ -217,21 +275,370 @@ module.exports = function({ Value, GM_getValue, GM_setValue }) {
     }
   }
 
+  const listeners = {}
+
+  function proxyListener() {
+    const name = arguments[0]
+    if (listeners[name]) {
+      listeners[name].forEach(listener => listener.apply(null, arguments))
+    }
+  }
+
+  function addValueChangeListener(names, listener) {
+    names = Array.isArray(names) ? names : [names]
+    for (const name of names) {
+      if (!listeners[name]) {
+        listeners[name] = [listener]
+        GM_addValueChangeListener(name, proxyListener)
+      } else {
+        listeners[name].push(listener)
+      }
+    }
+  }
+
+  function removeValueChangeListener(names, listener) {
+    names = Array.isArray(names) ? names : [names]
+    for (const name of names) {
+      if (listeners[name]) {
+        const i = listeners[name].indexOf(listener)
+        if (~i) listeners[name].splice(i, 1)
+      }
+      if (listeners[name].length === 0) {
+        delete listeners[name]
+        GM_removeValueChangeListener(name, proxyListener)
+      }
+    }
+  }
+
+  function pascal(str) {
+    return str && str.replace(/(?<=[a-z])(?=[A-Z])|\W+/g, '_').toUpperCase()
+  }
+
+  class Store {
+    static New(name) {
+      return new Store(name)
+    }
+    static Toggle(name) {
+      return new Toggle('STORE_TOGGLE_' + pascal(name))
+    }
+    static Hash(name) {
+      return new Hash('STORE_HASH_' + pascal(name))
+    }
+    static List(name) {
+      return new List('STORE_LIST_' + pascal(name))
+    }
+    constructor(name) {
+      this.name = name
+    }
+    set(value) {
+      return GM_setValue(this.name, value)
+    }
+    get() {
+      return GM_getValue(this.name)
+    }
+    on(listener) {
+      addValueChangeListener(this.name, listener)
+    }
+    off(listener) {
+      removeValueChangeListener(this.name, listener)
+    }
+  }
+  class Toggle extends Store {
+    get() {
+      return !!super.get()
+    }
+    toggle(value) {
+      GM_setValue(this.name, value === void 0 ? !GM_getValue(this.name) : !!value)
+      return this
+    }
+  }
+  class Hash extends Store {
+    get() {
+      const d = super.get() || []
+      return Array.isArray(d) ? d : {}
+    }
+    attr(k, v) {
+      const val = this.get()
+      if (arguments.length > 1) {
+        val[k] = v
+      } else if (v !== void 0) {
+        return val[k]
+      } else {
+        delete val[k]
+      }
+      this.set(val)
+      return this
+    }
+  }
+  class List extends Store {
+    get() {
+      const d = super.get() || []
+      return Array.isArray(d) ? d : []
+    }
+    add(v) {
+      const val = this.get()
+      val.push(v)
+      this.set(val)
+      return this
+    }
+    del(v) {
+      const val = this.get()
+      const i = val.indexOf(v)
+      if (~i) {
+        val.splice(i, 1)[0]
+        this.set(val)
+      }
+      return this
+    }
+    has(v) {
+      const val = this.get()
+      return val.includes(v)
+    }
+    empty() {
+      this.set([])
+    }
+  }
+
+  function getUid(name) {
+    return NAME + '_' + name
+  }
+
+  function noop() {}
+
+  /**  */
+  /**
+   * handle possible promise data with preserving returning data itself
+   *
+   * @param {*} data
+   * @param {function} [onSuccess] default is `noop`
+   * @param {function} [onError=onSuccess] default is `onSuccess`
+   * @returns
+   */
+  function promisable(data, onSuccess, onError) {
+    onSuccess = onSuccess || noop
+    onError = onError || onSuccess
+    if (data && typeof data.then === 'function' && typeof data.catch === 'function') {
+      return data.then((d) => {
+        onSuccess(d)
+        return d
+      }).catch((e) => {
+        onError(e)
+        return Promise.reject(e)
+      })
+    } else {
+      onSuccess(data)
+      return data
+    }
+  }
+
+  class UserProxy {
+    get selection() {
+      return window.getSelection()
+    }
+    get text() {
+      return window.getSelection().toString()
+    }
+    static useSelection(cb) {
+      const s = window.getSelection()
+      const ranges = new Array(s.rangeCount).fill().map((e, i) => s.getRangeAt(i))
+      s.removeAllRanges()
+      return promisable(cb(s), () => {
+        const s = window.getSelection()
+        s.removeAllRanges()
+        ranges.forEach(r => s.addRange(r))
+      })
+    }
+    static useFocus(cb) {
+      const el = document.activeElement
+      return promisable(cb(), () => el.focus())
+    }
+    static fakeElement(textArrayOrTag, cb) {
+      const el = Array.isArray(textArrayOrTag)
+        ? document.createTextNode(textArrayOrTag.join('\n'))
+        : document.createElement(textArrayOrTag)
+      document.body.appendChild(el)
+      return promisable(cb(el), () => document.body.removeChild(el))
+    }
+    static read() {
+      if (navigator.clipboard) {
+        return navigator.clipboard.readText()
+      }
+      return UserProxy.fakeElement('textarea', el => {
+        return UserProxy.useFocus(() => {
+          el.focus()
+          document.execCommand('paste')
+          return el.value
+        })
+      })
+    }
+    static write(text) {
+      if (navigator.clipboard) {
+        return navigator.clipboard.writeText(text)
+      }
+      return UserProxy.useSelection(s => {
+        UserProxy.fakeElement([text], el => {
+          const r = document.createRange()
+          r.selectNodeContents(el)
+          s.addRange(r)
+          document.execCommand('copy')
+        })
+      })
+    }
+  }
+
+  /**
+   * @see https://www.tampermonkey.net/documentation.php?ext=dhdg#GM_xmlhttpRequest
+   *
+   * @param {string} url
+   * @param {*} more
+   * @returns
+   */
+  function request(url, more) {
+    const r = new Promise((resolve, reject) => {
+      GM_xmlhttpRequest({
+        url,
+        method: 'GET',
+        responseType: 'json', // json, arraybuffer, blob, stream
+        ...more,
+        onabort(...args) {
+          r.fire('abort', ...args)
+        },
+        ontimeout(...args) {
+          r.fire('timeout', ...args)
+        },
+        onloadstart(...args) {
+          r.fire('loadstart', ...args)
+        },
+        onprogress(...args) {
+          r.fire('progress', ...args)
+        },
+        onreadystatechange(...args) {
+          r.fire('readystatechange', ...args)
+        },
+        onload(res) {
+          const response = {
+            finalUrl: res.finalUrl,
+            status: res.status,
+            statusText: res.statusText,
+            headers: res.responseHeaders,
+            body: res.response, // corresponding with `responseType`
+            text: res.responseText,
+            xml: res.responseXML
+          }
+          resolve(response)
+        },
+        onerror(err) {
+          reject(err)
+        },
+      })
+    })
+    EventEmitter.mount(r)
+    return r
+  }
+
+  class Jira {
+    constructor(origin, username, password) {
+      this.origin = origin
+      this.username = username
+      this.password = password
+    }
+    request(url, more) {
+      return request(url, {
+        method: 'GET',
+        user: this.username,
+        password: this.password,
+        responseType: 'json',
+        anonymous: true,
+        nocache: true,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        ...more
+      })
+    }
+    addComment(issueId, comment) {
+      return this.request(`${this.origin}/rest/api/2/issue/${issueId}/comment`, {
+        body: JSON.stringify({
+          body: comment,
+        })
+      })
+    }
+  }
+
+  class DNode extends EventEmitter {
+    static of(node) {
+      return new DNode(node)
+    }
+    static nativeOn(el, name, listener, ...more) {
+      el.addEventListener(name, listener, ...more)
+      return function nativeOff() {
+        el.removeEventListener(name, listener, ...more)
+      }
+    }
+    static get draggable() {
+      return draggable
+    }
+    /**
+     * @param {Node} node
+     */
+    constructor(node) {
+      super()
+      this.node = node
+      this.disposables = {
+        nativeOn: []
+      }
+    }
+    dispose() {
+      Object.entries(this.disposables).forEach(([name, fn]) => Array.isArray(fn) ? fn.forEach(f => f()) : fn())
+      this.off()
+      return this
+    }
+    nativeOn(...args) {
+      const nativeOff = DNode.nativeOn(this.node, ...args)
+      this.disposables.nativeOn.push(nativeOff)
+      return nativeOff
+    }
+    draggable(id) {
+      if (!this.disposables.draggable) {
+        this.disposables.draggable = DNode.draggable(this.node, id)
+      }
+      return this
+    }
+    undraggable() {
+      this.disposables.draggable()
+      delete this.disposables.draggable
+      return this
+    }
+    mount(el) {
+      el.appenChild(this.node)
+      return this
+    }
+    unmount() {
+      deleteElement(this.node)
+      return this
+    }
+  }
+
   return {
-    NAME,
-    SEARCHES,
-    getSelectionText,
-    randomId,
-    later,
-    deleteElement,
-    isElementInvisible,
-    inHostname,
-    getDOMPath,
+    addValueChangeListener,
     callOnElement,
-    openTab,
-    toggleValue,
-    getQuery,
-    search,
+    deleteElement,
     draggable,
+    event,
+    getDOMPath,
+    getSelectionText,
+    getUid,
+    isElementInvisible,
+    later,
+    openTab,
+    randomId,
+    removeValueChangeListener,
+    SEARCHES,
+    promisable,
+    request,
+    Store,
+    UserProxy,
+    DNode,
+    Jira,
   }
 }

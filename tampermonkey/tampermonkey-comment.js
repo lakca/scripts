@@ -10,6 +10,7 @@
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue
+// @grant        GM_listValues
 // @grant        GM_addStyle
 // @grant        GM_addElement
 // @grant        GM_setClipboard
@@ -17,4 +18,7 @@
 // @grant        window.location.href
 // @grant        GM_registerMenuCommand
 // @grant        GM_addValueChangeListener
+// @grant        GM_removeValueChangeListener
+// @grant        GM_xmlhttpRequest
+// @grant        GM_download
 // ==/UserScript==

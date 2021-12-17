@@ -1,35 +1,33 @@
+/* eslint-disable indent */
 /* eslint-disable new-cap */
 const TOGGLES = [
-  ['新标签打开链接', 'OPEN_LINK_IN_NEW_TAB']
+  { name: '新标签打开链接', key: 'OPEN_LINK_IN_NEW_TAB' }
 ]
-
-const STORE_SITES = 'STORE_SITES'
-const STORE_TOGGLE_MENU = 'STORE_TOGGLE_MENU'
-const STORE_TOGGLE_OPEN_LINK_IN_NEW_TAB = 'STORE_TOGGLE_OPEN_LINK_IN_NEW_TAB'
-
+/* eslint-disable new-cap */
+/**
+ * @param {ReturnType<import('./ctx')> & ReturnType<import('./method')>} param0
+ */
 module.exports = function ({
   g,
-  NAME,
   SEARCHES,
-  getQuery,
   search,
-  toggleValue,
   openTab,
   deleteElement,
   Value,
-  GM_getValue,
-  GM_setValue,
-  GM_deleteValue,
   GM_addStyle,
-  GM_addValueChangeListener,
-  GM_registerMenuCommand,
-  popup,
-  draggable,
+  Store,
+  DNode,
+  getUid,
+  event
 }) {
+  /** @type {DNode} */
+  let MENU
   return {
+    uid: getUid('menu'),
     get style() {
+      const uid = this.uid
       return `
-        #${NAME} {
+        #${uid} {
           position: fixed;
           z-index: 999999999999;
           left: 0px;
@@ -43,77 +41,68 @@ module.exports = function ({
           -ms-user-select: none;
           user-select: none;
         }
-        #${NAME} {
+        #${uid} {
           box-shadow: 0 0 10px #ddd;
         }
-        #${NAME}.fold li[data-action=TOGGLE_MENU] ~ li {
+        #${uid}.fold li[data-action=TOGGLE_MENU] ~ li {
           display: none;
         }
-        #${NAME} li {
+        #${uid} li {
           color: #25f;
           cursor: pointer;
           margin: 10px 10px;
           list-style: none;
         }
-        #${NAME} li span:not(:last-child) {
+        #${uid} li span:not(:last-child) {
           margin-right: 10px;
         }
-        #${NAME} li:hover {
+        #${uid} li:hover {
           color: #f29;
         }
       `
     },
-    addSite() {
-      const sites = GM_getValue(STORE_SITES, {})
-      const origin = window.location.origin
-      const hostname = window.location.hostname
-      sites[hostname] = origin
-      GM_setValue(STORE_SITES, sites)
-      this.createMenu()
+    getMenu() {
+      return MENU
     },
-    clearSites() {
-      GM_deleteValue(STORE_SITES)
-      this.createMenu()
+    toggleMenu() {
+      const menu = this.getMenu()
+      menu.node.classList.toggle('fold')
+      Store.Toggle('menu').toggle(menu.node.classList.contains('fold'))
     },
     deleteMenu() {
-      const el = document.getElementById(NAME)
-      if (el) {
-        el.ondrag = null
-        el.ondragstart = null
-        el.ondragend = null
-        el.onclick = null
+      const menu = this.getMenu()
+      if (menu) {
+        menu.destroy()
       }
-      deleteElement(el)
     },
     getItem(type, item) {
       switch (type) {
         case 'search':
           return g('li')
             .data('action', 'OPEN_URL')
-            .data('actionTarget', item[1])
+            .data('value', item.key)
             .down('span')
             .text('🔎')
             .next('span')
-            .text(item[0])
+            .text(item.name)
         case 'toggle':
           return g('li')
             .data('action', 'TOGGLE')
-            .data('actionTarget', item[1])
+            .data('value', item.key)
             .down('span')
             .text('🛠')
             .next('span')
-            .text(item[0])
+            .text(item.name)
             .next('span')
-            .text(GM_getValue('STORE_TOGGLE_' + item[1]) ? '✅' : '❌')
+            .text(Store.Toggle(item.key).get() ? '✅' : '❌')
         case 'site':
           return g('li')
             .data('action', 'OPEN_URL')
-            .data('actionTarget', item[1])
-            .data('hostname', item[0])
+            .data('value', item)
             .down('span')
             .text('🔗')
             .next('span')
-            .text(item[0])
+            .text(item)
             .next('span')
             .text('🗑')
             .data('action', 'DEL_SITE')
@@ -131,98 +120,104 @@ module.exports = function ({
         e => '0' + e
       )
     },
-    createMenu() {
-      const self = this
-      this.deleteMenu()
-      const sites = GM_getValue(STORE_SITES, {})
-      const ul = g('ul')
-        .down('li')
-        .attr('id', 'clock')
-        .style('font-weight: bold; font-size: 20px; margin-bottom: 8px')
-        .text(this.time)
-        .next('li')
-        .down('span')
-        .data('action', 'TO_TOP')
-        .text('🔝')
-        .next('span')
-        .data('action', 'TO_BOTTOM')
-        .style('float: right; display: inline-block; transform: rotate(180deg)')
-        .text('🔝')
-        .down()
-        .next('li')
-        .data('action', 'TOGGLE_MENU')
-        .style('font-weight: bold; margin-bottom: 8px')
-        .text('收起/展开')
-        .next('li')
-        .data('action', 'SHOW_TEXT')
-        .text('显示查询文本')
-        .next(this.gap)
-        .next(SEARCHES.map(e => this.getItem('search', e[1]).start))
-        .next(this.gap)
-        .next(TOGGLES.map(e => this.getItem('toggle', e).start))
-        .next(this.gap)
-        .next(Object.entries(sites).map(e => this.getItem('site', e).start))
-        .start.el
-      ul.id = NAME
-      if (GM_getValue(STORE_TOGGLE_MENU, false)) {
-        ul.classList.add('fold')
-      }
-      document.body.appendChild(ul)
-      ul.onclick = function (e) {
-        const target = (t => {
-          while (t && (!t.dataset || !t.dataset.action))
-            t = t.parentNode
-          return t
-        })(e.target)
-        if (!target) return
-        const { action, actionTarget } = target.dataset
-        console.log(target.dataset)
-        if (action) {
-          switch (action) {
-            case 'TOGGLE':
-              toggleValue(`STORE_TOGGLE_${actionTarget}`)
-              self.createMenu()
-              break
-            case 'DEL_SITE': {
-              const hostname = target.parentNode.dataset.hostname
-              delete sites[hostname]
-              GM_setValue(STORE_SITES, sites)
-              self.createMenu()
-            } break
-            case 'TOGGLE_MENU':
-              ul.classList.toggle('fold')
-              GM_setValue(STORE_TOGGLE_MENU, ul.classList.contains('fold'))
-              break
-            case 'SHOW_TEXT':
-              popup(getQuery())
-              break
-            case 'OPEN_URL':
-              search(target.dataset.actionTarget, true)
-              break
-            case 'TO_TOP':
-              window.scrollTo({ top: 0, behavior: 'auto' })
-              break
-            case 'TO_BOTTOM':
-              window.scrollTo({ top: 99999, behavior: 'auto' })
-              break
-            default:
-          }
+    onclick(e) {
+      const target = (t => {
+        while (t && (!t.dataset || !t.dataset.action))
+          t = t.parentNode
+        return t
+      })(e.target)
+      if (!target) return
+      const { action, value } = target.dataset
+      if (action) {
+        switch (action) {
+          case 'TOGGLE':
+            Store.Toggle(value).toggle()
+            break
+          case 'SHOW_STORE':
+            event.fire('show', 'store')
+            break
+          case 'DEL_SITE': {
+            event.fire('delSite', { site: target.parentNode.dataset.hostname })
+          } break
+          case 'TOGGLE_MENU':
+            event.fire('toggleMenu')
+            break
+          case 'SHOW_TEXT':
+            event.fire('show', 'query')
+            break
+          case 'OPEN_URL':
+            event.fire('search', { name: value, newtab: true })
+            break
+          case 'TO_TOP':
+            event.fire('toTop')
+            break
+          case 'TO_BOTTOM':
+            event.fire('toBottom')
+            break
+          default:
         }
       }
-      draggable(ul, 'menu')
     },
-    mountCommands() {
-      SEARCHES[1].forEach(e => GM_registerMenuCommand(e[0], search.bind(null, e[1])))
-      GM_registerMenuCommand('添加网站', this.addSite.bind(this))
-      GM_registerMenuCommand('清空网站', this.clearSites.bind(this))
+    createMenu() {
+      this.deleteMenu()
+      const menu = g('ul')
+        .id(this.uid)
+        .class({ fold: Store.Toggle('menu').get() })
+        .on('click', this.onclick)
+          .down('li')
+            .key('clock')
+            .style('font-weight: bold; font-size: 20px; margin-bottom: 8px')
+            .text(this.time)
+            .next('li')
+              .down('span')
+                .data('action', 'TO_TOP')
+                .text('🔝')
+              .next('span')
+                .data('action', 'TO_BOTTOM')
+                .style('float: right; display: inline-block; transform: rotate(180deg)')
+                .text('🔝')
+          .down()
+          .next('li')
+            .data('action', 'TOGGLE_MENU')
+            .style('font-weight: bold; margin-bottom: 8px')
+            .text('收起/展开')
+          .next('li')
+            .data('action', 'SHOW_TEXT')
+            .text('显示查询文本')
+            .down('span')
+              .data('action', 'SHOW_STORE')
+              .text('查看存储')
+              .next(this.gap)
+              .next(SEARCHES.map(e => this.getItem('search', e).start))
+              .next(this.gap)
+              .next(TOGGLES.map(e => this.getItem('toggle', e).start))
+              .next(this.gap)
+              .next(Store.List('sites').get().map(e => this.getItem('site', e).start))
+        .start
+      const dNode = MENU = DNode.of(menu.el)
+      dNode.g = menu
+      dNode.draggable('menu')
+      dNode.nativeOn('click', this.onclick)
+      dNode.mount(document.body)
+      const interval = setInterval(() => interval ? menu.node('clock').text(this.time, true) : clearInterval(interval), 1000)
+
+      menu.destroy = () => {
+        dNode.dispose()
+        clearInterval(interval)
+        dNode.unmount()
+        MENU = null
+      }
+      return menu
     },
     mountEvents() {
+      event.on('toggleMenu', this.toggleMenu.bind(this))
+      TOGGLES.forEach(e => Store.Toggle(e.key).on(this.createMenu.bind(this)))
       document.body.addEventListener(
         'click',
         e => {
           const target = e.target
           const tag = Value(target.tagName.toUpperCase())
-          if (tag.is('A') && GM_getValue(STORE_TOGGLE_OPEN_LINK_IN_NEW_TAB)) {
+          if (tag.is('A') && Store.Toggle('OPEN_LINK_IN_NEW_TAB')) {
             Value.prevent(e)
             openTab(target.getAttribute('href'))
           }
@@ -234,13 +229,7 @@ module.exports = function ({
       if (window.top !== window) return
       GM_addStyle(this.style)
       this.createMenu()
-      this.mountCommands()
       this.mountEvents()
-      GM_addValueChangeListener(NAME, () => this.createMenu())
-
-      setInterval(() => {
-        document.getElementById('clock').innerHTML = this.time
-      }, 1000)
     }
   }
 }

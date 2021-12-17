@@ -1,5 +1,8 @@
 /* eslint-disable indent */
 
+/**
+ * @param {ReturnType<import('./ctx')>} param0
+ */
 module.exports = function({g, randomId, deleteElement, draggable}) {
   const getStyle = id =>  `
   #${id} ul {
@@ -55,7 +58,9 @@ module.exports = function({g, randomId, deleteElement, draggable}) {
     background: rgba(0,0,0,0.2);
     `
     const modalStyle = `
-    width: 500px;
+    max-width: 60%;
+    max-height: 60%;
+    overflow: auto;
     padding: 20px;
     background: white;
     border-radius: 4px;
