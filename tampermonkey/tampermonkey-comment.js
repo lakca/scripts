@@ -6,7 +6,6 @@
 // @author       You
 // @match        *://*/*
 // @icon         data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==
-// @require      https://unpkg.com/the-value@1.1.1/dist/index.min.js
 // @grant        GM_setValue
 // @grant        GM_getValue
 // @grant        GM_deleteValue

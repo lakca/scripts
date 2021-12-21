@@ -134,7 +134,7 @@ set_prompt () {
     PROMPT+='${PR_RESET}${PR_RED}>${PR_RESET} '
 
     # Matching continuation prompt
-    PROMPT2='${PR_RESET}${PR_RED}>${PR_RESET} %_'
+    PROMPT2='${PR_RESET}${PR_RED}> ${PR_RESET} %_'
     # ######### PROMPT #########
 }
 

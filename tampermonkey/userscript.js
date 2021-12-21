@@ -3,30 +3,11 @@
 
 ;(function(window) {
   'use strict';
-
-  const g = require('/Users/longpeng/Documents/GitHub/gelement/dist/index.min.js')
-  const context = {
-    g,
-    Value: TheValue.addon(),
-    GM_addStyle,
-    GM_addElement,
-    GM_registerMenuCommand,
-    GM_addValueChangeListener,
-    GM_setValue,
-    GM_getValue,
-    GM_deleteValue,
-    GM_listValues,
-    GM_setClipboard
-  }
+  const context = require('./context')
   unsafeWindow.context = context
-  Object.assign(context, require('./ctx')(context))
-  Object.assign(context, { popup: require('./popup')(context) })
-  Object.assign(context, require('./method')(context))
-  context.menu = require('./menu')(context)
-  context.action = require('./action')(context)
-
-  context.menu.mount()
-  context.action.mount()
+  context.menu = require('./menu')
+  require('./method')
+  require('./action')
 })(window);
 
 

@@ -1,10 +1,8 @@
 /* eslint-disable indent */
 
-/**
- * @param {ReturnType<import('./ctx')>} param0
- */
-module.exports = function({g, randomId, deleteElement, draggable}) {
-  const getStyle = id =>  `
+const context = require('./context')
+
+const getStyle = id =>  `
   #${id} ul {
     padding: 0;
     margin: 0;
@@ -35,72 +33,74 @@ module.exports = function({g, randomId, deleteElement, draggable}) {
     margin: 0 2px;
     color: #1967d2;
   }
+`
+
+function popup(gelements, options = {}) {
+  const {
+    destroy = true,
+    closable = true,
+    confirmable = false,
+    overlay = true,
+    style = ''
+  } = options
+  const id = 's' + context.randomId()
+  const overlayStyle = `
+  position: fixed;
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.2);
   `
-  return function popup(gelements, options = {}) {
-    const {
-      destroy = true,
-      closable = true,
-      confirmable = false,
-      overlay = true,
-      style = ''
-    } = options
-    const id = 's' + randomId()
-    const overlayStyle = `
-    position: fixed;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    left: 0;
-    top: 0;
-    z-index: 9999;
-    background: rgba(0,0,0,0.2);
-    `
-    const modalStyle = `
-    max-width: 60%;
-    max-height: 60%;
-    overflow: auto;
-    padding: 20px;
-    background: white;
-    border-radius: 4px;
-    box-shadow: 5px 5px 20px grey;
-    `
-    const instance = {
-      get id() { return id },
-      root: g('div').id(id),
-      show(gelementsReplacement) {
-        if (gelementsReplacement) {
-          this.root.node('content').el.innerHTML = ''
-        }
-        this.root.style({display: 'block'})
+  const modalStyle = `
+  max-width: 60%;
+  max-height: 60%;
+  margin: 20px;
+  overflow: auto;
+  padding: 20px;
+  background: white;
+  border-radius: 4px;
+  box-shadow: 5px 5px 20px grey;
+  `
+  const instance = {
+    get id() { return id },
+    root: context.g('div').id(id),
+    show(gelementsReplacement) {
+      if (gelementsReplacement) {
+        this.root.node('content').el.innerHTML = ''
       }
+      this.root.style({ display: 'block' })
     }
-    instance.root.style(overlay ? overlayStyle : modalStyle)
-      .down('div').key('modal')
-        .if(overlay)
-        .style(modalStyle)
-        .class('overlay')
-      .down('div').key('content').class('content')
-        .down(typeof gelements === 'string' ? g('span').text(gelements) : gelements)
-        .down()
-      .next('div').if(closable || confirmable).class('footer').style('margin-top: 20px; text-align: center;')
-        .down('button')
-          .if(closable)
-          .text('关闭')
-          .data('action', 'close')
-          .on('click', () => destroy ? deleteElement(instance.root.el) : instance.root.style({display: 'none'}))
-        .next('button')
-          .if(confirmable)
-          .text('确认')
-          .data('action', 'confirm')
-          .on('click', () => {})
-        .down()
-      .next('style').text(getStyle(id)).text(style)
-      .start
-    document.body.appendChild(instance.root.el)
-    draggable(instance.root.node('modal').el, 'popup')
-    return instance
   }
+  instance.root.style(overlay ? overlayStyle : modalStyle)
+    .down('div').key('modal')
+      .if(overlay)
+      .style(modalStyle)
+      .class('overlay')
+    .down('div').key('content').class('content')
+      .down(typeof gelements === 'string' ? context.g('span').text(gelements) : gelements)
+      .down()
+    .next('div').if(closable || confirmable).class('footer').style('margin-top: 20px; text-align: center;')
+      .down('button')
+        .if(closable)
+        .text('关闭')
+        .data('action', 'close')
+        .nativeOn('click', () => destroy ? context.deleteElement(instance.root.el) : instance.root.style({display: 'none'}))
+      .next('button')
+        .if(confirmable)
+        .text('确认')
+        .data('action', 'confirm')
+        .nativeOn('click', () => {})
+      .down()
+    .next('style').text(getStyle(id)).text(style)
+    .start
+  document.body.appendChild(instance.root.el)
+  // context.draggable(instance.root.node('modal').el, 'popup')
+  return instance
 }
 
+module.exports = popup
