@@ -43,7 +43,7 @@ function popup(gelements, options = {}) {
     overlay = true,
     style = ''
   } = options
-  const id = 's' + context.randomId()
+  const id = 's' + Math.random()
   const overlayStyle = `
   position: fixed;
   display: flex;
@@ -53,7 +53,7 @@ function popup(gelements, options = {}) {
   height: 100%;
   left: 0;
   top: 0;
-  z-index: 9999;
+  z-index: 9999999999999;
   background: rgba(0,0,0,0.2);
   `
   const modalStyle = `
@@ -99,7 +99,6 @@ function popup(gelements, options = {}) {
     .next('style').text(getStyle(id)).text(style)
     .start
   document.body.appendChild(instance.root.el)
-  // context.draggable(instance.root.node('modal').el, 'popup')
   return instance
 }
 

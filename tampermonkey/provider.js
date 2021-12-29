@@ -16,5 +16,10 @@ module.exports = {
   GM_getValue,
   GM_deleteValue,
   GM_listValues,
-  GM_setClipboard
+  GM_setClipboard,
+  GM_notification,
+  GM_openInTab,
+  GM_saveTab,
+  GM_getTab,
+  GM_getTabs,
 }

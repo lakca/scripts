@@ -3,12 +3,11 @@
 
 const {
   Store,
-  UserProxy,
   Value,
   event,
   g,
   popup,
-  getSelectionText,
+  UserProxy,
   isElementInvisible,
   SEARCHES,
   openTab,
@@ -28,7 +27,7 @@ function inHostname(part) {
 }
 
 function getQuery() {
-  let text = getSelectionText().trim()
+  let text = UserProxy.text.trim()
   if (text) return text
   if (inHostname('translate') || inHostname('fanyi')) {
     text = document.querySelector('textarea').value
@@ -79,15 +78,15 @@ function clearSites() {
 }
 
 function toTop() {
-  window.scrollTo({ top: 0, behavior: 'auto' })
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function toBottom() {
-  window.scrollTo({ top: 99999, behavior: 'auto' })
+  window.scrollTo({ top: 99999, behavior: 'smooth' })
 }
 
 function showStore() {
-  popup(g('ul').down(GM_listValues().map(k => {
+  popup(g('ul').down(GM_listValues().sort().map(k => {
     const v = Store.New(k).get()
     const vs = JSON.stringify(v, null, 2)
     const rows = vs.split('\n')
@@ -158,6 +157,10 @@ function onclick(e) {
   }
 }
 
+function copyMd() {
+  popup(`[${getQuery()}](${location.href})`)
+}
+
 event.on('search', data => search(data.name, data.text || getQuery(), data.newtab))
 event.on('showStore', showStore)
 event.on('showQuery', showQuery)
@@ -167,5 +170,6 @@ event.on('clearSites', clearSites)
 event.on('toTop', toTop)
 event.on('toBottom', toBottom)
 event.on('jiraMention', jiraMention)
+event.on('copyMd', copyMd)
 
 document.body.addEventListener('click', onclick, true)
