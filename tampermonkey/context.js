@@ -6,6 +6,7 @@ const {
   Value,
   GM_getValue,
   GM_setValue,
+  GM_openInTab,
   GM_addValueChangeListener,
   GM_removeValueChangeListener,
   GM_xmlhttpRequest
@@ -25,19 +26,68 @@ Value.addon({
 })
 
 class Base {
-  /** Return the method function with this bound.
+  constructor() {
+    this.disposables = {}
+  }
+  /** Return the method with `this` bound.
    * @param {string} method
    * @param  {...any} [args]
    * @returns {function}
+   *
+   * @example
+   *    this.bound('dispose')
+   *    this.bound.call(console, 'log')
    */
   bound(method, ...args) {
     return this[method].bind(this, ...args)
   }
+  /** Return `this` with calling the method.
+   * @param {string} method
+   * @param  {...any} args
+   */
+  chained(method, ...args) {
+    this[method](...args)
+    return this
+  }
+  /** Add disposable
+   * @param {string} name
+   * @param {function} fn
+   * @returns
+   */
+  disposeOf(name, fn) {
+    if (this.disposables[name]) {
+      Array.isArray(this.disposables[name]) ? this.disposables[name].push(fn)
+      : this.disposables[name] = [this.disposables[name], fn]
+    } else {
+      this.disposables[name] = [fn]
+    }
+    return this
+  }
+  /** Dispose
+   * @param {string} [name]
+   * @returns
+   */
+  dispose(name) {
+    if (name) {
+      const fn = this.disposables[name]
+      if (fn) if (Array.isArray(fn)) fn.forEach(f => f())
+                    else fn()
+      delete this.disposables[name]
+    } else {
+      Object.keys(this.disposables).forEach(name => this.dispose(name))
+    }
+    return this
+  }
 }
 
 class EventEmitter extends Base {
+  /**
+   *  @template T
+   * @param {T} obj
+   * @returns {T & EventEmitter}
+   */
   static mount(obj) {
-    Object.assign(obj, new EventEmitter)
+    return Object.assign(obj, new EventEmitter)
   }
   constructor() {
     super()
@@ -128,17 +178,6 @@ const SEARCHES = [
 
 const event = new EventEmitter
 
-/** 获取页面选中的文本 */
-function getSelectionText() {
-  let text = ''
-  if (window.getSelection) {
-    text = window.getSelection().toString()
-  } else if (document.selection && document.selection.type != 'Control') {
-    text = document.selection.createRange().text
-  }
-  return text
-}
-
 function deleteElement(el) {
   if (el && el.parentNode) {
     el.parentNode.removeChild(el)
@@ -166,10 +205,7 @@ function callOnElement(el, fnName) {
 }
 
 function openTab(href) {
-  const a = document.createElement('a')
-  a.href = href
-  a.target = '_blank'
-  a.click()
+  GM_openInTab(href)
 }
 
 function getDOMPath(dom) {
@@ -202,10 +238,6 @@ function getDOMPath(dom) {
   return paths.join(' > ')
 }
 
-function randomId() {
-  return Date.now().toString(16)
-}
-
 /** 定时器统一（如果队列中存在函数）不间断定时执行 */
 function later(fn) {
   if (fn && typeof fn === 'function' && !later.laterQueue.includes(fn)) {
@@ -226,66 +258,10 @@ function later(fn) {
 later.laterQueue = []
 later.timeout = null
 
-function draggable(el, id) {
-  if (!el) return
-  el.draggable = true
-  el.addEventListener('dragstart', dragstart)
-  el.addEventListener('drag', drag)
-  el.addEventListener('dragend', dragend)
-  const storeKey = draggable.getStoreKey(id)
-  const onchange = draggable.setPosFromStore.bind(null, el, storeKey)
-  if (storeKey) {
-    addValueChangeListener(storeKey, onchange)
-    draggable.setPosFromStore(el, storeKey)
-  }
-  function dragstart(e) {
-    document.addEventListener('dragover', dragover, false)
-    const rect = this.getBoundingClientRect()
-    this.dataset.dx = rect.x - e.clientX
-    this.dataset.dy = rect.y - e.clientY
-  }
-  function drag(e) {
-    e.preventDefault()
-  }
-  function dragend(e) {
-    document.removeEventListener('dragover', dragover, false)
-    const x = e.clientX + +this.dataset.dx
-    const y = e.clientY + +this.dataset.dy
-    this.style.left = x + 'px'
-    this.style.top = y + 'px'
-    const storeKey = draggable.getStoreKey(id)
-    if (storeKey) GM_setValue(storeKey, { x: x, y: y })
-    this.dataset.dx = 0
-    this.dataset.dy = 0
-  }
-  function dragover(e) {
-    e.preventDefault()
-  }
-  return function undraggble() {
-    el.removeEventListener('dragstart', dragstart)
-    el.removeEventListener('drag', drag)
-    el.removeEventListener('dragend', dragend)
-    removeValueChangeListener(storeKey, onchange)
-  }
-}
-
-draggable.getStoreKey = function(id) {
-  return id ? 'STORE_POSITION_OF_' + id : null
-}
-
-draggable.setPosFromStore = function(el, storeKey) {
-  if (storeKey) {
-    const pos = GM_getValue(storeKey)
-    if (pos) {
-      el.style.top = pos.y + 'px'
-      el.style.left = pos.x + 'px'
-    }
-  }
-}
-
 const listeners = {}
 
 function proxyListener(name, oldVal, newVal, ...more) {
+  console.log('changed', name)
   if (listeners[name]) {
     listeners[name].listeners.forEach(listener => listener.call(null, newVal, oldVal, ...more))
   }
@@ -305,7 +281,10 @@ function addValueChangeListener(names, listener) {
   }
 }
 
+addValueChangeListener.listeners = listeners
+
 function removeValueChangeListener(names, listener) {
+  if (!names) return
   names = Array.isArray(names) ? names : [names]
   for (const name of names) {
     if (listeners[name]) {
@@ -420,14 +399,13 @@ function getUid(name) {
 
 function noop() {}
 
-/**  */
 /**
  * handle possible promise data with preserving returning data itself
- *
- * @param {*} data
+ * @template T
+ * @param {T} data
  * @param {function} [onSuccess] default is `noop`
  * @param {function} [onError=onSuccess] default is `onSuccess`
- * @returns
+ * @returns {T extends Promise ? Promise<Awaited<T>> : T}
  */
 function promisable(data, onSuccess, onError) {
   onSuccess = onSuccess || noop
@@ -447,11 +425,17 @@ function promisable(data, onSuccess, onError) {
 }
 
 class UserProxy extends Base {
-  get selection() {
+  static get selection() {
     return window.getSelection()
   }
-  get text() {
-    return window.getSelection().toString()
+  static get text() {
+    if (window.getSelection) {
+      return window.getSelection().toString()
+    // @ts-ignore
+    } else if (document.selection && document.selection.type != 'Control') {
+      // @ts-ignore
+      return document.selection.createRange().text
+    }
   }
   static useSelection(cb) {
     const s = window.getSelection()
@@ -509,7 +493,7 @@ class UserProxy extends Base {
  * @returns
  */
 function request(url, more) {
-  const r = new Promise((resolve, reject) => {
+  const r = EventEmitter.mount(new Promise((resolve, reject) => {
     GM_xmlhttpRequest({
       url,
       method: 'GET',
@@ -546,9 +530,155 @@ function request(url, more) {
         reject(err)
       },
     })
-  })
-  EventEmitter.mount(r)
+  }))
   return r
+}
+
+class Draggable extends Base {
+  static new(el, id, direction) {
+    return new Draggable(el, id, direction)
+  }
+  constructor(el, id, direction) {
+    super()
+    this.el = el
+    this.id = id
+    this._draggable = false
+    this._direction = 'left'
+    this.fix(direction)
+    this.draggble(true)
+    this._clientWidth = document.documentElement.clientWidth
+    this._sync = setInterval(() => {
+      if (this._direction === 'right' && document.visibilityState === 'visible') {
+        const w = document.documentElement.clientWidth
+        if (this._clientWidth !== w) {
+          this._clientWidth = w
+        }
+        this.savePos()
+      }
+    }, 5000)
+    this.disposeOf('savePos', () => clearInterval(this._sync))
+  }
+  get storeKey() {
+    return this.id ? 'STORE_POSITION_OF_' + this.id : null
+  }
+  init() {
+    if (this._draggable) return this
+    const { storeKey } = this
+    const self = this
+    this.el.draggable = true
+    this.el.addEventListener('dragstart', dragstart)
+    this.el.addEventListener('drag', drag)
+    this.el.addEventListener('dragend', dragend)
+    this.disposeOf('dragstart', this.bound.call(this.el, 'removeEventListener', 'dragstart', dragstart))
+    this.disposeOf('drag', this.bound.call(this.el, 'removeEventListener', 'drag', drag))
+    this.disposeOf('dragend', this.bound.call(this.el, 'removeEventListener', 'dragend', dragend))
+    this.listenChange(true)
+    this._draggable = true
+    return this
+    function dragstart(e) {
+      document.addEventListener('dragover', dragover, false)
+      const rect = this.getBoundingClientRect()
+      this.dataset.dx = rect.x - e.clientX
+      this.dataset.dy = rect.y - e.clientY
+    }
+    function drag(e) {
+      e.preventDefault()
+    }
+    function dragover(e) {
+      e.preventDefault()
+    }
+    function dragend(e) {
+      document.removeEventListener('dragover', dragover, false)
+      const x = e.clientX + +this.dataset.dx
+      const y = e.clientY + +this.dataset.dy
+      self.setPos(x, y)
+      this.dataset.dx = 0
+      this.dataset.dy = 0
+    }
+  }
+  setPos(x, y) {
+    Object.assign(this.el.style, this.getPos(x, y))
+    if (this.storeKey) GM_setValue(this.storeKey, { x, y })
+  }
+  getPos(x, y) {
+    switch (this._direction) {
+      case 'right':
+        const rect = this.el.getBoundingClientRect()
+        const width = document.documentElement.clientWidth
+        return {
+          top: y + 'px',
+          right: (width - rect.width - x) + 'px',
+          left: 'auto',
+          bottom: 'auto',
+        }
+      case 'left':
+        return {
+          top: y + 'px',
+          left: x + 'px',
+          right: 'auto',
+          bottom: 'auto',
+        }
+    }
+  }
+  savePos() {
+    const rect = this.el.getBoundingClientRect()
+    const x = rect.x
+    const y = rect.y
+    if (this.storeKey) GM_setValue(this.storeKey, { x, y })
+  }
+  uninit() {
+    this.el.draggable = false
+    this.dispose()
+    this._draggable = false
+    return this
+  }
+  listenChange(flag) {
+    if (this.storeKey) {
+      if (flag) {
+        const onchange = this.bound('setPosFromStore', this.el)
+        addValueChangeListener(this.storeKey, onchange)
+        this.disposeOf('addValueChangeListener', () => removeValueChangeListener(this.storeKey, onchange))
+        this.setPosFromStore()
+      } else {
+        this.dispose('addValueChangeListener')
+      }
+    }
+    return this
+  }
+  setPosFromStore() {
+    if (this.storeKey) {
+      const pos = GM_getValue(this.storeKey)
+      if (pos) {
+        Object.assign(this.el.style, this.getPos(pos.x, pos.y))
+      }
+    }
+    return this
+  }
+  draggble(flag) {
+    if (flag) {
+      this.init()
+    } else {
+      this.uninit()
+    }
+    return this
+  }
+  /**
+   * @param {'right'|'left'} [direction='left']
+   */
+  fix(direction) {
+    const oldDirection = this._direction
+    if (['left', 'right'].includes(direction)) {
+      this._direction = direction
+      if (direction === 'left' && oldDirection === 'right') {
+        const rect = this.el.getBoundingClientRect()
+        this.setPos(rect.x, rect.y)
+      }
+      else if (oldDirection === 'left' && direction === 'right') {
+        this.setPosFromStore()
+      }
+    }
+    return this
+  }
 }
 
 class Jira {
@@ -594,35 +724,28 @@ class DNode extends EventEmitter {
       el.removeEventListener(name, listener, ...more)
     }
   }
-  static get draggable() {
-    return draggable
-  }
   constructor(node) {
     super()
     this.node = node
-    this.disposables = {
-      nativeOn: []
-    }
-  }
-  dispose() {
-    Object.entries(this.disposables).forEach(([name, fn]) => Array.isArray(fn) ? fn.forEach(f => f()) : fn())
-    this.off()
-    return this
+    this._draggable = null
   }
   nativeOn(...args) {
     const nativeOff = DNode.nativeOn(this.node, ...args)
-    this.disposables.nativeOn.push(nativeOff)
+    this.disposeOf('nativeOn', nativeOff)
     return nativeOff
   }
-  draggable(id) {
-    if (!this.disposables.draggable) {
-      this.disposables.draggable = DNode.draggable(this.node, id)
+  draggable(id, direction) {
+    if (!this._draggable) {
+      this._draggable = Draggable.new(this.node, id, direction).draggble(true)
+      this.disposeOf('draggable', this._draggable.bound('dispose'))
+    } else {
+      this._draggable.fix(direction)
+      this._draggable.draggble(true)
     }
     return this
   }
   undraggable() {
-    this.disposables.draggable()
-    delete this.disposables.draggable
+    this._draggable.draggble(false)
     return this
   }
   mount(el) {
@@ -633,6 +756,10 @@ class DNode extends EventEmitter {
     deleteElement(this.node)
     return this
   }
+  destroy() {
+    this.unmount()
+    this.dispose()
+  }
 }
 
 module.exports = {
@@ -640,15 +767,12 @@ module.exports = {
   addValueChangeListener,
   callOnElement,
   deleteElement,
-  draggable,
   event,
   getDOMPath,
-  getSelectionText,
   getUid,
   isElementInvisible,
   later,
   openTab,
-  randomId,
   removeValueChangeListener,
   SEARCHES,
   promisable,
@@ -657,6 +781,9 @@ module.exports = {
   UserProxy,
   DNode,
   Jira,
+  Base,
+  Draggable,
+  EventEmitter,
 }
 
 module.exports.popup = require('./popup')

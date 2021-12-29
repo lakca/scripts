@@ -20,4 +20,9 @@
 // @grant        GM_removeValueChangeListener
 // @grant        GM_xmlhttpRequest
 // @grant        GM_download
+// @grant        GM_openInTab
+// @grant        GM_saveTab
+// @grant        GM_getTab
+// @grant        GM_getTabs
+// @grant        GM_notification
 // ==/UserScript==
