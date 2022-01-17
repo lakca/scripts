@@ -32,20 +32,19 @@
 ########## COLOR ###########
 for COLOR in CYAN WHITE YELLOW MAGENTA BLACK BLUE RED DEFAULT GREEN GREY; do
     eval PR_$COLOR='%{$fg[${(L)COLOR}]%}'
-    eval PR_BRIGHT_$COLOR='%{$fg_bright[${(L)COLOR}]%}'
 done
 PR_RESET="%{$reset_color%}"
-RED_START="${PR_RESET}${PR_RED}❯${PR_RESET} "
-RED_BASE_START="${PR_RESET}${PR_RED}>${PR_RESET}"
+JOINER_COLOR="$FG[240]"
 VCS_DIRTY_COLOR="${PR_RESET}${PR_RED}"
 VCS_CLEAN_COLOR="${PR_RESET}${PR_GREEN}"
-VCS_SUFIX_COLOR=""
+VCS_INFO_COLOR="${PR_RESET}${PR_YELLOW}"
+VCS_SUFIX_COLOR="${PR_RESET}"
 # ########## COLOR ###########
 # ########## GIT ###########
 ZSH_THEME_GIT_PROMPT_PREFIX=""
 ZSH_THEME_GIT_PROMPT_SUFFIX=""
-ZSH_THEME_GIT_PROMPT_DIRTY="${VCS_DIRTY_COLOR} ✘ ${VCS_SUFIX_COLOR}"
-ZSH_THEME_GIT_PROMPT_CLEAN="${VCS_CLEAN_COLOR} ✔ ${VCS_SUFIX_COLOR}"
+ZSH_THEME_GIT_PROMPT_DIRTY="${VCS_DIRTY_COLOR}✘${VCS_SUFIX_COLOR}"
+ZSH_THEME_GIT_PROMPT_CLEAN="${VCS_CLEAN_COLOR}✔${VCS_SUFIX_COLOR}"
 
 ZSH_THEME_GIT_PROMPT_UNTRACKED="Untracked "
 ZSH_THEME_GIT_PROMPT_MODIFIED="Modified "
@@ -86,35 +85,42 @@ function precmd {
     fi
 }
 
+function git_current_branch_upstream {
+   echo $(__git_prompt_git branch --format="%(upstream:short)" --points-at HEAD)
+}
+
 # Context: user@directory or just directory
 prompt_context () {
-    text+="$FG[240]%D{%R}${PR_RESET} "
+    text+="${JOINER_COLOR}%D{%R}${PR_RESET} "
     if [[ -n "$SSH_CLIENT" ]]; then
         text+="${PR_RESET}${PR_RED}$USER@%m "
+    else
+        text+="${PR_RESET}${PR_BLUE}$USER:"
     fi
-    text+="${PR_RESET}${PR_BLUE}$(git_current_user_name):"
     text+="${PR_RESET}${PR_BLUE}%~%<<"
-    # text+="${PR_RESET}${PR_BRIGHT_GREY} $(git_prompt_info)"
-    # text+="$(git_prompt_status)"
-    # text+="$(git_prompt_remote)"
-    # text+="$(git_prompt_short_sha)"
-    # text+="$(git_remote_status)"
     if [[ -n "$(git_repo_name)" ]]; then
-        text+=" ${PR_RESET}${PR_YELLOW}$(git_repo_name)"
+        text+="${PR_RESET} ${VCS_INFO_COLOR}$(git_current_user_name)"
+        text+="${PR_RESET} ${JOINER_COLOR}at${PR_RESET} ${VCS_INFO_COLOR}$(git_repo_name)"
         if [[ -n "$(git_current_branch)" ]]; then
-            text+="${PR_RESET} : ${PR_BLUE}$(git_current_branch)"
-        fi
-        if [[ -n "$(parse_git_dirty)" ]]; then
-            text+="${PR_RESET}$(parse_git_dirty)"
+            text+="${PR_RESET} ${JOINER_COLOR}on${PR_RESET} ${VCS_INFO_COLOR}$(git_current_branch)"
         fi
         if [[ -n "$(git_prompt_status)" ]]; then
-            text+="${PR_RESET}(${PR_RED}${$(git_prompt_status)%\ }${PR_RESET})"
+            text+="${PR_RESET} (${VCS_DIRTY_COLOR}${$(git_prompt_status)%\ }${PR_RESET})"
+        fi
+        if [[ -n "$(git_prompt_short_sha)" ]]; then
+            text+="${PR_RESET} ${VCS_INFO_COLOR}$(git_prompt_short_sha)"
         fi
         if [[ $(git_commits_ahead) -gt 0 ]]; then
-            text+=" ${PR_RESET}${PR_MAGENTA}👆 $(git_commits_ahead)"
+            text+="${PR_RESET} ${PR_MAGENTA}👆 $(git_commits_ahead)"
         fi
         if [[ $(git_commits_behind) -gt 0 ]]; then
-            text+=" ${PR_RESET}${PR_MAGENTA}👇 $(git_commits_behind)"
+            text+="${PR_RESET} ${PR_MAGENTA}👇 $(git_commits_behind)"
+        fi
+        if [[ -n "$(git_current_branch_upstream)" ]]; then
+            text+="${PR_RESET} ${JOINER_COLOR}to${PR_RESET} ${VCS_INFO_COLOR}$(git_current_branch_upstream)"
+        fi
+        if [[ -n "$(parse_git_dirty)" ]]; then
+            text+="${PR_RESET} $(parse_git_dirty)"
         fi
     fi
     echo -n "$text"
@@ -131,10 +137,10 @@ set_prompt () {
 
     PROMPT='${PROMPT_HEAD}'$'\n'
     PROMPT+='$(prompt_context)'$'\n'
-    PROMPT+='${PR_RESET}${PR_RED}>${PR_RESET} '
+    PROMPT+='${PR_RESET}${PR_GREEN}~${PR_RESET} '
 
     # Matching continuation prompt
-    PROMPT2='${PR_RESET}${PR_RED}> ${PR_RESET} %_'
+    PROMPT2='${PR_RESET}${PR_GREEN}~${PR_RESET} %_'
     # ######### PROMPT #########
 }
 
