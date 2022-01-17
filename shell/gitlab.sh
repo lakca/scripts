@@ -92,24 +92,26 @@ function doJob() {
       sleep 3
       status=$(invoke 'job' -p $EXPOSE_PROJECT -j $EXPOSE_JOB -R | jsone "useGet(data, 'status')")
     done
+    echo "$status"
   fi
 }
 
-OPTS="$OPTS""j:J:o:p:s:t:"
+OPTS="$OPTS""t:"
 OPTS_MSG="$OPTS_MSG
-        -j <job ID>
-        -J <pipeline ID>
-        -o <GITLAB_ORIGIN>
-        -p <project ID>
-        -s <commit sha>
         -t <GITLAB_PRIVATE_TOKEN>"
 CMDS_MSG="$CMDS_MSG
-        project(s)
-        commit(s)
-        comments
-        pipeline(s)
-        job(s)
-        doJob [${JOB_ACTIONS[@]}]"
+        projects
+        project
+        statistics
+        commits
+        commit
+        commit:refs
+        commit:comments
+        pipelines
+        pipeline
+        pipeline:jobs
+        job
+        job:do"
 
 function parseOpts() {
   case $1 in

@@ -22,7 +22,7 @@ GS_ASK_ARG_VALUE='' # value of the asked `invoke` argument (set by `ask`).
 OPTS="AcC:hP:Q:rRS:T:vV"
 CMDS=""
 OPTS_MSG="Options:
-        -A asynchronous
+        -A wait for asynchronous job to finish
         -c colorful output
         -C <columns>
         -P <page=1>

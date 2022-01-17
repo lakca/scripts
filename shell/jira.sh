@@ -101,7 +101,7 @@ function page() {
   open $(invoke 'issue' -i "$1" -R | jsone "useFilter(data.key, 'jiraUrl')")
 }
 
-OPTS="$OPTS""u:w:p:i:"
+OPTS="$OPTS""u:w:"
 OPTS_MSG="$OPTS_MSG
         -u <jira username>
         -w <jira password>"
