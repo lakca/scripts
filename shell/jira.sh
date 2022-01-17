@@ -1,5 +1,12 @@
 # !/usr/bin/env bash
 
+# usage:
+# 1. alias
+# alias jira='jira.sh'
+# jira -h
+# 2. run in subshell
+# (jira.sh -h)
+
 source $(dirname $0)/prelude.sh
 
 JIRA_ORIGIN=${JIRA_ORIGIN:-}
@@ -144,5 +151,3 @@ function parseCmds() {
   esac
 }
 parseArgs "$@"
-
-unset_prelude

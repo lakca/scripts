@@ -1,5 +1,12 @@
 # !/usr/bin/env bash
 
+# usage:
+# 1. alias
+# alias gitlab='gitlab.sh'
+# gitlab -h
+# 2. run in subshell
+# (gitlab.sh -h)
+
 source $(dirname $0)/prelude.sh
 GITLAB_ORIGIN=${GITLAB_ORIGIN:-}
 # https://docs.gitlab.com/ee/api/index.html#personalproject-access-tokens
@@ -135,5 +142,3 @@ function parseCmds() {
   esac
 }
 parseArgs "$@"
-
-unset_prelude
