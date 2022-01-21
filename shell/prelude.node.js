@@ -1,3 +1,5 @@
+const vm = require('vm')
+
 const FILTERS = {
   date(date) {
     if (!date) return date
@@ -49,6 +51,21 @@ const FILTERS = {
   array(v) {
     return Array.isArray(v) ? v : [v]
   },
+  jsonp(v, name) {
+    const args = []
+    vm.runInContext(v, vm.createContext({
+      [name]: function() {
+        args.push(...arguments)
+      }
+    }))
+    return args.length > 1 ? args : args[0]
+  },
+  postfix(v, postfix) {
+    return `${postfix}${v}`
+  },
+  suffix(v, suffix) {
+    return `${v}${suffix}`
+  }
 }
 
 function useGet(obj, prop) {
@@ -84,12 +101,14 @@ function useFilter(data, ...filters) {
  * @param {object} config
  * @param {*} config.data
  * @param {string} config.cols - format: 'iterKey:/fromRootCol1,/fromRootCol2,col1,col2|filter1|filter2,col3'
+ * @param {string} [config.jsonp] - jsonp function name
  * @param {string} [config.iterKey]
  * @param {'table'|'th'|'list'} [config.format=th]
  * @param {boolean} [config.aligned]
  * @param {boolean} [config.colorful]
  */
 function useJsonf(config) {
+  const data = config.jsonp ? useFilter(config.data, ['jsonp', config.jsonp]) : config.data
   const iterFactors = config.cols.split(':')
     .map(col => col.trim())
   const keyPart = iterFactors.length > 1 ? iterFactors[1] : iterFactors[0]
@@ -102,9 +121,9 @@ function useJsonf(config) {
       const value = parts[0]
       return { value, text: config.colorful ? useFilter(value, 'green') : value, filters: parts.slice(1) }
     })
-  const rows = useFilter(useGet(config.data, iterKey), 'array').map(row => {
+  const rows = useFilter(useGet(data, iterKey), 'array').map(row => {
     return cols.map(col => {
-      const value = useFilter(col.value.startsWith('/') ? useGet(config.data, col.value.slice(1)) : useGet(row, col.value), ...col.filters)
+      const value = useFilter(col.value.startsWith('/') ? useGet(data, col.value.slice(1)) : useGet(row, col.value), ...col.filters)
       return { value, text: config.colorful ? useFilter(value, 'blue') : value }
     })
   })

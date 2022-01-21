@@ -7,6 +7,7 @@ GI_PAGE=1
 GI_SIZE=10
 # bool type
 GI_VERBOSE=0
+GB_ALIGN=0
 GB_ASYNC=0
 GB_COLORFUL=0
 # string type
@@ -19,9 +20,10 @@ GI_ASK_MAX_COUNT=10 # max ask count of per `invoke` argument.
 GB_ASK_ARG_STATE=0 # settle state of the asked `invoke` argument, 1 is settled, 0 is unsetled (set by `ask`).
 GS_ASK_ARG_VALUE='' # value of the asked `invoke` argument (set by `ask`).
 
-OPTS="AcC:hP:Q:rRS:T:vV"
+OPTS="aAcC:hP:Q:rRS:T:vV"
 CMDS=""
 OPTS_MSG="Options:
+        -a aligned output
         -A wait for asynchronous job to finish
         -c colorful output
         -C <columns>
@@ -74,10 +76,16 @@ function unset_prelude() {
   unset parseDefine
   unset invoke
   unset unset_prelude
+  unset send
+}
+
+function send() {
+  [[ $GI_VERBOSE -gt 0 ]] && echo "curl -s $@" | red 1>&2;
+  [[ $GI_VERBOSE -gt 1 ]] && curl -v $@ || curl -s $@;
 }
 
 function helpMsg() {
-  echo "Usage: $0 [OPTIONS] [COMMAND]
+  green -n -i "Usage: $0 [OPTIONS] [COMMAND]
 
   $OPTS_MSG
 
@@ -86,13 +94,16 @@ function helpMsg() {
 }
 
 function parseOpts() {
-  echo 'default'
+  echo 'default' >/dev/null
 }
+
 function parseCmds() {
-  echo 'default'
+  echo 'default' >/dev/null
 }
+
 function parseCommonOpts() {
   case $1 in
+    a) GB_ALIGN=1;;
     A) GB_ASYNC=1;;
     c) GB_COLORFUL=1;;
     C) GS_COLS=$OPTARG;;
@@ -119,24 +130,71 @@ function parseArgs() {
   parseCmds ${!OPTIND} "${@:`expr $OPTIND + 1`}"
 }
 
+# js
 function js() {
-  xargs -0 node -e "$1"
+  local OPTIND
+  local OPTARG
+  local input
+  local inputed=0
+  local code="$GS_NODE_HELPERS
+  $1"
+  while getopts ":i:nh" opt; do
+    case $opt in
+      i) input=$OPTARG; inputed=1;;
+      n) code="$1";; # neat (without helpers)
+      h) green -n -i "Usage: js <CODE> [OPTIONS]
+        pipeline is supported.
+        -i <input>
+        -n neat (without helpers)
+        -h help
+      "; exit 0;;
+      :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
+    esac
+  done
+  [[ $inputed -gt 0 ]] && node -e "$code" "$input" || xargs -0 node -e "$code"
 }
 
+# json or jsonp
 function json() {
-  local hasCode=false
-  [[ $# -gt 0 ]] && {
-    hasCode=true
-  }
+
+  debug "json:$#:$@"
+
+  local coded=false
+  if [[ !($1 =~ ^-.$) ]]; then
+    local code="$1"
+    local coded=true
+    shift
+  fi
+
+  local OPTIND
+  local OPTARG
+  local jsonp
+  while getopts ':p:h' opt; do
+    case $opt in
+      p) jsonp=$OPTARG;;
+      h) green -n -i "Usage: json [CODE] [OPTIONS]
+        pipeline is supported.
+        -p <jsonp key>
+        -h help
+
+        * More options to see `js`
+      "; exit 0;;
+      :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
+    esac
+  done
+
+  debug "jsonp:$jsonp"
+  debug "code:$code"
+
   js "
-  $GS_NODE_HELPERS
-  const data = JSON.parse(process.argv[1]);
-  if ($hasCode) {
-      $1
-    } else {
-      console.log(JSON.stringify(data, null, 2));
-    }
-  "
+  const jsonp = '$jsonp';
+  const data = jsonp ? useFilter(process.argv[1], ['jsonp', jsonp]) : JSON.parse(process.argv[1]);
+  if ($coded) {
+    $code
+  } else {
+    console.log(JSON.stringify(data, null, 2));
+  }
+  " "$@"
 }
 
 function jsone() {
@@ -144,31 +202,38 @@ function jsone() {
 }
 
 function jsonf() {
-  local cols=$1
-  shift
-  local aligned=0
+
+  debug "jsonp:$#:$@"
+
+  local cols=''
+  local aligned=$GB_ALIGN
   local iterKey=''
   local spanJoin
   local lineJoin='\n'
   local tableType=$GS_TABLE_TYPE
+  local jsonp
   local OPTIND
   local OPTARG
 
-  while getopts ":k:s:l:t:ha" opt; do
+  while getopts ":af:k:l:p:s:t:h" opt; do
     case $opt in
-      s) spanJoin=$OPTARG;;
-      l) lineJoin=$OPTARG;;
-      k) iterKey=$OPTARG;;
       a) aligned=1;;
-      t) tableType=$OPTARG;;
+      f) cols="$OPTARG";;
+      k) iterKey="$OPTARG";;
+      l) lineJoin="$OPTARG";;
+      p) jsonp="$OPTARG";;
+      s) spanJoin="$OPTARG";;
+      t) tableType="$OPTARG";;
       h)
-        echo "Usage: $0 [GS_COLS] [OPTIONS]
-
+        green -n -i "Usage: jsonf <code> [OPTIONS]
+        -a align table columns
         -s <span seperator>
         -l <line seperator>
         -k <root data key>
-        -a align table columns
-        -h
+        -f <columns template string>
+        -t <table type>
+        -p <jsonp key>
+        -h help
         "
         exit 0
         ;;
@@ -182,12 +247,18 @@ function jsonf() {
     fi
   fi
 
+  local args=()
+
+  [[ -n "$jsonp" ]] && args+=(-p "$jsonp")
+
+  debug "args:${#args[@]}:${args[@]}"
+
   case $GS_PRASER in
     'cat')
       cat
       ;;
     'json')
-      json
+      json "${args[@]}"
       ;;
     'jsonf')
       json "
@@ -201,13 +272,13 @@ function jsonf() {
         spanJoin: '$spanJoin',
         lineJoin: '$lineJoin'
       }));
-      "
+      " "${args[@]}"
     ;;
   esac
 }
 
 function red() {
-  sprintf -f "\033[0;31m%s\033[0m" "$@"
+  sprintf -f "\033[0;31m%s\033[0m" "$*"
 }
 function green() {
   sprintf -f "\033[0;32m%s\033[0m" "$@"
@@ -246,7 +317,7 @@ function sprintf() {
 
 function debug() {
   if [ "$DEBUG" = 'true' ]; then
-    red -n -i "$@" 1>&2
+    red -n -i "$*" 1>&2
   fi
 }
 
@@ -281,28 +352,30 @@ function define() {
     h) def+=(-h "$OPTARG");;
     v) def+=(-v "$OPTARG");;
     H)
-      echo "Usage: define [OPTIONS]
+      green -n -i "Usage: define [OPTIONS]
         -n <name>
         -p <path>
-        -a <mixed args>, e.g. '-a USERNAME,TOKEN;u:t:', required arguments are postfixed with '!', e.g. '-a USERNAME,TOKEN!;u:t:'
+        -a <mixed args>, e.g. '-a USERNAME,TOKEN;u:t:'
+                        * required arguments are postfixed with '!', e.g. '-a USERNAME,TOKEN!;u:t:'
+                        * QUERY,FORMAT,JSONP,RAW (Q:F:J:R respectively) are reserved and provided by default.
         -f <format>
         -x <method>
         -d <data>
         -h <header> e.g. -h 'Content-Type:application/json' -h 'Accept:application/json'
-        -v <args default value> value prefixed with `<argName>:`, e.g. -v 'USERNAME:admin' -v 'TOKEN:123456'
+        -v <args default value> value prefixed with '<argName>:', e.g. -v 'USERNAME:admin' -v 'TOKEN:123456'
         -H help message
       "
       return
       ;;
     \?) echo "Invalid option: -$OPTARG" >&2; exit 1;;
-    :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
+    :) echo "Option -$OPTARG requires an argument. Show help with -H option." >&2; exit 1;;
     esac
   done
   local args=$(grep -o '^[A-Z][A-Z0-9_,!]\+' <<<"$mixedArgs")
   local opts=$(grep -o '[A-Za-z:]\+$' <<<"$mixedArgs")
   opts=${opts/#:/}
-  def+=(-a "$args,QUERY,FORMAT,RAW")
-  def+=(-o ":$opts"'Q:F:R')
+  def+=(-a "$args,QUERY,FORMAT,JSONP,RAW")
+  def+=(-o ":$opts"'Q:F:J:R')
   _defines+=("$name ${def[*]}")
 }
 
@@ -360,10 +433,11 @@ function invoke() {
   local _pureArgsList=($(grep -o '[A-Z][A-Z0-9_]\+' <<<$_args))
   local _optsList=($(grep -o '[a-zA-Z]' <<<$_opts))
 
-  # default args
+  # reserved args
   local QUERY
   local FORMAT
-  local RAW=1 # reversed
+  local JSONP
+  local RAW=1
   # parse args
   local _caseArms=''
   local _argIdxList=$(seq 0 $(expr ${#_pureArgsList[@]} - 1))
@@ -434,9 +508,9 @@ function invoke() {
           echo "Too many invalid arguments: $_name@${_pureArgsList[_index]}"
           exit 1
         fi
-        debug "ask $_askCount: $_name@${_pureArgsList[_index]}"
+        debug "ask $_askCount""th: $_name@${_pureArgsList[_index]}"
         ask "$_name@${_pureArgsList[_index]}"
-        debug "asked $_name@${_pureArgsList[_index]}:${!_pureArgsList[_index]}"
+        debug "asked $_name@${_pureArgsList[_index]}: ${!_pureArgsList[_index]}"
       done
     fi
     _index=$(expr $_index + 1)
@@ -449,28 +523,21 @@ function invoke() {
     _realData=${_realData//"\$${_pureArgsList[idx]}"/"${!_pureArgsList[idx]}"}
   done
   # send
-  local _sendString="send '$_realPath'"
-  if [ -n "$_method" ]; then
-    _sendString="$_sendString -X $_method"
-  fi
-  if [ -n "$_realData" ]; then
-    _sendString="$_sendString -d $_realData"
-  fi
+  local _sendArgs=("$_realPath")
+
+  [[ -n "$_method" ]] && _sendArgs+=(-X "$_method")
+  [[ -n "$_realData" ]] && _sendArgs+=(-d "$_realData")
   for _h in "${_headers[@]}"; do
-    _sendString="$_sendString -H $_h"
+    _sendArgs+=(-H "$_h")
   done
 
-  if [ "$RAW" = 1 ]; then
-    if [ -n "$FORMAT" ]; then
-      eval "$_sendString"  | jsonf "$FORMAT"
-    elif [ -n "$_format" ]; then
-      eval "$_sendString"  | jsonf "$_format"
-    else
-      eval "$_sendString"  | jsonf
-    fi
-  else
-    eval "$_sendString"
-  fi
+  local _jsonfArgs=()
+
+  [[ -n "$FORMAT" ]] && _jsonfArgs+=(-f "$FORMAT") || [[ -n "$_format" ]] && _jsonfArgs+=(-f "$_format")
+  [[ -n "$JSONP" ]] && _jsonfArgs+=(-p "$JSONP")
+
+  [[ "$RAW" = 1 ]] && send "${_sendArgs[@]}" | jsonf "${_jsonfArgs[@]}" || send "${_sendArgs[@]}"
+
   if [ -n "$expose" ]; then
     for arg in "${_pureArgsList[@]}"; do
       debug "$expose,$expose$arg,${!arg}"
