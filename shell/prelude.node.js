@@ -1,11 +1,23 @@
 const vm = require('vm')
 
 const FILTERS = {
-  date(date) {
+  datetime(date) {
     if (!date) return date
     date = new Date(date)
     date.setHours(date.getHours() + 8)
     return date.toISOString().slice(0, -5)
+  },
+  date(date) {
+    if (!date) return date
+    date = new Date(date)
+    date.setHours(date.getHours() + 8)
+    return date.toISOString().slice(0, -14)
+  },
+  time(date) {
+    if (!date) return date
+    date = new Date(date)
+    date.setHours(date.getHours() + 8)
+    return date.toISOString().slice(-13, -5)
   },
   trim(s) {
     return typeof s === 'string' ? s.trim() : s
@@ -65,6 +77,9 @@ const FILTERS = {
   },
   suffix(v, suffix) {
     return `${v}${suffix}`
+  },
+  nullish(v) {
+    return v == null ? '-' : v
   }
 }
 
@@ -103,10 +118,58 @@ function useFilter(data, ...filters) {
   }, data)
 }
 
+function lexer(format) {
+  // group ;
+  // caption :
+  // col ,
+  // root /
+  // filter |
+  // rename =
+  // escape \
+  const groups = [
+    {
+      caption: {
+        key: '',
+        rename: '',
+      },
+      columns: [
+        {
+          key: '',
+          rename: '',
+          filters: [],
+        }
+      ],
+    }
+  ]
+  let s = ''
+  for (const e of format.length) {
+    switch (e) {
+      case ';':
+        break
+      case ':':
+        break
+      case ',':
+        break
+      case '/':
+        break
+      case '|':
+        break
+      case '=':
+        break
+      case '\\':
+        break
+      default:
+        s += e
+    }
+  }
+}
+
+
 /**
  * @param {object} config
  * @param {*} config.data
- * @param {string} config.cols - format: 'iterKey:/fromRootCol1,/fromRootCol2,col1,col2|filter1|filter2,col3'
+ * @param {string} config.cols - format: 'iterKey:/fromRootCol1,/fromRootCol2,col1=displayName,col2|filter1|filter2,col3;...'
+ *                             - reserved characters: `;` `:` `,` `|` `/`, `=`
  * @param {string} [config.jsonp] - jsonp function name
  * @param {string} [config.iterKey]
  * @param {'table'|'th'|'list'} [config.format=th]
@@ -114,72 +177,53 @@ function useFilter(data, ...filters) {
  * @param {boolean} [config.colorful]
  */
 function useJsonf(config) {
+  const indicator = {
+    group: ';',
+    caption: ':',
+    col: ',',
+    root: '/',
+    filter: '|',
+    rename: '=',
+  }
   const data = config.jsonp ? useFilter(config.data, ['jsonp', config.jsonp]) : config.data
-  const iterFactors = config.cols.split(':')
-    .map(col => col.trim())
-  const keyPart = iterFactors.length > 1 ? iterFactors[1] : iterFactors[0]
-  const iterKey = config.iterKey ? config.iterKey : iterFactors.length > 1 ? iterFactors[0] : ''
-  const cols = keyPart.split(',')
-    .map(col => col.trim())
-    .filter(col => col)
-    .map(col => {
-      const parts = col.split('|')
-      const value = parts[0]
-      const key = value.startsWith('/') ? value.slice(1) : value
-      return { key, value, text: config.colorful ? useFilter(value, 'green') : value, filters: parts.slice(1) }
+  return config.cols.split(indicator.group).filter(e => e.trim()).map(colsCfg => {
+    const iterFactors = colsCfg.split(indicator.caption)
+      .map(col => col.trim())
+    const keyPart = iterFactors.length > 1 ? iterFactors[1] : iterFactors[0]
+    const iter = config.iterKey ? config.iterKey : iterFactors.length > 1 ? iterFactors[0] : ''
+    const [ iterKey, iterRename ] = iter.split(indicator.rename)
+    const cols = ['#', ...keyPart.split(indicator.col)]
+      .map(col => col.trim())
+      .filter(col => col)
+      .map(col => {
+        const parts = col.split(indicator.filter)
+        const [value, rename] = parts[0].split(indicator.rename)
+        const text = rename || value
+        return { value, rename, text: config.colorful ? useFilter(text, 'green') : text, filters: parts.slice(1) }
+      })
+    const rows = useFilter(useGet(data, iterKey), 'array').map((row, rowIndex) => {
+      return cols.map((col, colIndex) => {
+        const value = col.value === '#' ? (rowIndex + 1) : useFilter(col.value.startsWith(indicator.root) ? useGet(data, col.value.slice(1)) : useGet(row, col.value), 'nullish', ...col.filters)
+        return { value, text: config.colorful ? useFilter(value, 'blue') : value }
+      })
     })
-  const rows = useFilter(useGet(data, iterKey), 'array').map(row => {
-    return cols.map(col => {
-      const key = col.key
-      const value = useFilter(useGet(row, key), ...col.filters)
-      return { key, value, text: config.colorful ? useFilter(value, 'blue') : value }
-    })
-  })
 
-  const colValue = (row, key) => {
-    const col = row.find(it => it.key === key)
-    return col ? col.value : undefined
-  }
-
-  if (config.sorts) {
-    const sorts = config.sorts.split(',').map(it => {
-      let asc = true
-      if (it.startsWith('+')) it = it.slice(1)
-      else if (it.startsWith('-')) {
-        asc = false
-        it = it.slice(1)
-      }
-      return [it, asc]
-    })
-    debug(sorts)
-    rows.sort((a, b) => {
-      for (const [key, asc] of sorts) {
-        const av = colValue(a, key)
-        const bv = colValue(b, key)
-        debug('vs', av, bv)
-        if (av == bv) continue
-        const r = (av > bv) && asc
-        return r ? 1 : -1
-      }
-      return 0
-    })
-  }
-
-  if (config.format === 'list') {
-    return rows.map(row => {
-      return cols.map((col, i) => {
-        return col.text + '\t' + row[i].text
-      }).join('\n')
-    }).join('\n------------\n')
-  } else {
-    const items = (config.format === 'th') ? [cols, ...rows] : [...rows]
-    if (config.aligned) {
-      const alignedItems = useFilter(items, ['align', 'value'])
-      return alignedItems.map(row => row.map(e => e.text + ' '.repeat(e._align)).join('\t')).join('\n')
+    if (config.format === 'list') {
+      return rows.map(row => {
+        return cols.map((col, i) => {
+          return col.text + '\t' + row[i].text
+        }).join('\n')
+      }).join('\n\n')
     } else {
-      return items.map(row => row.map(e => e.text).join('\t')).join('\n')
+      const items = (config.format === 'th') ? [cols, ...rows] : [...rows]
+      if (config.aligned) {
+        const alignedItems = useFilter(items, ['align', 'value'])
+        return alignedItems.map(row => row.map(e => e.text + ' '.repeat(e._align)).join('\t')).join('\n')
+      } else {
+        return items.map(row => row.map(e => e.text).join('\t')).join('\n')
+      }
     }
-  }
+  }).join('\n\n')
 }
 
 // console.log(useJsonf({
