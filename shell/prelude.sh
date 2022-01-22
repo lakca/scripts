@@ -1,5 +1,7 @@
 # !/usr/bin/env bash
 
+# - you can use python *tabulate* to print table with columns aligned. e.g. `cmd | tabulte -1`
+
 # Reserved Variables:
 # int type
 GI_PAGE=${GI_PAGE:=1}
@@ -99,10 +101,27 @@ function decode() {
 
 function helpMsg() {
   green "Usage: $0 [OPTIONS] [COMMAND]
+  local names=()
+  local maxLen=0
+  for df in "${_defines[@]}"; do
+    df=(${df[0]})
+    maxLen=$((${#df[0]} > $maxLen ? ${#df[0]} : $maxLen))
+  done
+  for df in "${_defines[@]}"; do
+    df=(${df[0]})
+    local name=`printf %-${maxLen}s ${df[0]} | blue`
+    [[ "${df[1]}" = '-N' ]] && names+=("$name ${df[2]}") || names+=("$name")
+  done
 
+  green -n -i "Usage: $0 [OPTIONS] [COMMAND]
+
+  Options:
   $OPTS_MSG
 
-  $CMDS_MSG
+  Commands:
+  ${CMDS_MSG:=
+          `for i in ${!names[@]}; do printf "%s
+          " "${names[$i]}"; done`}
   "
 }
 
@@ -111,7 +130,9 @@ function parseOpts() {
 }
 
 function parseCmds() {
-  echo 'default' >/dev/null
+  case $1 in
+    *) invoke "$@";;
+  esac
 }
 
 function parseCommonOpts() {
@@ -320,13 +341,13 @@ function jsonf() {
 }
 
 function red() {
-  [[ $# -gt 0 ]] && printf "\033[0;31m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;31m%s\033[0m" 
+  [[ $# -gt 0 ]] && printf "\033[0;31m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;31m%s\033[0m"
 }
 function green() {
-  [[ $# -gt 0 ]] && printf "\033[0;32m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;32m%s\033[0m" 
+  [[ $# -gt 0 ]] && printf "\033[0;32m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;32m%s\033[0m"
 }
 function blue() {
-  [[ $# -gt 0 ]] && printf "\033[0;34m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;34m%s\033[0m" 
+  [[ $# -gt 0 ]] && printf "\033[0;34m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;34m%s\033[0m"
 }
 
 function sprintf() {
@@ -394,9 +415,10 @@ function define() {
   local OPTARG
   local OPTIND
   local name
+  local nameDisplay
   local mixedArgs
   local def=()
-  while getopts ":n:p:a:f:x:d:h:v:z:H" opt; do
+  while getopts ":n:p:a:f:x:d:h:v:z:N:H" opt; do
     local encoded=`encode "$OPTARG"`
     case $opt in
     a) mixedArgs="$OPTARG" ;;
@@ -408,9 +430,11 @@ function define() {
     h) def+=(-h "$encoded") ;;
     v) def+=(-v "$encoded") ;;
     z) def+=(-z "$encoded") ;;
+    N) nameDisplay="$OPTARG";;
     H)
       green "Usage: define [OPTIONS]
         -n <name>
+        -N <name to display>
         -p <path>
         -a <arguments>, e.g. '-a USERNAME,TOKEN;u:t:'
                         * required arguments are postfixed with '!', e.g. '-a USERNAME,TOKEN!;u:t:'
@@ -441,39 +465,48 @@ function define() {
   opts=${opts/#:/}
   def+=(-a `encode "$args,QUERY,FORMAT,JSONP,RAW"`)
   def+=(-o `encode ":$opts"'Q:F:J:R'`)
+  [[ -n "$nameDisplay" ]] && def=(-N "$nameDisplay" "${def[@]}")
   _defines+=("$name ${def[*]}")
 }
 
 function parseDefine() {
   _name="$1"
   local def
+  local firstMatch
   for df in "${_defines[@]}"; do
+    local name=`cut -d' ' -f1 <<<"$df"`
+    [[ "$name" == *"$_name"* ]] && [ -z "$firstMatch" ] && firstMatch="$df"
     if [ "${df:0:${#_name}+1}" = "$_name " ]; then
       def="$df"
       break
     fi
   done
-  debug "df '$_name': ${def[@]}"
-  [[ -z "$def" ]] && red "No such define: $_name" && exit 1
+  if [ -z "$def" ]; then
+    if [ -z "$firstMatch" ]; then
+      red -n -i "No definition found for $_name" 1>&2
+      return 1
+    else
+      yellow -n -i "No definition found for $_name, using first match: `cut -d' ' -f1 <<< $firstMatch`" 1>&2
+      def="$firstMatch"
+    fi
+  fi
   set -- ${def[@]}
   shift
   local OPTARG
   local OPTIND
-  while getopts ":p:a:o:f:m:d:h:v:z:" opt; do
-    debug "df opts origin '$opt': $OPTARG"
-    local decoded=`decode "$OPTARG"`
-    debug "df opts encode '$opt': $decoded"
+  while getopts ":p:a:o:f:m:d:h:v:N:z:" opt; do
     case $opt in
-      n) _name="$OPTARG" ;;
-      p) _path="$decoded" ;;
-      a) _args="$decoded" ;;
-      o) _opts="$decoded" ;;
-      f) _format="$decoded" ;;
-      m) _method="$decoded" ;;
-      d) _data="$decoded" ;;
-      h) _headers+=("$decoded") ;;
-      v) _defaults+=("$decoded") ;;
-      z) _sorts="$decoded" ;;
+    n) _name=$OPTARG;;
+    N) _displayName=$OPTARG;;
+    p) _path=$OPTARG;;
+    a) _args=$OPTARG;;
+    o) _opts=$OPTARG;;
+    f) _format=$OPTARG;;
+    m) _method=$OPTARG;;
+    d) _data=$OPTARG;;
+    h) _headers+=($OPTARG);;
+    v) _defaults+=($OPTARG);;
+    z) _sorts="$decoded" ;;
     esac
   done
 }
@@ -490,6 +523,7 @@ function invoke() {
   local _headers=()
   local _defaults=()
   local _sorts
+  local _nameDisplay
   parseDefine "$_name"
   debug "invoke $_name:"
   debug "  path: $_path"
@@ -501,6 +535,7 @@ function invoke() {
   debug "  headers: $_headers"
   debug "  defaults: $_defaults"
   debug "  sorts: $_sorts"
+  debug "  nameDisplay: $_nameDisplay"
   local _argsList=($(grep -o '[A-Z][A-Z0-9_]\+!\?' <<<$_args))
   local _pureArgsList=($(grep -o '[A-Z][A-Z0-9_]\+' <<<$_args))
   local _optsList=($(grep -o '[a-zA-Z]' <<<$_opts))
@@ -606,8 +641,8 @@ function invoke() {
   done
 
   local _jsonfArgs=()
-
-  [[ -n "$_format" ]] && _jsonfArgs+=(-f "$_format") || ([[ -n "$FORMAT" ]] && _jsonfArgs+=(-f "$FORMAT"))
+  [[ -n "$_format" ]] && _jsonfArgs+=(-f "$_format")
+  [[ -n "$FORMAT" ]] && _jsonfArgs+=(-f "$FORMAT")
   [[ -n "$JSONP" ]] && _jsonfArgs+=(-p "$JSONP")
   [[ -n "$_sorts" ]] && _jsonfArgs+=(-z "$_sorts")
   [[ "$RAW" = 1 ]] && send "${_sendArgs[@]}" | jsonf "${_jsonfArgs[@]}" || send "${_sendArgs[@]}"
