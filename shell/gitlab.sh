@@ -86,20 +86,42 @@ function ask() {
   esac
 }
 
+blinks=(
+  '.'
+  '.'
+  '.'
+  '\b \b'
+  '\b  \b\b'
+  '\b   \b\b\b'
+)
+
 # https://docs.gitlab.com/ee/api/jobs.html
 # action: play, cancel, retry
 function doJob() {
   expose='EXPOSE_' invoke 'job:do' "$@"
-  echo $(invoke 'job' -p $EXPOSE_PROJECT -j $EXPOSE_JOB -R | jsone "useGet(data, 'status')")
   if [ "$GB_ASYNC" -gt 0 ]; then
     echo "Waiting for job to finish..."
     local status='pending'
-    while [ $status = "running" -o $status = "pending" ]; do
-      echo "$status"
-      sleep 3
-      status=$(invoke 'job' -p $EXPOSE_PROJECT -j $EXPOSE_JOB -R | jsone "useGet(data, 'status')")
+    local newStatus="$status"
+    cache -k "$cacheKey" -v ""
+    local cacheKey=jobStatus_$EXPOSE_JOB
+    printf "$status"
+    while [ 1 -gt 0 ]; do
+      invoke 'job' -p "$EXPOSE_PROJECT" -j "$EXPOSE_JOB" -R | jsone "useGet(data, 'status')" | cache -k "$cacheKey" -s &
+      for i in "${blinks[@]}"; do
+        newStatus=$(cache -k "$cacheKey")
+        if [ "$newStatus" != "$status" ]; then
+          echo && printf "$newStatus"
+        fi
+        status=$newStatus
+        if [ "$status" != "running" -a "$status" != "pending" ]; then
+          break 2
+        fi
+        printf "$i"
+        sleep .5
+      done
     done
-    echo "$status"
+    echo
   fi
 }
 

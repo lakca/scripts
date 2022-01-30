@@ -19,7 +19,23 @@ function send() {
 }
 
 function getToken() {
-  invoke 'token' -R | grep -m 1 -oE '"[0-9A-F]{32}"' | head -1 | xargs
+  local file=`dirname $0`/cache
+  local token
+  if [ -f $file ]; then
+    token=`sed -n 's/^estoken://p' /Users/longpeng/Documents/GitHub/scripts/shell/token`
+  fi
+  if [ -n "$token" ]; then
+    printf "$token"
+  else
+    token=`invoke 'token' -R | grep -m 1 -oE '"[0-9A-F]{32}"' | head -1 | xargs`
+    if [ -n "$token" ]; then
+      echo "estoken:$token" > $file
+      printf "$token"
+    else
+      echo "token not found"
+      exit 1
+    fi
+  fi
 }
 
 function ask() {
@@ -95,6 +111,7 @@ define -n 'market' -p "https://push2.eastmoney.com/api/qt/clist/get?pi=0&pz=10&p
 
 function parseCmds() {
   case $1 in
+    token) getToken;;
     *) invoke "$@";;
   esac
 }

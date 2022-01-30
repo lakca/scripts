@@ -37,7 +37,7 @@ OPTS_MSG="Options:
         -V Print curl command."
 CMDS_MSG="Commands:"
 
-GS_NODE_HELPERS=$(cat $(dirname $0)/prelude.node.js)
+GS_NODE_HELPERS=$(cat prelude.node.js)
 
 function unset_prelude() {
   unset GI_PAGE
@@ -77,6 +77,8 @@ function unset_prelude() {
   unset invoke
   unset unset_prelude
   unset send
+  unset ask
+  unset cache
 }
 
 function send() {
@@ -136,12 +138,13 @@ function js() {
   local OPTARG
   local input
   local inputed=0
-  local code="$GS_NODE_HELPERS
-  $1"
+  local code="$1"
+  local neat=0
+  shift
   while getopts ":i:nh" opt; do
     case $opt in
       i) input=$OPTARG; inputed=1;;
-      n) code="$1";; # neat (without helpers)
+      n) neat=1;; # neat (without helpers)
       h) green -n -i "Usage: js <CODE> [OPTIONS]
         pipeline is supported.
         -i <input>
@@ -151,6 +154,8 @@ function js() {
       :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
     esac
   done
+  [[ $neat -eq 0 ]] && code="$GS_NODE_HELPERS
+  $code"
   [[ $inputed -gt 0 ]] && node -e "$code" "$input" || xargs -0 node -e "$code"
 }
 
@@ -543,5 +548,48 @@ function invoke() {
       debug "$expose,$expose$arg,${!arg}"
       eval "$expose$arg=${!arg}"
     done
+  fi
+}
+
+function cache() {
+  local store='.cache'
+  local OPTIND
+  local OPTARG
+  local key
+  local value
+  local hasKey=0
+  local hasValue=0
+  local saving=0
+  while getopts :k:v:s OPT; do
+    case "$OPT" in
+      f) store="$OPTARG";;
+      k) key="$OPTARG";hasKey=1;;
+      v) value="$OPTARG";hasValue=1;;
+      s) saving=1;;
+      :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
+      \?) echo "Usage: cache [-f store] [-k key] [-v value] [-s]
+
+        -k <key>, get/set value in cache.
+        -v <value>, set value directly, taking precedence over -s.
+        -f <filename=.cache>, cache file.
+        -s, set value from stdin.
+      ";exit 0;;
+    esac
+  done
+  if [ "$hasKey" -eq 1 ]; then
+    # set
+    if [ "$hasValue" -eq 1 -o "$saving" -eq 1 ]; then
+      if [ "$hasValue" -ne 1 ]; then
+        read value
+      fi
+      echo "value:$value:"
+      if [ $(sed -n "/^$key=/p" "$store") ]; then
+        sed -i "s/^$key=.*/$key=$value/g" "$store"
+      else
+        echo "$key=$value" >> "$store"
+      fi
+    else
+      cat "$store" | sed -n "s/^$key=\(.*\)/\1/p"
+    fi
   fi
 }

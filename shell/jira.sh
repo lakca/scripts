@@ -58,7 +58,7 @@ define -n 'issue' -p '/rest/api/latest/issue/$ISSUE_KEY' -a 'ISSUE_KEY!;i:' -f "
 define -n 'issue:comments' -p '/rest/api/latest/issue/$ISSUE_KEY/comment' -a 'ISSUE_KEY!;i:' -f 'id,body,author.displayName,created|date'
 define -n 'issue:transitions' -p '/rest/api/latest/issue/$ISSUE_KEY/transitions' -a 'ISSUE_KEY!;i:' -f 'transitions:id,name'
 define -n 'issue:comment:do' -x 'POST' -p '/rest/api/latest/issue/$ISSUE_KEY/comment' -a 'ISSUE_KEY!;i:'
-define -n 'issue:status:do' -x 'POST' -p '/rest/api/latest/issue/$ISSUE_KEY/transitions' -h 'content-type:application/json' -d '{\"transition\":{\"id\":\"$TRANSITION_ID\"}}' -a 'ISSUE_KEY!,TRANSITION_ID!;i:t:'
+define -n 'issue:status:do' -x 'POST' -p '/rest/api/latest/issue/$ISSUE_KEY/transitions' -h 'content-type:application/json' -d '{"transition":{"id":"$TRANSITION_ID"}}' -a 'ISSUE_KEY!,TRANSITION_ID!;i:t:'
 
 function issues() {
   local OPTARG
@@ -93,7 +93,7 @@ function issues() {
   ")
   local data=$(invoke 'issues' -j "$jql" -s "$start" -S 10 -R)
 
-  sprintf -n -i "$data" | jsonf "issues:$ISSUE_FORMAT" -t "$tableType"
+  [[ $RAW = 1 ]] && sprintf -n -i "$data" || sprintf -n -i "$data" | jsonf -f "issues:$ISSUE_FORMAT" -t "$tableType"
 
   local total=$(sprintf -i "$data" | jsone "data.total")
   local next=$(sprintf -i "$data" | jsone "data.startAt + data.maxResults")
