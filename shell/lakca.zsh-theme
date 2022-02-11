@@ -91,6 +91,7 @@ function git_current_branch_upstream {
 
 # Context: user@directory or just directory
 prompt_context () {
+    text+="${JOINER_COLOR}[`jobs | grep '^\[' | wc -l | xargs`]${PR_RESET} " # prevent 'pwd now:...'
     text+="${JOINER_COLOR}%D{%R}${PR_RESET} "
     if [[ -n "$SSH_CLIENT" ]]; then
         text+="${PR_RESET}${PR_RED}$USER@%m "
