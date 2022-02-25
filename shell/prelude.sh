@@ -37,7 +37,7 @@ OPTS_MSG="Options:
         -V Print curl command."
 CMDS_MSG="Commands:"
 
-GS_NODE_HELPERS=$(cat prelude.node.js)
+GS_NODE_HELPERS=$(cat `dirname $0`/prelude.node.js)
 
 function unset_prelude() {
   unset GI_PAGE
@@ -593,3 +593,26 @@ function cache() {
     fi
   fi
 }
+
+if [ `basename $0` = 'prelude.sh'  ]; then
+  function parseCmds() {
+    args="${@:2}"
+    case $1 in
+      js) js "${args[@]}";;
+      json) json "${args[@]}";;
+      jsone) jsone "${args[@]}";;
+      jsonf) jsonf "${args[@]}";;
+      jsonp) jsonp "${args[@]}";;
+      sprintf) sprintf "${args[@]}";;
+    esac
+  }
+  CMDS_MSG="$CMDS_MSG
+      js
+      json
+      jsone
+      jsonf
+      jsonp
+      sprintf
+      "
+  parseArgs "$@"
+fi
