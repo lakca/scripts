@@ -540,9 +540,9 @@ function invoke() {
 
   [[ -n "$FORMAT" ]] && _jsonfArgs+=(-f "$FORMAT") || [[ -n "$_format" ]] && _jsonfArgs+=(-f "$_format")
   [[ -n "$JSONP" ]] && _jsonfArgs+=(-p "$JSONP")
-
+if [ $_name != 'job:do' ]; then
   [[ "$RAW" = 1 ]] && send "${_sendArgs[@]}" | jsonf "${_jsonfArgs[@]}" || send "${_sendArgs[@]}"
-
+fi
   if [ -n "$expose" ]; then
     for arg in "${_pureArgsList[@]}"; do
       debug "$expose,$expose$arg,${!arg}"
@@ -552,7 +552,7 @@ function invoke() {
 }
 
 function cache() {
-  local store='.cache'
+  local store=`dirname $0`/.cache
   local OPTIND
   local OPTARG
   local key
@@ -582,7 +582,6 @@ function cache() {
       if [ "$hasValue" -ne 1 ]; then
         read value
       fi
-      echo "value:$value:"
       if [ $(sed -n "/^$key=/p" "$store") ]; then
         sed -i "s/^$key=.*/$key=$value/g" "$store"
       else

@@ -103,18 +103,18 @@ function doJob() {
     echo "Waiting for job to finish..."
     local status='pending'
     local newStatus="$status"
-    cache -k "$cacheKey" -v ""
     local cacheKey=jobStatus_$EXPOSE_JOB
-    printf "$status"
+    cache -k "$cacheKey" -v "$status"
+    green -i "$status"
     while [ 1 -gt 0 ]; do
       invoke 'job' -p "$EXPOSE_PROJECT" -j "$EXPOSE_JOB" -R | jsone "useGet(data, 'status')" | cache -k "$cacheKey" -s &
       for i in "${blinks[@]}"; do
         newStatus=$(cache -k "$cacheKey")
         if [ "$newStatus" != "$status" ]; then
-          echo && printf "$newStatus"
+          echo && green -i "$newStatus"
         fi
         status=$newStatus
-        if [ "$status" != "running" -a "$status" != "pending" ]; then
+        if [ "$status" -a "$status" != "running" -a "$status" != "pending" ]; then
           break 2
         fi
         printf "$i"
