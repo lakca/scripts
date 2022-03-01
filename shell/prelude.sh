@@ -540,9 +540,9 @@ function invoke() {
 
   [[ -n "$FORMAT" ]] && _jsonfArgs+=(-f "$FORMAT") || [[ -n "$_format" ]] && _jsonfArgs+=(-f "$_format")
   [[ -n "$JSONP" ]] && _jsonfArgs+=(-p "$JSONP")
-if [ $_name != 'job:do' ]; then
+
   [[ "$RAW" = 1 ]] && send "${_sendArgs[@]}" | jsonf "${_jsonfArgs[@]}" || send "${_sendArgs[@]}"
-fi
+
   if [ -n "$expose" ]; then
     for arg in "${_pureArgsList[@]}"; do
       debug "$expose,$expose$arg,${!arg}"
