@@ -133,7 +133,7 @@ function useJsonf(config) {
       return cols.map((col, i) => {
         return col.text + '\t' + row[i].text
       }).join('\n')
-    }).join('\n')
+    }).join('\n------------\n')
   } else {
     const items = (config.format === 'th') ? [cols, ...rows] : [...rows]
     if (config.aligned) {

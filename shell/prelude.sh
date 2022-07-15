@@ -7,25 +7,25 @@ GI_PAGE=1
 GI_SIZE=10
 # bool type
 GI_VERBOSE=0
-GB_ALIGN=0
+GB_ALIGN=1
 GB_ASYNC=0
-GB_COLORFUL=0
+GB_COLORFUL=1
 # string type
 GS_QUERY=''
 GS_COLS=''
-GS_PRASER='jsonf' # cat, json, jsonf
+GS_PRASER='jsonf'  # cat, json, jsonf
 GS_TABLE_TYPE='th' # table, th, list
 # Reserved for `invoke` and `ask`.
 GI_ASK_MAX_COUNT=10 # max ask count of per `invoke` argument.
-GB_ASK_ARG_STATE=0 # settle state of the asked `invoke` argument, 1 is settled, 0 is unsetled (set by `ask`).
+GB_ASK_ARG_STATE=0  # settle state of the asked `invoke` argument, 1 is settled, 0 is unsetled (set by `ask`).
 GS_ASK_ARG_VALUE='' # value of the asked `invoke` argument (set by `ask`).
 
 OPTS="aAcC:hP:Q:rRS:T:vV"
 CMDS=""
 OPTS_MSG="Options:
-        -a aligned output
+        -a not align output
         -A wait for asynchronous job to finish
-        -c colorful output
+        -c no colorful output
         -C <columns>
         -P <page=1>
         -S <size=10>
@@ -37,7 +37,7 @@ OPTS_MSG="Options:
         -V Print curl command."
 CMDS_MSG="Commands:"
 
-GS_NODE_HELPERS=$(cat `dirname $0`/prelude.node.js)
+GS_NODE_HELPERS=$(cat $(dirname $0)/prelude.node.js)
 
 function unset_prelude() {
   unset GI_PAGE
@@ -82,8 +82,8 @@ function unset_prelude() {
 }
 
 function send() {
-  [[ $GI_VERBOSE -gt 0 ]] && echo "curl -s $@" | red 1>&2;
-  [[ $GI_VERBOSE -gt 1 ]] && curl -v $@ || curl -s $@;
+  [[ $GI_VERBOSE -gt 0 ]] && echo "curl -s $@" | red 1>&2
+  [[ $GI_VERBOSE -gt 1 ]] && curl -v $@ || curl -s $@
 }
 
 function helpMsg() {
@@ -105,21 +105,31 @@ function parseCmds() {
 
 function parseCommonOpts() {
   case $1 in
-    a) GB_ALIGN=1;;
-    A) GB_ASYNC=1;;
-    c) GB_COLORFUL=1;;
-    C) GS_COLS=$OPTARG;;
-    P) GI_PAGE=$OPTARG;;
-    Q) GS_QUERY=$OPTARG;;
-    S) GI_SIZE=$OPTARG;;
-    T) GS_TABLE_TYPE=$OPTARG;;
-    v) GI_VERBOSE=2;;
-    V) GI_VERBOSE=1;;
-    r) GS_PRASER='cat';;
-    R) GS_PRASER='json';;
-    h) helpMsg; exit 0;;
-    \?) echo "Invalid option: -$OPTARG" >&2; helpMsg; exit 1;;
-    :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
+  a) GB_ALIGN=0 ;;
+  A) GB_ASYNC=1 ;;
+  c) GB_COLORFUL=0 ;;
+  C) GS_COLS=$OPTARG ;;
+  P) GI_PAGE=$OPTARG ;;
+  Q) GS_QUERY=$OPTARG ;;
+  S) GI_SIZE=$OPTARG ;;
+  T) GS_TABLE_TYPE=$OPTARG ;;
+  v) GI_VERBOSE=2 ;;
+  V) GI_VERBOSE=1 ;;
+  r) GS_PRASER='cat' ;;
+  R) GS_PRASER='json' ;;
+  h)
+    helpMsg
+    exit 0
+    ;;
+  \?)
+    echo "Invalid option: -$OPTARG" >&2
+    helpMsg
+    exit 1
+    ;;
+  :)
+    echo "Option -$OPTARG requires an argument." >&2
+    exit 1
+    ;;
   esac
 }
 function parseArgs() {
@@ -129,7 +139,7 @@ function parseArgs() {
     parseOpts $opt
     parseCommonOpts $opt
   done
-  parseCmds ${!OPTIND} "${@:`expr $OPTIND + 1`}"
+  parseCmds ${!OPTIND} "${@:$(expr $OPTIND + 1)}"
 }
 
 # js
@@ -143,15 +153,24 @@ function js() {
   shift
   while getopts ":i:nh" opt; do
     case $opt in
-      i) input=$OPTARG; inputed=1;;
-      n) neat=1;; # neat (without helpers)
-      h) green -n -i "Usage: js <CODE> [OPTIONS]
+    i)
+      input=$OPTARG
+      inputed=1
+      ;;
+    n) neat=1 ;; # neat (without helpers)
+    h)
+      green -n -i "Usage: js <CODE> [OPTIONS]
         pipeline is supported.
         -i <input>
         -n neat (without helpers)
         -h help
-      "; exit 0;;
-      :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
+      "
+      exit 0
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
     esac
   done
   [[ $neat -eq 0 ]] && code="$GS_NODE_HELPERS
@@ -165,7 +184,7 @@ function json() {
   debug "json:$#:$@"
 
   local coded=false
-  if [[ !($1 =~ ^-.$) ]]; then
+  if [[ $1 && ${1:0:1} != '-' ]]; then
     local code="$1"
     local coded=true
     shift
@@ -176,15 +195,21 @@ function json() {
   local jsonp
   while getopts ':p:h' opt; do
     case $opt in
-      p) jsonp=$OPTARG;;
-      h) green -n -i "Usage: json [CODE] [OPTIONS]
+    p) jsonp=$OPTARG ;;
+    h)
+      green -n -i "Usage: json [CODE] [OPTIONS]
         pipeline is supported.
         -p <jsonp key>
         -h help
 
-        * More options to see `js`
-      "; exit 0;;
-      :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
+        * More options to see $(js)
+      "
+      exit 0
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
     esac
   done
 
@@ -222,15 +247,15 @@ function jsonf() {
 
   while getopts ":af:k:l:p:s:t:h" opt; do
     case $opt in
-      a) aligned=1;;
-      f) cols="$OPTARG";;
-      k) iterKey="$OPTARG";;
-      l) lineJoin="$OPTARG";;
-      p) jsonp="$OPTARG";;
-      s) spanJoin="$OPTARG";;
-      t) tableType="$OPTARG";;
-      h)
-        green -n -i "Usage: jsonf <code> [OPTIONS]
+    a) aligned=1 ;;
+    f) cols="$OPTARG" ;;
+    k) iterKey="$OPTARG" ;;
+    l) lineJoin="$OPTARG" ;;
+    p) jsonp="$OPTARG" ;;
+    s) spanJoin="$OPTARG" ;;
+    t) tableType="$OPTARG" ;;
+    h)
+      green -n -i "Usage: jsonf <code> [OPTIONS]
         -a align table columns
         -s <span seperator>
         -l <line seperator>
@@ -240,8 +265,8 @@ function jsonf() {
         -p <jsonp key>
         -h help
         "
-        exit 0
-        ;;
+      exit 0
+      ;;
     esac
   done
 
@@ -259,14 +284,14 @@ function jsonf() {
   debug "args:${#args[@]}:${args[@]}"
 
   case $GS_PRASER in
-    'cat')
-      cat
-      ;;
-    'json')
-      json "${args[@]}"
-      ;;
-    'jsonf')
-      json "
+  'cat')
+    cat
+    ;;
+  'json')
+    json "${args[@]}"
+    ;;
+  'jsonf')
+    json "
       console.log(useJsonf({
         data: data,
         cols: '$cols,$GS_COLS',
@@ -302,12 +327,15 @@ function sprintf() {
   local args=()
   while getopts ":i:f:v:n" opt; do
     case "$opt" in
-      i) input+=("$OPTARG"); inputFlag=1;;
-      f) format="$OPTARG";;
-      n) postfix='\n';;
-      v)
-        args+=('var')
-        args+=("$OPTARG")
+    i)
+      input+=("$OPTARG")
+      inputFlag=1
+      ;;
+    f) format="$OPTARG" ;;
+    n) postfix='\n' ;;
+    v)
+      args+=('var')
+      args+=("$OPTARG")
       ;;
     esac
   done
@@ -348,14 +376,14 @@ function define() {
   local def=()
   while getopts ":n:p:a:f:x:d:h:v:H" opt; do
     case $opt in
-    n) name="$OPTARG";;
-    a) mixedArgs="$OPTARG";;
-    p) def+=(-p "$OPTARG");;
-    f) def+=(-f "$OPTARG");;
-    x) def+=(-m "$OPTARG");;
-    d) def+=(-d "$OPTARG");;
-    h) def+=(-h "$OPTARG");;
-    v) def+=(-v "$OPTARG");;
+    n) name="$OPTARG" ;;
+    a) mixedArgs="$OPTARG" ;;
+    p) def+=(-p "$OPTARG") ;;
+    f) def+=(-f "$OPTARG") ;;
+    x) def+=(-m "$OPTARG") ;;
+    d) def+=(-d "$OPTARG") ;;
+    h) def+=(-h "$OPTARG") ;;
+    v) def+=(-v "$OPTARG") ;;
     H)
       green -n -i "Usage: define [OPTIONS]
         -n <name>
@@ -372,8 +400,14 @@ function define() {
       "
       return
       ;;
-    \?) echo "Invalid option: -$OPTARG" >&2; exit 1;;
-    :) echo "Option -$OPTARG requires an argument. Show help with -H option." >&2; exit 1;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument. Show help with -H option." >&2
+      exit 1
+      ;;
     esac
   done
   local args=$(grep -o '^[A-Z][A-Z0-9_,!]\+' <<<"$mixedArgs")
@@ -393,22 +427,22 @@ function parseDefine() {
       break
     fi
   done
-  [[ -z "$def" ]] && echo "No such define: $_name" && exit 1;
+  [[ -z "$def" ]] && echo "No such define: $_name" && exit 1
   set -- ${def[@]}
   shift
   local OPTARG
   local OPTIND
   while getopts ":p:a:o:f:m:d:h:v:" opt; do
     case $opt in
-    n) _name=$OPTARG;;
-    p) _path=$OPTARG;;
-    a) _args=$OPTARG;;
-    o) _opts=$OPTARG;;
-    f) _format=$OPTARG;;
-    m) _method=$OPTARG;;
-    d) _data=$OPTARG;;
-    h) _headers+=($OPTARG);;
-    v) _defaults+=($OPTARG);;
+    n) _name=$OPTARG ;;
+    p) _path=$OPTARG ;;
+    a) _args=$OPTARG ;;
+    o) _opts=$OPTARG ;;
+    f) _format=$OPTARG ;;
+    m) _method=$OPTARG ;;
+    d) _data=$OPTARG ;;
+    h) _headers+=($OPTARG) ;;
+    v) _defaults+=($OPTARG) ;;
     esac
   done
 }
@@ -538,7 +572,7 @@ function invoke() {
 
   local _jsonfArgs=()
 
-  [[ -n "$FORMAT" ]] && _jsonfArgs+=(-f "$FORMAT") || [[ -n "$_format" ]] && _jsonfArgs+=(-f "$_format")
+  [[ -n "$_format" ]] && _jsonfArgs+=(-f "$_format") || ([[ -n "$FORMAT" ]] && _jsonfArgs+=(-f "$FORMAT"))
   [[ -n "$JSONP" ]] && _jsonfArgs+=(-p "$JSONP")
 
   [[ "$RAW" = 1 ]] && send "${_sendArgs[@]}" | jsonf "${_jsonfArgs[@]}" || send "${_sendArgs[@]}"
@@ -552,7 +586,7 @@ function invoke() {
 }
 
 function cache() {
-  local store=`dirname $0`/.cache
+  local store=$(dirname $0)/.cache
   local OPTIND
   local OPTARG
   local key
@@ -562,18 +596,30 @@ function cache() {
   local saving=0
   while getopts :k:v:s OPT; do
     case "$OPT" in
-      f) store="$OPTARG";;
-      k) key="$OPTARG";hasKey=1;;
-      v) value="$OPTARG";hasValue=1;;
-      s) saving=1;;
-      :) echo "Option -$OPTARG requires an argument." >&2; exit 1;;
-      \?) echo "Usage: cache [-f store] [-k key] [-v value] [-s]
+    f) store="$OPTARG" ;;
+    k)
+      key="$OPTARG"
+      hasKey=1
+      ;;
+    v)
+      value="$OPTARG"
+      hasValue=1
+      ;;
+    s) saving=1 ;;
+    :)
+      echo "Option -$OPTARG requires an argument." >&2
+      exit 1
+      ;;
+    \?)
+      echo "Usage: cache [-f store] [-k key] [-v value] [-s]
 
         -k <key>, get/set value in cache.
         -v <value>, set value directly, taking precedence over -s.
         -f <filename=.cache>, cache file.
         -s, set value from stdin.
-      ";exit 0;;
+      "
+      exit 0
+      ;;
     esac
   done
   if [ "$hasKey" -eq 1 ]; then
@@ -585,7 +631,7 @@ function cache() {
       if [ $(sed -n "/^$key=/p" "$store") ]; then
         sed -i "s/^$key=.*/$key=$value/g" "$store"
       else
-        echo "$key=$value" >> "$store"
+        echo "$key=$value" >>"$store"
       fi
     else
       cat "$store" | sed -n "s/^$key=\(.*\)/\1/p"
@@ -593,16 +639,16 @@ function cache() {
   fi
 }
 
-if [ `basename $0` = 'prelude.sh'  ]; then
+if [ $(basename $0) = 'prelude.sh' ]; then
   function parseCmds() {
     args="${@:2}"
     case $1 in
-      js) js "${args[@]}";;
-      json) json "${args[@]}";;
-      jsone) jsone "${args[@]}";;
-      jsonf) jsonf "${args[@]}";;
-      jsonp) jsonp "${args[@]}";;
-      sprintf) sprintf "${args[@]}";;
+    js) js "${args[@]}" ;;
+    json) json "${args[@]}" ;;
+    jsone) jsone "${args[@]}" ;;
+    jsonf) jsonf "${args[@]}" ;;
+    jsonp) jsonp "${args[@]}" ;;
+    sprintf) sprintf "${args[@]}" ;;
     esac
   }
   CMDS_MSG="$CMDS_MSG

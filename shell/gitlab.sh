@@ -12,6 +12,7 @@ GITLAB_ORIGIN=${GITLAB_ORIGIN:-}
 # https://docs.gitlab.com/ee/api/index.html#personalproject-access-tokens
 GITLAB_PRIVATE_TOKEN=${GITLAB_PRIVATE_TOKEN:-}
 JOB_ACTIONS=(play cancel retry)
+JOB_ORDERS=${JOB_ORDERS:-"code_build image_build deploy"}
 # Pagination: https://docs.gitlab.com/ee/api/index.html#Pagination
 
 function send() {
@@ -43,46 +44,46 @@ define -n 'pipeline' -p '/api/v4/projects/$PROJECT/pipelines/$PIPELINE' -a 'PROJ
 define -n 'pipeline:jobs' -p '/api/v4/projects/$PROJECT/pipelines/$PIPELINE/jobs?page=$PAGE&per_page=$SIZE' -a 'PROJECT!,PIPELINE!,PAGE,SIZE;p:J:P:S:' -f 'id,name,stage,status,pipeline.project_id,pipeline.id,ref,user.username,commit.id,commit.author_name,commit.title,commit.message|trim,commit.web_url,created_at|date,updated_at|date,finished_at|date,web_url'
 define -n 'job' -p '/api/v4/projects/$PROJECT/jobs/$JOB' -a 'PROJECT!,JOB!;p:j:' -f 'id,status,name,stage,pipeline.project_id,pipeline.id,ref,user.username,commit.id,commit.author_name,commit.title,commit.message|trim,commit.web_url,created_at|date,updated_at|date,finished_at|date,web_url'
 
-define -n 'job:do' -x 'POST' -p  '/api/v4/projects/$PROJECT/jobs/$JOB/$ACTION' -a 'PROJECT!,JOB!,ACTION!;p:j:a:' -f 'id,stage,name,ref,status,commit.author_name,commit.id,commit.title,created_at|date'
+define -n 'job:do' -x 'POST' -p '/api/v4/projects/$PROJECT/jobs/$JOB/$ACTION' -a 'PROJECT!,JOB!,ACTION!;p:j:a:' -f 'id,stage,name,ref,status,commit.author_name,commit.id,commit.title,created_at|date'
 
 function ask() {
   case "$1" in
-    'project@PROJECT'|'statistics@PROJECT'|'commits@PROJECT'|'commit@PROJECT'|'commit:refs@PROJECT'|'commit:comments@PROJECT'|'pipelines@PROJECT'|'pipeline@PROJECT'|'pipeline:jobs@PROJECT'|'job@PROJECT'|'job:do@PROJECT')
-      invoke 'projects'
-      red -i 'Project ID: '
-      read PROJECT
-      ;;
-    'commit@COMMIT'|'commit:refs@COMMIT'|'commit:comments@COMMIT')
-      invoke 'commits' -p "$PROJECT"
-      red -i 'Commit ID: '
-      read COMMIT
+  'project@PROJECT' | 'statistics@PROJECT' | 'commits@PROJECT' | 'commit@PROJECT' | 'commit:refs@PROJECT' | 'commit:comments@PROJECT' | 'pipelines@PROJECT' | 'pipeline@PROJECT' | 'pipeline:jobs@PROJECT' | 'job@PROJECT' | 'job:do@PROJECT')
+    invoke 'projects'
+    red -i 'Project ID: '
+    read PROJECT
     ;;
-    'pipeline@PIPELINE'|'pipeline:jobs@PIPELINE')
-      invoke 'pipelines' -p "$PROJECT"
-      red -i 'Pipeline ID: '
-      read PIPELINE
+  'commit@COMMIT' | 'commit:refs@COMMIT' | 'commit:comments@COMMIT')
+    invoke 'commits' -p "$PROJECT"
+    red -i 'Commit ID: '
+    read COMMIT
     ;;
-    'job@JOB'|'job:do@JOB')
-      local PIPELINE
-      ask 'pipeline'
-      invoke 'pipeline:jobs' -p "$PROJECT" -J "$PIPELINE"
-      red -i 'Job ID: '
-      read JOB
-      ;;
-    'job:do@ACTION')
-      green -i "Job Actions: "
-      printf "%s " "${JOB_ACTIONS[@]}" | green -n
-      red -i 'Your job action: '
-      read ACTION
-      if [ $(indexOf "$ACTION" "${JOB_ACTIONS[@]}") -eq -1 ]; then
-        ask "$@"
-      fi
-      ;;
-    'pipeline')
-      invoke 'pipelines' -p "$PROJECT" -S "$GI_SIZE"
-      red -i 'Pipeline ID: '
-      read PIPELINE
-      ;;
+  'pipeline@PIPELINE' | 'pipeline:jobs@PIPELINE' | 'doPipeline@PIPELINE')
+    invoke 'pipelines' -p "$PROJECT"
+    red -i 'Pipeline ID: '
+    read PIPELINE
+    ;;
+  'job@JOB' | 'job:do@JOB')
+    local PIPELINE
+    ask 'pipeline'
+    invoke 'pipeline:jobs' -p "$PROJECT" -J "$PIPELINE"
+    red -i 'Job ID: '
+    read JOB
+    ;;
+  'job:do@ACTION')
+    green -i "Job Actions: "
+    printf "%s " "${JOB_ACTIONS[@]}" | green -n
+    red -i 'Your job action: '
+    read ACTION
+    if [ $(indexOf "$ACTION" "${JOB_ACTIONS[@]}") -eq -1 ]; then
+      ask "$@"
+    fi
+    ;;
+  'pipeline')
+    invoke 'pipelines' -p "$PROJECT" -S "$GI_SIZE"
+    red -i 'Pipeline ID: '
+    read PIPELINE
+    ;;
   esac
 }
 
@@ -95,33 +96,71 @@ blinks=(
   '\b   \b\b\b'
 )
 
+function waitJob() {
+  expose='EXPOSE_' invoke 'job' "$@"
+  green -i "Waiting for job $EXPOSE_JOB on project $EXPOSE_PROJECT to finish..." && echo
+  local status='pending'
+  local newStatus="$status"
+  local cacheKey=jobStatus_$EXPOSE_JOB
+  cache -k "$cacheKey" -v "$status"
+  green -i "$status"
+  while [ 1 -gt 0 ]; do
+    invoke 'job' -p "$EXPOSE_PROJECT" -j "$EXPOSE_JOB" -R | jsone "useGet(data, 'status')" | cache -k "$cacheKey" -s &
+    for i in "${blinks[@]}"; do
+      newStatus=$(cache -k "$cacheKey")
+      if [ "$newStatus" != "$status" ]; then
+        echo && green -i "$newStatus"
+      fi
+      status=$newStatus
+      if [ "$status" -a "$status" != "running" -a "$status" != "pending" ]; then
+        break 2
+      fi
+      printf "$i"
+      sleep .5
+    done
+  done
+  echo
+}
+
 # https://docs.gitlab.com/ee/api/jobs.html
 # action: play, cancel, retry
 function doJob() {
   expose='EXPOSE_' invoke 'job:do' "$@"
-  if [ "$GB_ASYNC" -gt 0 ]; then
-    echo "Waiting for job to finish..."
-    local status='pending'
-    local newStatus="$status"
-    local cacheKey=jobStatus_$EXPOSE_JOB
-    cache -k "$cacheKey" -v "$status"
-    green -i "$status"
-    while [ 1 -gt 0 ]; do
-      invoke 'job' -p "$EXPOSE_PROJECT" -j "$EXPOSE_JOB" -R | jsone "useGet(data, 'status')" | cache -k "$cacheKey" -s &
-      for i in "${blinks[@]}"; do
-        newStatus=$(cache -k "$cacheKey")
-        if [ "$newStatus" != "$status" ]; then
-          echo && green -i "$newStatus"
-        fi
-        status=$newStatus
-        if [ "$status" -a "$status" != "running" -a "$status" != "pending" ]; then
-          break 2
-        fi
-        printf "$i"
-        sleep .5
-      done
-    done
+  sleep 1
+  waitJob -p "$EXPOSE_PROJECT" -j "$EXPOSE_JOB"
+}
+
+function doPipeline() {
+  expose='EXPOSE_' invoke 'pipeline' "$@"
+  local jobList=$(invoke 'pipeline:jobs' -p $EXPOSE_PROJECT -J $EXPOSE_PIPELINE -R |
+  jsone "(function() {
+    const orders = '$JOB_ORDERS'.trim().split(/\s+/);
+    return data.sort((a, b) => orders.indexOf(a.name) - orders.indexOf(b.name))
+    .map(e => [e.id, e.status, e.name].join(' '))
+    .join('\n')
+    })()")
+
+  printf "Do pipeline \033[0;32m$EXPOSE_PIPELINE\033[0m on project \033[0;32m$EXPOSE_PROJECT\033[0m with orders: \033[0;32m$JOB_ORDERS\033[0m"
+  read -p "? (y/n) " -n 1 -r
+
+  if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo
+    echo "$jobList" | while read -r line; do
+      local jobId=$(echo "$line" | cut -d ' ' -f 1)
+      local jobStatus=$(echo "$line" | cut -d ' ' -f 2)
+      local jobName=$(echo "$line" | cut -d ' ' -f 3)
+      echo "$jobName $jobId ($jobStatus)"
+      if [[ "$jobStatus" = 'canceled' || "$jobStatus" = 'skipped' || "$jobStatus" = 'failed' || "$jobStatus" = 'manual' ]]; then
+        doJob -p "$EXPOSE_PROJECT" -j "$jobId" -a 'play'
+      else
+        green -n -i 'Job '"$jobName"' on project '"$EXPOSE_PROJECT is already finished ($jobStatus)!"
+      fi
+      local rStatus=$(invoke 'job' -p "$EXPOSE_PROJECT" -j "$jobId" -R | jsone "useGet(data, 'status')")
+      if [ "$rStatus" != "success" ]; then
+        red -n -i 'Job '"$jobName"' on project '"$EXPOSE_PROJECT failed($rStatus)!"
+        exit 1
+      fi
+    done
   fi
 }
 
@@ -152,15 +191,18 @@ function parseOpts() {
 function parseCmds() {
   local args=("${@:2}")
   case $1 in
-    job:do)
-      doJob "${args[@]}"
-      ;;
-    send)
-      send "${args[@]}"
-      ;;
-    *)
-      invoke "$@"
-      ;;
+  job:do)
+    doJob "${args[@]}"
+    ;;
+  pipeline:do)
+    doPipeline "${args[@]}"
+    ;;
+  send)
+    send "${args[@]}"
+    ;;
+  *)
+    invoke "$@"
+    ;;
   esac
 }
 parseArgs "$@"
