@@ -80,6 +80,12 @@ function useGet(obj, prop) {
   return obj
 }
 
+function debug() {
+  if (process.env.DEBUG === 'true') {
+    console.log(...arguments)
+  }
+}
+
 /**
  * @param {*} data
  * @param {Array<string|function|array>} filters - type of array is used to providing extra arguments (from the second) to the filter: `[<filterName>, <arg1>, <arg2>...]`.
@@ -119,14 +125,45 @@ function useJsonf(config) {
     .map(col => {
       const parts = col.split('|')
       const value = parts[0]
-      return { value, text: config.colorful ? useFilter(value, 'green') : value, filters: parts.slice(1) }
+      const key = value.startsWith('/') ? value.slice(1) : value
+      return { key, value, text: config.colorful ? useFilter(value, 'green') : value, filters: parts.slice(1) }
     })
   const rows = useFilter(useGet(data, iterKey), 'array').map(row => {
     return cols.map(col => {
-      const value = useFilter(col.value.startsWith('/') ? useGet(data, col.value.slice(1)) : useGet(row, col.value), ...col.filters)
-      return { value, text: config.colorful ? useFilter(value, 'blue') : value }
+      const key = col.key
+      const value = useFilter(useGet(row, key), ...col.filters)
+      return { key, value, text: config.colorful ? useFilter(value, 'blue') : value }
     })
   })
+
+  const colValue = (row, key) => {
+    const col = row.find(it => it.key === key)
+    return col ? col.value : undefined
+  }
+
+  if (config.sorts) {
+    const sorts = config.sorts.split(',').map(it => {
+      let asc = true
+      if (it.startsWith('+')) it = it.slice(1)
+      else if (it.startsWith('-')) {
+        asc = false
+        it = it.slice(1)
+      }
+      return [it, asc]
+    })
+    debug(sorts)
+    rows.sort((a, b) => {
+      for (const [key, asc] of sorts) {
+        const av = colValue(a, key)
+        const bv = colValue(b, key)
+        debug('vs', av, bv)
+        if (av == bv) continue
+        const r = (av > bv) && asc
+        return r ? 1 : -1
+      }
+      return 0
+    })
+  }
 
   if (config.format === 'list') {
     return rows.map(row => {

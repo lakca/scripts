@@ -20,7 +20,7 @@ GI_ASK_MAX_COUNT=10 # max ask count of per `invoke` argument.
 GB_ASK_ARG_STATE=0  # settle state of the asked `invoke` argument, 1 is settled, 0 is unsetled (set by `ask`).
 GS_ASK_ARG_VALUE='' # value of the asked `invoke` argument (set by `ask`).
 
-OPTS="aAcC:hP:Q:rRS:T:vV"
+OPTS="aAcC:hP:Q:rRS:T:LvV"
 CMDS=""
 OPTS_MSG="Options:
         -a not align output
@@ -33,6 +33,7 @@ OPTS_MSG="Options:
         -r Raw response, without parsed.
         -R Whole response with parsed json.
         -T <output format> value can be table, th(table_with_head), list.
+        -L Same as -T list
         -v Verbose, curl output etc.
         -V Print curl command."
 CMDS_MSG="Commands:"
@@ -86,8 +87,15 @@ function send() {
   [[ $GI_VERBOSE -gt 1 ]] && curl -v $@ || curl -s $@
 }
 
+function encode() {
+  echo -n "$@" | base64
+}
+function decode() {
+  echo -n "$@" | base64 --decode
+}
+
 function helpMsg() {
-  green -n -i "Usage: $0 [OPTIONS] [COMMAND]
+  green "Usage: $0 [OPTIONS] [COMMAND]
 
   $OPTS_MSG
 
@@ -113,6 +121,7 @@ function parseCommonOpts() {
   Q) GS_QUERY=$OPTARG ;;
   S) GI_SIZE=$OPTARG ;;
   T) GS_TABLE_TYPE=$OPTARG ;;
+  L) GS_TABLE_TYPE=list ;;
   v) GI_VERBOSE=2 ;;
   V) GI_VERBOSE=1 ;;
   r) GS_PRASER='cat' ;;
@@ -159,7 +168,7 @@ function js() {
       ;;
     n) neat=1 ;; # neat (without helpers)
     h)
-      green -n -i "Usage: js <CODE> [OPTIONS]
+      green "Usage: js <CODE> [OPTIONS]
         pipeline is supported.
         -i <input>
         -n neat (without helpers)
@@ -197,7 +206,7 @@ function json() {
     case $opt in
     p) jsonp=$OPTARG ;;
     h)
-      green -n -i "Usage: json [CODE] [OPTIONS]
+      green "Usage: json [CODE] [OPTIONS]
         pipeline is supported.
         -p <jsonp key>
         -h help
@@ -233,7 +242,7 @@ function jsone() {
 
 function jsonf() {
 
-  debug "jsonp:$#:$@"
+  debug "jsonf:$#:$@"
 
   local cols=''
   local aligned=$GB_ALIGN
@@ -242,10 +251,11 @@ function jsonf() {
   local lineJoin='\n'
   local tableType=$GS_TABLE_TYPE
   local jsonp
+  local sorts=''
   local OPTIND
   local OPTARG
 
-  while getopts ":af:k:l:p:s:t:h" opt; do
+  while getopts ":af:k:l:p:s:t:z:h" opt; do
     case $opt in
     a) aligned=1 ;;
     f) cols="$OPTARG" ;;
@@ -254,10 +264,12 @@ function jsonf() {
     p) jsonp="$OPTARG" ;;
     s) spanJoin="$OPTARG" ;;
     t) tableType="$OPTARG" ;;
+    z) sorts="$OPTARG" ;;
     h)
-      green -n -i "Usage: jsonf <code> [OPTIONS]
+      green "Usage: jsonf <code> [OPTIONS]
         -a align table columns
         -s <span seperator>
+        -z <sorts>
         -l <line seperator>
         -k <root data key>
         -f <columns template string>
@@ -300,7 +312,8 @@ function jsonf() {
         aligned: $aligned,
         format: '$tableType',
         spanJoin: '$spanJoin',
-        lineJoin: '$lineJoin'
+        lineJoin: '$lineJoin',
+        sorts: '$sorts'
       }));
       " "${args[@]}"
     ;;
@@ -308,13 +321,13 @@ function jsonf() {
 }
 
 function red() {
-  sprintf -f "\033[0;31m%s\033[0m" "$*"
+  [[ $# -gt 0 ]] && printf "\033[0;31m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;31m%s\033[0m" 
 }
 function green() {
-  sprintf -f "\033[0;32m%s\033[0m" "$@"
+  [[ $# -gt 0 ]] && printf "\033[0;32m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;32m%s\033[0m" 
 }
 function blue() {
-  sprintf -f "\033[0;33m%s\033[0m" "$@"
+  [[ $# -gt 0 ]] && printf "\033[0;33m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;33m%s\033[0m" 
 }
 
 function sprintf() {
@@ -326,6 +339,7 @@ function sprintf() {
   local postfix
   local args=()
   while getopts ":i:f:v:n" opt; do
+    echo "sprintf: $opt, $OPTARG"
     case "$opt" in
     i)
       input+=("$OPTARG")
@@ -349,8 +363,10 @@ function sprintf() {
 }
 
 function debug() {
-  if [ "$DEBUG" = 'true' ]; then
-    red -n -i "$*" 1>&2
+  if [ -n "$DEBUG" ]; then
+    echo "$*" | while IFS= read line ; do
+      printf "\033[0;31m[DEBUG:`realpath ${BASH_SOURCE[0]}`:$LINENO]\033[0m \033[0;37m%s\033[0m\n" "$line"
+    done
   fi
 }
 
@@ -374,28 +390,32 @@ function define() {
   local name
   local mixedArgs
   local def=()
-  while getopts ":n:p:a:f:x:d:h:v:H" opt; do
+  while getopts ":n:p:a:f:x:d:h:v:z:H" opt; do
+    local encoded=`encode "$OPTARG"`
     case $opt in
-    n) name="$OPTARG" ;;
     a) mixedArgs="$OPTARG" ;;
-    p) def+=(-p "$OPTARG") ;;
-    f) def+=(-f "$OPTARG") ;;
-    x) def+=(-m "$OPTARG") ;;
-    d) def+=(-d "$OPTARG") ;;
-    h) def+=(-h "$OPTARG") ;;
-    v) def+=(-v "$OPTARG") ;;
+    n) name="$OPTARG" ;;
+    p) def+=(-p "$encoded") ;;
+    f) def+=(-f "$encoded") ;;
+    x) def+=(-m "$encoded") ;;
+    d) def+=(-d "$encoded") ;;
+    h) def+=(-h "$encoded") ;;
+    v) def+=(-v "$encoded") ;;
+    z) def+=(-z "$encoded") ;;
     H)
-      green -n -i "Usage: define [OPTIONS]
+      green "Usage: define [OPTIONS]
         -n <name>
         -p <path>
-        -a <mixed args>, e.g. '-a USERNAME,TOKEN;u:t:'
+        -a <arguments>, e.g. '-a USERNAME,TOKEN;u:t:'
                         * required arguments are postfixed with '!', e.g. '-a USERNAME,TOKEN!;u:t:'
                         * QUERY,FORMAT,JSONP,RAW (Q:F:J:R respectively) are reserved and provided by default.
-        -f <format>
+        -f <format> e.g. '-f items:id,name,created_at|date'
+                        '-f iterKey:/fromRootCol1,/fromRootCol2,col1,col2|filter1|filter2,col3'
         -x <method>
         -d <data>
         -h <header> e.g. -h 'Content-Type:application/json' -h 'Accept:application/json'
-        -v <args default value> value prefixed with '<argName>:', e.g. -v 'USERNAME:admin' -v 'TOKEN:123456'
+        -v <arguments default value> value prefixed with '<argName>:', e.g. -v 'USERNAME:admin' -v 'TOKEN:123456'
+        -z <sorts> e.g. -z '+created,-name'
         -H help message
       "
       return
@@ -413,8 +433,8 @@ function define() {
   local args=$(grep -o '^[A-Z][A-Z0-9_,!]\+' <<<"$mixedArgs")
   local opts=$(grep -o '[A-Za-z:]\+$' <<<"$mixedArgs")
   opts=${opts/#:/}
-  def+=(-a "$args,QUERY,FORMAT,JSONP,RAW")
-  def+=(-o ":$opts"'Q:F:J:R')
+  def+=(-a `encode "$args,QUERY,FORMAT,JSONP,RAW"`)
+  def+=(-o `encode ":$opts"'Q:F:J:R'`)
   _defines+=("$name ${def[*]}")
 }
 
@@ -427,22 +447,26 @@ function parseDefine() {
       break
     fi
   done
-  [[ -z "$def" ]] && echo "No such define: $_name" && exit 1
+  debug "df '$_name': ${def[@]}"
+  [[ -z "$def" ]] && red "No such define: $_name" && exit 1
   set -- ${def[@]}
   shift
   local OPTARG
   local OPTIND
-  while getopts ":p:a:o:f:m:d:h:v:" opt; do
+  while getopts ":p:a:o:f:m:d:h:v:z:" opt; do
+    local decoded=`decode "$OPTARG"`
+    debug "df opts '$opt': $decoded"
     case $opt in
-    n) _name=$OPTARG ;;
-    p) _path=$OPTARG ;;
-    a) _args=$OPTARG ;;
-    o) _opts=$OPTARG ;;
-    f) _format=$OPTARG ;;
-    m) _method=$OPTARG ;;
-    d) _data=$OPTARG ;;
-    h) _headers+=($OPTARG) ;;
-    v) _defaults+=($OPTARG) ;;
+      n) _name="$OPTARG" ;;
+      p) _path="$decoded" ;;
+      a) _args="$decoded" ;;
+      o) _opts="$decoded" ;;
+      f) _format="$decoded" ;;
+      m) _method="$decoded" ;;
+      d) _data="$decoded" ;;
+      h) _headers+=("$decoded") ;;
+      v) _defaults+=("$decoded") ;;
+      z) _sorts="$decoded" ;;
     esac
   done
 }
@@ -458,6 +482,7 @@ function invoke() {
   local _data
   local _headers=()
   local _defaults=()
+  local _sorts
   parseDefine "$_name"
   debug "Invoking $_name"
   debug "  path: $_path"
@@ -468,6 +493,7 @@ function invoke() {
   debug "  data: $_data"
   debug "  headers: $_headers"
   debug "  defaults: $_defaults"
+  debug "  sorts: $_sorts"
   local _argsList=($(grep -o '[A-Z][A-Z0-9_]\+!\?' <<<$_args))
   local _pureArgsList=($(grep -o '[A-Z][A-Z0-9_]\+' <<<$_args))
   local _optsList=($(grep -o '[a-zA-Z]' <<<$_opts))
@@ -482,8 +508,8 @@ function invoke() {
   local _argIdxList=$(seq 0 $(expr ${#_pureArgsList[@]} - 1))
   # apply default values.
   for _d in "${_defaults[@]}"; do
-    _argName=$(grep -o '^[A-Z][A-Z0-9_]\+' <<<$_d)
-    _argDefault=${_d:${#_argName}+1}
+    local _argName=$(grep -o '^[A-Z][A-Z0-9_]\+' <<<$_d)
+    local _argDefault=${_d:${#_argName}+1}
     local _argIdx=$(indexOf "$_argName" "${_pureArgsList[@]}")
     if [ "$_argIdx" -gt -1 ]; then
       local "$_argName"="${_argDefault#:}"
@@ -554,7 +580,7 @@ function invoke() {
     fi
     _index=$(expr $_index + 1)
   done
-  # assign arguments values in the path and data
+  green assign arguments values in the path and data
   local _realPath="$_path"
   local _realData="$_data"
   for idx in ${_argIdxList[@]}; do
@@ -574,6 +600,9 @@ function invoke() {
 
   [[ -n "$_format" ]] && _jsonfArgs+=(-f "$_format") || ([[ -n "$FORMAT" ]] && _jsonfArgs+=(-f "$FORMAT"))
   [[ -n "$JSONP" ]] && _jsonfArgs+=(-p "$JSONP")
+  [[ -n "$_sorts" ]] && _jsonfArgs+=(-z "$_sorts")
+
+  debug "jsonf args: $_jsonfArgs"
 
   [[ "$RAW" = 1 ]] && send "${_sendArgs[@]}" | jsonf "${_jsonfArgs[@]}" || send "${_sendArgs[@]}"
 

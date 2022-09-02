@@ -28,17 +28,17 @@ function ask() {
   case "$1" in
   'statuses@PROJECT_KEY')
     invoke 'projects'
-    red -i 'Project Key: ' 1>&2
+    red 'Project Key: ' 1>&2
     read PROJECT_KEY
     ;;
   'issue@ISSUE_KEY' | 'issue:desc@ISSUE_KEY' | 'issue:comments@ISSUE_KEY' | 'issue:transitions@ISSUE_KEY' | 'issue:comment:do@ISSUE_KEY' | 'issue:status:do@ISSUE_KEY')
     issues
-    red -i 'Issue Key: ' 1>&2
+    red 'Issue Key: ' 1>&2
     read ISSUE_KEY
     ;;
   'issue:status:do@TRANSITION_ID')
     invoke 'issue:transitions' -i "$ISSUE_KEY"
-    red -i 'Transition ID: ' 1>&2
+    red 'Transition ID: ' 1>&2
     read TRANSITION_ID
     ;;
   esac

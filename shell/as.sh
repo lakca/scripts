@@ -22,7 +22,7 @@ function getToken() {
   local file=`dirname $0`/cache
   local token
   if [ -f $file ]; then
-    token=`sed -n 's/^estoken://p' /Users/longpeng/Documents/GitHub/scripts/shell/token`
+    token=`sed -n 's/^estoken://p' $file` 
   fi
   if [ -n "$token" ]; then
     printf "$token"
@@ -108,6 +108,15 @@ define -n 'zxbb' -p "https://emres.dfcfw.com/60/zxbb2018.js?callback=zxbb2018&_=
 define -n 'market' -p "https://push2.eastmoney.com/api/qt/clist/get?pi=0&pz=10&po=1&np=1&fields=f1,f2,f3,f4,f12,f13,f14&fltt=2&invt=2&ut=433fd2d0e98eaf36ad3d5001f088614d&fs=i:1.000001,i:0.399001,i:0.399006,i:1.000300,i:0.300059&cb=$jsonp&_=$stamp"\
   -v "JSONP:$jsonp"\
   -f 'data.diff:f2,f3|indicateColor,f4|indicateColor,f12,f14'
+
+CMDS_MSG="$CMDS_MSG
+          token
+          search
+          search:guba
+          xxx
+          zxbb
+          market
+"
 
 function parseCmds() {
   case $1 in

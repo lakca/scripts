@@ -16,7 +16,7 @@ JOB_ORDERS=${JOB_ORDERS:-"code_build image_build deploy"}
 # Pagination: https://docs.gitlab.com/ee/api/index.html#Pagination
 
 function send() {
-  [[ $GI_VERBOSE -gt 0 ]] && echo "curl -s -H 'PRIVATE-TOKEN: $GITLAB_PRIVATE_TOKEN' $GITLAB_ORIGIN$@" | red -i 1>&2
+  [[ $GI_VERBOSE -gt 0 ]] && echo "curl -s -H 'PRIVATE-TOKEN: $GITLAB_PRIVATE_TOKEN' $GITLAB_ORIGIN$@" | red 1>&2
   [[ $GI_VERBOSE -gt 1 ]] && curl -v -H "PRIVATE-TOKEN: $GITLAB_PRIVATE_TOKEN" $GITLAB_ORIGIN$@ || curl -s -H "PRIVATE-TOKEN: $GITLAB_PRIVATE_TOKEN" $GITLAB_ORIGIN$@
 }
 
@@ -50,30 +50,30 @@ function ask() {
   case "$1" in
   'project@PROJECT' | 'statistics@PROJECT' | 'commits@PROJECT' | 'commit@PROJECT' | 'commit:refs@PROJECT' | 'commit:comments@PROJECT' | 'pipelines@PROJECT' | 'pipeline@PROJECT' | 'pipeline:jobs@PROJECT' | 'job@PROJECT' | 'job:do@PROJECT')
     invoke 'projects'
-    red -i 'Project ID: '
+    red 'Project ID: '
     read PROJECT
     ;;
   'commit@COMMIT' | 'commit:refs@COMMIT' | 'commit:comments@COMMIT')
     invoke 'commits' -p "$PROJECT"
-    red -i 'Commit ID: '
+    red 'Commit ID: '
     read COMMIT
     ;;
   'pipeline@PIPELINE' | 'pipeline:jobs@PIPELINE' | 'doPipeline@PIPELINE')
     invoke 'pipelines' -p "$PROJECT"
-    red -i 'Pipeline ID: '
+    red 'Pipeline ID: '
     read PIPELINE
     ;;
   'job@JOB' | 'job:do@JOB')
     local PIPELINE
     ask 'pipeline'
     invoke 'pipeline:jobs' -p "$PROJECT" -J "$PIPELINE"
-    red -i 'Job ID: '
+    red 'Job ID: '
     read JOB
     ;;
   'job:do@ACTION')
-    green -i "Job Actions: "
-    printf "%s " "${JOB_ACTIONS[@]}" | green -n
-    red -i 'Your job action: '
+    green "Job Actions: "
+    printf "%s " "${JOB_ACTIONS[@]}" | green
+    red 'Your job action: '
     read ACTION
     if [ $(indexOf "$ACTION" "${JOB_ACTIONS[@]}") -eq -1 ]; then
       ask "$@"
@@ -81,7 +81,7 @@ function ask() {
     ;;
   'pipeline')
     invoke 'pipelines' -p "$PROJECT" -S "$GI_SIZE"
-    red -i 'Pipeline ID: '
+    red 'Pipeline ID: '
     read PIPELINE
     ;;
   esac
@@ -98,18 +98,18 @@ blinks=(
 
 function waitJob() {
   expose='EXPOSE_' invoke 'job' "$@"
-  green -i "Waiting for job $EXPOSE_JOB on project $EXPOSE_PROJECT to finish..." && echo
+  green "Waiting for job $EXPOSE_JOB on project $EXPOSE_PROJECT to finish..." && echo
   local status='pending'
   local newStatus="$status"
   local cacheKey=jobStatus_$EXPOSE_JOB
   cache -k "$cacheKey" -v "$status"
-  green -i "$status"
+  green "$status"
   while [ 1 -gt 0 ]; do
     invoke 'job' -p "$EXPOSE_PROJECT" -j "$EXPOSE_JOB" -R | jsone "useGet(data, 'status')" | cache -k "$cacheKey" -s &
     for i in "${blinks[@]}"; do
       newStatus=$(cache -k "$cacheKey")
       if [ "$newStatus" != "$status" ]; then
-        echo && green -i "$newStatus"
+        echo && green "$newStatus"
       fi
       status=$newStatus
       if [ "$status" -a "$status" != "running" -a "$status" != "pending" ]; then
@@ -153,11 +153,11 @@ function doPipeline() {
       if [[ "$jobStatus" = 'canceled' || "$jobStatus" = 'skipped' || "$jobStatus" = 'failed' || "$jobStatus" = 'manual' ]]; then
         doJob -p "$EXPOSE_PROJECT" -j "$jobId" -a 'play'
       else
-        green -n -i 'Job '"$jobName"' on project '"$EXPOSE_PROJECT is already finished ($jobStatus)!"
+        green 'Job '"$jobName"' on project '"$EXPOSE_PROJECT is already finished ($jobStatus)!"
       fi
       local rStatus=$(invoke 'job' -p "$EXPOSE_PROJECT" -j "$jobId" -R | jsone "useGet(data, 'status')")
       if [ "$rStatus" != "success" ]; then
-        red -n -i 'Job '"$jobName"' on project '"$EXPOSE_PROJECT failed($rStatus)!"
+        red 'Job '"$jobName"' on project '"$EXPOSE_PROJECT failed($rStatus)!"
         exit 1
       fi
     done
