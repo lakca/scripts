@@ -59,7 +59,11 @@ class hot_list:
     def weibo():
         '''微博热搜'''
         rows = []
-        response = requests.get(WEIBO_HOT_URL, headers=HEADERS)
+        headers = {}
+        headers.update(HEADERS)
+        cookies = 'tid=rOZvrfn1Nsoc/GA35Nai17PcrJ9WssHqfxYLRDLwdeU=__095; SRT=D.QqHBTrsP4qRuV-RtOeYoWr9NUdRrSGYQUcb8dQAo5eV3MdbbN-bFJORqNbHi5mYNUCsuTZbgVdsBTeMNAZSAKGPCSqH-T-khA4yqidi-OqbsSrWPUQYHIQE9KDWGSX77*B.vAflW-P9Rc0lR-ykKDvnJqiQVbiRVPBtS!r3J8sQVqbgVdWiMZ4siOzu4DbmKPWFiESPOPWpi-i3TPYkNmo4OcV-VZEa; SRF=1662459995'
+        response = requests.get(WEIBO_HOT_URL, headers=headers, cookies=cookies)
+        print(response.text, response.headers, response.request.headers)
         soup = BeautifulSoup(response.content, 'lxml')
         trs = soup.find(id='pl_top_realtimehot').find('tbody').find_all('tr')
         cols = list(map(lambda col: strip(col.text), soup.find(

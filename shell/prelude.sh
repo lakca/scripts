@@ -1,24 +1,23 @@
 # !/usr/bin/env bash
 
 # Reserved Variables:
-
 # int type
-GI_PAGE=1
-GI_SIZE=10
+GI_PAGE=${GI_PAGE:=1}
+GI_SIZE=${GI_SIZE:=10}
 # bool type
-GI_VERBOSE=0
-GB_ALIGN=1
-GB_ASYNC=0
-GB_COLORFUL=1
+GI_VERBOSE=${GI_VERBOSE:=0}
+GB_ALIGN=${GB_ALIGN:=1}
+GB_ASYNC=${GB_ASYNC:=0}
+GB_COLORFUL=${GB_COLORFUL:=1}
 # string type
-GS_QUERY=''
-GS_COLS=''
-GS_PRASER='jsonf'  # cat, json, jsonf
-GS_TABLE_TYPE='th' # table, th, list
+GS_QUERY=${GS_QUERY:=''}
+GS_COLS=${GS_COLS:=''}
+GS_PRASER=${GS_PARSER:=jsonf}  # cat, json, jsonf
+GS_TABLE_TYPE=${GS_TABLE_TYPE:=th} # table, th, list
 # Reserved for `invoke` and `ask`.
-GI_ASK_MAX_COUNT=10 # max ask count of per `invoke` argument.
-GB_ASK_ARG_STATE=0  # settle state of the asked `invoke` argument, 1 is settled, 0 is unsetled (set by `ask`).
-GS_ASK_ARG_VALUE='' # value of the asked `invoke` argument (set by `ask`).
+GI_ASK_MAX_COUNT=${GI_ASK_MAX_COUNT:=10} # max ask count of per `invoke` argument.
+GB_ASK_ARG_STATE=${GB_ASK_ARG_STATE:=0}  # settle state of the asked `invoke` argument, 1 is settled, 0 is unsetled (set by `ask`).
+GS_ASK_ARG_VALUE=${GS_ASK_ARG_VALUE:=''} # value of the asked `invoke` argument (set by `ask`).
 
 OPTS="aAcC:hP:Q:rRS:T:LvV"
 CMDS=""
@@ -88,10 +87,14 @@ function send() {
 }
 
 function encode() {
-  echo -n "$@" | base64
+  if [ -n "$*" ]; then
+    printf "%s" "$*" | base64
+  fi
 }
 function decode() {
-  echo -n "$@" | base64 --decode
+  if [ -n "$*" ]; then
+    printf "%s" "$*" | base64 --decode
+  fi
 }
 
 function helpMsg() {
@@ -190,7 +193,7 @@ function js() {
 # json or jsonp
 function json() {
 
-  debug "json:$#:$@"
+  debug "json input: $@"
 
   local coded=false
   if [[ $1 && ${1:0:1} != '-' ]]; then
@@ -221,10 +224,6 @@ function json() {
       ;;
     esac
   done
-
-  debug "jsonp:$jsonp"
-  debug "code:$code"
-
   js "
   const jsonp = '$jsonp';
   const data = jsonp ? useFilter(process.argv[1], ['jsonp', jsonp]) : JSON.parse(process.argv[1]);
@@ -242,7 +241,7 @@ function jsone() {
 
 function jsonf() {
 
-  debug "jsonf:$#:$@"
+  debug "jsonf input: $@"
 
   local cols=''
   local aligned=$GB_ALIGN
@@ -293,7 +292,7 @@ function jsonf() {
 
   [[ -n "$jsonp" ]] && args+=(-p "$jsonp")
 
-  debug "args:${#args[@]}:${args[@]}"
+  debug "args of ${#args[@]}: ${args[@]}"
 
   case $GS_PRASER in
   'cat')
@@ -327,7 +326,7 @@ function green() {
   [[ $# -gt 0 ]] && printf "\033[0;32m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;32m%s\033[0m" 
 }
 function blue() {
-  [[ $# -gt 0 ]] && printf "\033[0;33m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;33m%s\033[0m" 
+  [[ $# -gt 0 ]] && printf "\033[0;34m%s\033[0m\n" "$*" || xargs -0 printf "\033[0;34m%s\033[0m" 
 }
 
 function sprintf() {
@@ -363,9 +362,16 @@ function sprintf() {
 }
 
 function debug() {
-  if [ -n "$DEBUG" ]; then
+  if [[ 'DEBUG' =~ "$DEBUG" ]]; then
     echo "$*" | while IFS= read line ; do
-      printf "\033[0;31m[DEBUG:`realpath ${BASH_SOURCE[0]}`:$LINENO]\033[0m \033[0;37m%s\033[0m\n" "$line"
+      printf "\033[0;31m[DEBUG:`realpath ${BASH_SOURCE[0]}`:${BASH_LINENO[0]}]\033[0m \033[0;37m%s\033[0m\n" "$line"
+    done
+  fi
+}
+function info() {
+  if [[ 'INFO' =~ "$DEBUG" ]]; then
+    echo "$*" | while IFS= read line ; do
+      printf "\033[0;32m[DEBUG:`realpath ${BASH_SOURCE[0]}`:${BASH_LINENO[0]}]\033[0m \033[0;37m%s\033[0m\n" "$line"
     done
   fi
 }
@@ -454,8 +460,9 @@ function parseDefine() {
   local OPTARG
   local OPTIND
   while getopts ":p:a:o:f:m:d:h:v:z:" opt; do
+    debug "df opts origin '$opt': $OPTARG"
     local decoded=`decode "$OPTARG"`
-    debug "df opts '$opt': $decoded"
+    debug "df opts encode '$opt': $decoded"
     case $opt in
       n) _name="$OPTARG" ;;
       p) _path="$decoded" ;;
@@ -484,7 +491,7 @@ function invoke() {
   local _defaults=()
   local _sorts
   parseDefine "$_name"
-  debug "Invoking $_name"
+  debug "invoke $_name:"
   debug "  path: $_path"
   debug "  args: $_args"
   debug "  opts: $_opts"
@@ -497,6 +504,8 @@ function invoke() {
   local _argsList=($(grep -o '[A-Z][A-Z0-9_]\+!\?' <<<$_args))
   local _pureArgsList=($(grep -o '[A-Z][A-Z0-9_]\+' <<<$_args))
   local _optsList=($(grep -o '[a-zA-Z]' <<<$_opts))
+  debug "pureArgs: ${_pureArgsList[@]}"
+  debug "optsList: ${_optsList[@]}"
 
   # reserved args
   local QUERY
@@ -565,7 +574,7 @@ function invoke() {
   local _index=0
   while [ "$_index" -lt "${#_pureArgsList[@]}" ]; do
     if [ "${_argsList[_index]: -1}" = '!' ]; then
-      debug "Required argument $_index: ${_pureArgsList[_index]}"
+      debug "required arg: ${_pureArgsList[_index]}"
       local _askCount=0
       while [ -z "${!_pureArgsList[_index]}" ]; do
         _askCount=$(expr $_askCount + 1)
@@ -573,14 +582,14 @@ function invoke() {
           echo "Too many invalid arguments: $_name@${_pureArgsList[_index]}"
           exit 1
         fi
-        debug "ask $_askCount""th: $_name@${_pureArgsList[_index]}"
+        debug "ask arg $_askCount""th: $_name@${_pureArgsList[_index]}"
         ask "$_name@${_pureArgsList[_index]}"
         debug "asked $_name@${_pureArgsList[_index]}: ${!_pureArgsList[_index]}"
       done
     fi
     _index=$(expr $_index + 1)
   done
-  green assign arguments values in the path and data
+  # assign arguments values in the path and data
   local _realPath="$_path"
   local _realData="$_data"
   for idx in ${_argIdxList[@]}; do
@@ -601,14 +610,12 @@ function invoke() {
   [[ -n "$_format" ]] && _jsonfArgs+=(-f "$_format") || ([[ -n "$FORMAT" ]] && _jsonfArgs+=(-f "$FORMAT"))
   [[ -n "$JSONP" ]] && _jsonfArgs+=(-p "$JSONP")
   [[ -n "$_sorts" ]] && _jsonfArgs+=(-z "$_sorts")
-
-  debug "jsonf args: $_jsonfArgs"
-
   [[ "$RAW" = 1 ]] && send "${_sendArgs[@]}" | jsonf "${_jsonfArgs[@]}" || send "${_sendArgs[@]}"
 
   if [ -n "$expose" ]; then
+    debug "expose prefix: $expose"
     for arg in "${_pureArgsList[@]}"; do
-      debug "$expose,$expose$arg,${!arg}"
+      debug "expose $expose$arg: ${!arg}"
       eval "$expose$arg=${!arg}"
     done
   fi
