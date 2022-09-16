@@ -16,7 +16,7 @@ JOB_ORDERS=${JOB_ORDERS:-"code_build image_build deploy"}
 # Pagination: https://docs.gitlab.com/ee/api/index.html#Pagination
 
 function send() {
-  [[ $GI_VERBOSE -gt 0 ]] && echo "curl -s -H 'PRIVATE-TOKEN: $GITLAB_PRIVATE_TOKEN' $GITLAB_ORIGIN$@" | red 1>&2
+  [[ $GI_VERBOSE -gt 0 ]] && echo "curl -s -H 'PRIVATE-TOKEN: $GITLAB_PRIVATE_TOKEN' $GITLAB_ORIGIN$@" | green 1>&2
   [[ $GI_VERBOSE -gt 1 ]] && curl -v -H "PRIVATE-TOKEN: $GITLAB_PRIVATE_TOKEN" $GITLAB_ORIGIN$@ || curl -s -H "PRIVATE-TOKEN: $GITLAB_PRIVATE_TOKEN" $GITLAB_ORIGIN$@
 }
 
@@ -40,7 +40,7 @@ define -n 'commit:comments' -p '/api/v4/projects/$PROJECT/repository/commits/$CO
 # order_by: id, status, ref, updated_at or user_id (default: id)
 # sort: asc or desc
 define -n 'pipelines' -p '/api/v4/projects/$PROJECT/pipelines?page=$PAGE&per_page=$SIZE' -a 'PROJECT!,PAGE,SIZE;p:P:S:' -f 'id,status,ref,sha,created_at|date,updated_at|date,web_url'
-define -n 'pipeline' -p '/api/v4/projects/$PROJECT/pipelines/$PIPELINE' -a 'PROJECT!,PIPELINE!;p:J:' -f 'id,user.name,ref,status,sha,duration,created_at|date,started_at|date,finished_at|date,web_url'
+define -n 'pipeline' -p '/api/v4/projects/$PROJECT/pipelines/$PIPELINE' -a 'PROJECT!,PIPELINE!;p:J:' -f 'id,user.name,ref,status,sha,duration,started_at|date,finished_at|date,web_url'
 define -n 'pipeline:jobs' -p '/api/v4/projects/$PROJECT/pipelines/$PIPELINE/jobs?page=$PAGE&per_page=$SIZE' -a 'PROJECT!,PIPELINE!,PAGE,SIZE;p:J:P:S:' -f 'id,name,stage,status,pipeline.project_id,pipeline.id,ref,user.username,commit.id,commit.author_name,commit.title,commit.message|trim,commit.web_url,created_at|date,updated_at|date,finished_at|date,web_url'
 define -n 'job' -p '/api/v4/projects/$PROJECT/jobs/$JOB' -a 'PROJECT!,JOB!;p:j:' -f 'id,status,name,stage,pipeline.project_id,pipeline.id,ref,user.username,commit.id,commit.author_name,commit.title,commit.message|trim,commit.web_url,created_at|date,updated_at|date,finished_at|date,web_url'
 
@@ -98,7 +98,7 @@ blinks=(
 
 function waitJob() {
   expose='EXPOSE_' invoke 'job' "$@"
-  green "Waiting for job $EXPOSE_JOB on project $EXPOSE_PROJECT to finish..." && echo
+  echo "Waiting for job `green $EXPOSE_JOB` on project `green $EXPOSE_PROJECT` to finish..."
   local status='pending'
   local newStatus="$status"
   local cacheKey=jobStatus_$EXPOSE_JOB
@@ -109,7 +109,7 @@ function waitJob() {
     for i in "${blinks[@]}"; do
       newStatus=$(cache -k "$cacheKey")
       if [ "$newStatus" != "$status" ]; then
-        echo && green "$newStatus"
+        green "$newStatus"
       fi
       status=$newStatus
       if [ "$status" -a "$status" != "running" -a "$status" != "pending" ]; then
@@ -149,15 +149,15 @@ function doPipeline() {
       local jobId=$(echo "$line" | cut -d ' ' -f 1)
       local jobStatus=$(echo "$line" | cut -d ' ' -f 2)
       local jobName=$(echo "$line" | cut -d ' ' -f 3)
-      echo "$jobName $jobId ($jobStatus)"
+      echo "Run job `green $jobName` $jobId ($jobStatus)"
       if [[ "$jobStatus" = 'canceled' || "$jobStatus" = 'skipped' || "$jobStatus" = 'failed' || "$jobStatus" = 'manual' ]]; then
         doJob -p "$EXPOSE_PROJECT" -j "$jobId" -a 'play'
       else
-        green 'Job '"$jobName"' on project '"$EXPOSE_PROJECT is already finished ($jobStatus)!"
+        green "Job $jobName on project $EXPOSE_PROJECT already finished ($jobStatus)!"
       fi
       local rStatus=$(invoke 'job' -p "$EXPOSE_PROJECT" -j "$jobId" -R | jsone "useGet(data, 'status')")
       if [ "$rStatus" != "success" ]; then
-        red 'Job '"$jobName"' on project '"$EXPOSE_PROJECT failed($rStatus)!"
+        red "Job $jobName on project $EXPOSE_PROJECT failed($rStatus)!"
         exit 1
       fi
     done
