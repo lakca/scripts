@@ -103,7 +103,7 @@ function waitJob() {
   local newStatus="$status"
   local cacheKey=jobStatus_$EXPOSE_JOB
   cache -k "$cacheKey" -v "$status"
-  green "$status"
+  green $newStatus
   while [ 1 -gt 0 ]; do
     invoke 'job' -p "$EXPOSE_PROJECT" -j "$EXPOSE_JOB" -R | jsone "useGet(data, 'status')" | cache -k "$cacheKey" -s &
     for i in "${blinks[@]}"; do
@@ -141,25 +141,37 @@ function doPipeline() {
     })()")
 
   printf "Do pipeline \033[0;32m$EXPOSE_PIPELINE\033[0m on project \033[0;32m$EXPOSE_PROJECT\033[0m with orders: \033[0;32m$JOB_ORDERS\033[0m"
-  read -p "? (y/n) " -n 1 -r
+  read -p "? (y/n) " -n 1
 
-  if [[ $REPLY =~ ^[Yy]$ ]]; then
+  if [[ $REPLY = y ]]; then
     echo
     echo "$jobList" | while read -r line; do
       local jobId=$(echo "$line" | cut -d ' ' -f 1)
       local jobStatus=$(echo "$line" | cut -d ' ' -f 2)
       local jobName=$(echo "$line" | cut -d ' ' -f 3)
-      echo "Run job `green $jobName` $jobId ($jobStatus)"
-      if [[ "$jobStatus" = 'canceled' || "$jobStatus" = 'skipped' || "$jobStatus" = 'failed' || "$jobStatus" = 'manual' ]]; then
-        doJob -p "$EXPOSE_PROJECT" -j "$jobId" -a 'play'
-      else
-        green "Job $jobName on project $EXPOSE_PROJECT already finished ($jobStatus)!"
-      fi
-      local rStatus=$(invoke 'job' -p "$EXPOSE_PROJECT" -j "$jobId" -R | jsone "useGet(data, 'status')")
-      if [ "$rStatus" != "success" ]; then
-        red "Job $jobName on project $EXPOSE_PROJECT failed($rStatus)!"
-        exit 1
-      fi
+      while True; do
+        if [[ "$jobStatus" = 'running' ]]; then
+          waitJob -p "$EXPOSE_PROJECT" -j "$jobId"
+        else
+          echo "Run job `green $jobName` $jobId ($jobStatus)"
+          if [[ "$jobStatus" = 'canceled' || "$jobStatus" = 'skipped' || "$jobStatus" = 'failed' || "$jobStatus" = 'manual' ]]; then
+            doJob -p "$EXPOSE_PROJECT" -j "$jobId" -a 'play'
+          else
+            green "Job $jobName on project $EXPOSE_PROJECT already finished ($jobStatus)!"
+          fi
+        fi
+        local rStatus=$(invoke 'job' -p "$EXPOSE_PROJECT" -j "$jobId" -R | jsone "useGet(data, 'status')")
+        if [[ "$rStatus" != "success" ]]; then
+          red "Job $jobName on project $EXPOSE_PROJECT failed($rStatus)!"
+          echo "Retry job $jobName($jobId)?(y/n)"
+          read -p "Retry job $jobName($jobId)?(y/n)"
+          if [[ $REPLY = 'y' ]]; then
+            continue
+          fi
+          exit 1;
+        fi
+        break
+      done
     done
   fi
 }
