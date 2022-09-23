@@ -3,6 +3,8 @@
 WEIBO_HOT_URL='https://s.weibo.com/top/summary?cate=top_hot'
 WEIBO_YAOWEN_URL='https://s.weibo.com/top/summary?cate=socialevent'
 WEIBO_WENYU_URL='https://s.weibo.com/top/summary?cate=entrank'
+WEIBO_POST_URL='https://weibo.com/ajax/statuses/show?id=0'
+WEIBO_COMMENT_URL='https://weibo.com/ajax/statuses/buildComments?is_reload=1&id=0&is_show_bulletin=2&is_mix=0&count=0&uid=0'
 
 BAIDU_HOT_URL='https://top.baidu.com/board?tab=realtime'
 
@@ -60,14 +62,17 @@ function record() {
   [ -n "$VERBOSE" ] && echo -e "\033[33m地址\033[0m: \033[4;32m$link\033[0m"
 }
 
-
 function weibo() {
   local url="$WEIBO_HOT_URL"
   local i=0
+  local id=$2
   case ${1:-hot} in
     hot|ht) url="$WEIBO_HOT_URL";;
     yaowen|vip) url="$WEIBO_YAOWEN_URL";;
     wenyu|ent) url="$WEIBO_WENYU_URL";;
+    comment|cm)
+      weiboComment ${@:2}
+      return;;
   esac
   local cookie='SUB=_2AkMURLcVf8NxqwJRmf4dxWnibYt1zw7EieKiGEbOJRMxHRl-yj9jqlA5tRB6P8SZ-sVAyb47oXgB6AyfiRc9-7xR7yRm'
 
@@ -77,6 +82,40 @@ function weibo() {
     echo
     i=`expr $i + 1`
   done
+}
+
+function resolveLink() {
+  local link="$1"
+  link=${link//(\#|\?)*/}
+  local parts=(`echo $link | grep -oE '[^\/]+'`)
+  echo "${parts[*]}"
+}
+
+# https://weibo.com/1600463082/M74GseLpY
+function weiboPost() {
+  local parts=(`resolveLink $1`)
+  local pid=${parts[@]:3:1}
+  local posturl=${WEIBO_POST_URL//id=0/id=$id}
+  local post=`curl -s $posturl`
+  echo "$post"
+}
+
+function weiboComment() {
+  local url="$WEIBO_COMMENT_URL"
+  local link="$1"
+  local count=10
+  local parts=(`resolveLink $link`)
+  echo ${parts[@]}
+  local uid=${parts[@]:2:1}
+  local pid=${parts[@]:3:1}
+  local post=`cat weibo.post.json`
+  local id=`echo $post | grep -oE '"idstr":".+?"' | head -1 | cut -d'"' -f4`
+  url=${url//uid=0/uid=$uid}
+  url=${url//id=0/id=$id}
+  url=${url//count=0/count=$count}
+  local patterns=('"text_raw":".*?"' '"source":".*?"' '"screen_name":".*?"' '"followers_count_str":".*?"' '"profile_url":".*?"')
+  local indexes=(4 4 4 4 4)
+  json -u "$url" -p "${patterns[*]}" -i "${indexes[*]}"
 }
 
 function baidu() {
@@ -151,8 +190,8 @@ function toutiao() {
 }
 
 case $1 in
-  weibo|wb) weibo $2;;
-  baidu|bd) baidu $2;;
-  zhihu|zh) zhihu $2 $3;;
-  toutiao|tt) toutiao $2;;
+  weibo|wb) weibo ${@:2};;
+  baidu|bd) baidu ${@:2};;
+  zhihu|zh) zhihu ${@:2};;
+  toutiao|tt) toutiao ${@:2};;
 esac

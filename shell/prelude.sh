@@ -12,7 +12,7 @@ GB_COLORFUL=${GB_COLORFUL:=1}
 # string type
 GS_QUERY=${GS_QUERY:=''}
 GS_COLS=${GS_COLS:=''}
-GS_PRASER=${GS_PARSER:=jsonf}  # cat, json, jsonf
+GS_PARSER=${GS_PARSER:=jsonf}  # cat, json, jsonf
 GS_TABLE_TYPE=${GS_TABLE_TYPE:=th} # table, th, list
 # Reserved for `invoke` and `ask`.
 GI_ASK_MAX_COUNT=${GI_ASK_MAX_COUNT:=10} # max ask count of per `invoke` argument.
@@ -47,7 +47,7 @@ function unset_prelude() {
   unset GB_COLORFUL
   unset GS_QUERY
   unset GS_COLS
-  unset GS_PRASER
+  unset GS_PARSER
   unset GS_TABLE_TYPE
   unset GI_ASK_MAX_COUNT
   unset GB_ASK_ARG_STATE
@@ -127,8 +127,8 @@ function parseCommonOpts() {
   L) GS_TABLE_TYPE=list ;;
   v) GI_VERBOSE=2 ;;
   V) GI_VERBOSE=1 ;;
-  r) GS_PRASER='cat' ;;
-  R) GS_PRASER='json' ;;
+  r) GS_PARSER='cat' ;;
+  R) GS_PARSER='json' ;;
   h)
     helpMsg
     exit 0
@@ -294,7 +294,7 @@ function jsonf() {
 
   debug "args of ${#args[@]}: ${args[@]}"
 
-  case $GS_PRASER in
+  case $GS_PARSER in
   'cat')
     cat
     ;;
