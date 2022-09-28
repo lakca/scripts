@@ -100,7 +100,6 @@ function decode() {
 }
 
 function helpMsg() {
-  green "Usage: $0 [OPTIONS] [COMMAND]
   local names=()
   local maxLen=0
   for df in "${_defines[@]}"; do
@@ -495,17 +494,20 @@ function parseDefine() {
   local OPTARG
   local OPTIND
   while getopts ":p:a:o:f:m:d:h:v:N:z:" opt; do
+    debug "df opts origin '$opt': $OPTARG"
+    local decoded=`decode "$OPTARG" 2>/dev/null`
+    debug "df opts decode '$opt': $decoded"
     case $opt in
-    n) _name=$OPTARG;;
     N) _displayName=$OPTARG;;
-    p) _path=$OPTARG;;
-    a) _args=$OPTARG;;
-    o) _opts=$OPTARG;;
-    f) _format=$OPTARG;;
-    m) _method=$OPTARG;;
-    d) _data=$OPTARG;;
-    h) _headers+=($OPTARG);;
-    v) _defaults+=($OPTARG);;
+    n) _name=$decoded;;
+    p) _path=$decoded;;
+    a) _args=$decoded;;
+    o) _opts=$decoded;;
+    f) _format=$decoded;;
+    m) _method=$decoded;;
+    d) _data=$decoded;;
+    h) _headers+=($decoded);;
+    v) _defaults+=($decoded);;
     z) _sorts="$decoded" ;;
     esac
   done
