@@ -1,34 +1,45 @@
 #! /usr/bin/env bash
 
-function decodeUnicode() {
-  echo -e `echo "$*" | sed -E 's/\\u0([1-9a-f]{3})/\\x\1/gI' \
+function escapeUnicode() {
+  printf '%s' "$*" | sed -E 's/\\u0([1-9a-f]{3})/\\x\1/gI' \
   | sed -E 's/\\u00([1-9a-f]{2})/\\x\1/gI' \
-  | sed -E 's/\\u000([1-9a-f]{1})/\\x\1/gI'`
+  | sed -E 's/\\u000([1-9a-f]{1})/\\x\1/gI'
 }
 
-function encodeSpace() {
-  echo $* | sed -E 's/ /\\x20/g'
+function escapeSpace() {
+  printf '%s' "$*" | sed -E 's/ /\\x20/g' \
+    | sed -E 's/\\n/\\xa/g' \
+    | sed -E 's/\\t/\\x9/g' \
+    | sed -E 's/\\v/\\xb/g' \
+    | sed -E 's/\\f/\\xc/g' \
+    | sed -E 's/\\r/\\xd/g'
 }
 
 function print_record() {
   local -a fields=()
   local -a values=()
+  local id=''
   local OPTIND
-  while getopts ':a:v:' opt; do
+  while getopts ':a:v:n:' opt; do
     case "$opt" in
       a) fields+=($OPTARG);;
       v) values+=($OPTARG);;
+      n) id=$OPTARG;;
     esac
   done
   local primary=0
   for index in "${!fields[@]}"; do
     if [[ $primary -eq 0 ]]; then
-      echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[1;31m${values[@]:$index:1}\033[0m"
+      echo -e "\033[33m${fields[@]:$index:1}\033[0m: 【"$id"】\033[1;31m${values[@]:$index:1}\033[0m"
     else
       echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[32m${values[@]:$index:1}\033[0m"
     fi
     primary=1
   done
+}
+
+function urlencode() {
+  printf '%s' urlencode
 }
 
 function print_json() {
@@ -37,33 +48,41 @@ function print_json() {
   local -a fieldPatterns
   local -a fieldIndexes
   local -a transformers
+  local -a fieldKeys
   local url=''
   local text=''
   local OPTIND
   while getopts 'a:f:p:i:t:u:s:' opt; do
     case "$opt" in
       a) fieldAliases+=($OPTARG);;
+      k) fieldKeys+=($OPTARG);;
       f) fieldNames+=($OPTARG);;
       p) fieldPatterns+=($OPTARG);;
       i) fieldIndexes+=($OPTARG);;
       t) transformers+=($OPTARG);;
       u) url="$OPTARG";;
       s) text="$OPTARG";;
-      *) exit 1;;
+      *) echo '未知选项 $opt'; exit 1;;
     esac
   done
   if [[ -z "$text" ]]; then
-    text=`decodeUnicode \`curl -s $url\``
+    text="$(escapeSpace $(escapeUnicode $(curl -s $url)))"
   fi
+
+  printf '%s' "$text" > weibo.hot.post.json
 
   local primaryKey="${fieldNames[@]:0:1}"
 
   for index in "${!fieldNames[@]}"; do
-    local field="${fieldNames[@]:$index:1}"
+    local field="${fieldNames[@]:$index:1}";
+    local pattern="${fieldPatterns[@]:$index:1}"
+    if [[ "$pattern" = '_' ]]; then
+      pattern='"'$field'":"[^"]*"'
+    fi
     declare -a "arr_$field"
-    while read line; do
+    while read -r line; do
       declare "arr_$field+=(\"$line\")";
-    done < <(echo "$text" | grep -oE "${fieldPatterns[@]:$index:1}" | cut -d'"' -f${fieldIndexes[@]:$index:1})
+    done < <(printf '%s' "$text" | grep -oE "$pattern" | cut -d'"' -f${fieldIndexes[@]:$index:1})
   done
 
   local _primaryFieldsIndirection="arr_${primaryKey}[@]"
@@ -76,17 +95,26 @@ function print_json() {
       local _fieldValuesIndirection="arr_${field}[@]"
       local _fieldValues=("${!_fieldValuesIndirection}")
       local value="${_fieldValues[@]:$index:1}"
-      values+=("`encodeSpace "$value"`")
+      if [[ "$value" =~ ^:[0-9]+,$ ]]; then # 数字类型
+        value=$(echo "$value" | grep -oE '\d+')
+      fi
+      values+=("$value")
     done
 
     # iterate fields
+    local _values=()
     for idx in "${!fieldNames[@]}"; do
-      if [[ -n "${transformers[@]:$idx:1}" ]]; then
-        values[$idx]="`eval "echo ${transformers[@]:$idx:1}"`"
+      local tf="${transformers[@]:$idx:1}"
+      _values[$idx]="${values[@]:$idx:1}"
+      if [[ -n "$tf" && "$tf" != '_' ]]; then
+        _values[$idx]="`eval "printf '%s' $tf"`"
       fi
     done
+    for idx in "${!fieldNames[@]}"; do
+      values[$idx]="${_values[@]:$idx:1}"
+    done
 
-    print_record -a "${fieldAliases[*]}" -v "${values[*]}"
+    print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index`
     echo
   done
 }

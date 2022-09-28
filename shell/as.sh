@@ -45,7 +45,7 @@ function getToken() {
 function ask() {
   case "$1" in
     *@TOKEN)
-      TOKEN="$(token)"
+      TOKEN=`getToken`
       ;;
   esac
 }
@@ -127,11 +127,97 @@ CMDS_MSG="$CMDS_MSG
 "
 
 function parseCmds() {
-  local args=("${@:2}")
   case $1 in
-    token) shift; token "$@";;
+    token) getToken;;
     *) invoke "$@";;
   esac
 }
 parseArgs "$@"
 
+
+# searchModule: function(t, e, n) {
+#     if ("searchall" == e)
+#         return h.resolve({
+#             key: t
+#         });
+#     var a = [];
+#     switch (e) {
+#     case "stock":
+#         a = [14];
+#         break;
+#     case "guba":
+#         a = [8];
+#         break;
+#     case "user":
+#         a = [2, 7];
+#         break;
+#     case "group":
+#         a = [3];
+#         break;
+#     case "module":
+#         a = [16, 43, 38, 35, 501, 2, 7, 3];
+#         break;
+#     case "info":
+#         a = this.getInfoModules(n.infomodules)
+#     }
+#     var i = 1;
+#     return "stock" == e && (i = n.stockcount),
+#     "guba" == e && (i = n.gubacount),
+#     s.getdata2({
+#         key: t,
+#         types: a,
+#         count: i,
+#         filter: n.filter
+#     })
+# },
+
+# curl 'https://searchapi.eastmoney.com/api/suggest/get?cb=jQuery112408605893827100204_1642735968060&input=dfc&type=14&token=D43BF722C8E33BDC906FB84D85E326E8&markettype=&mktnum=&jys=&classify=&securitytype=&status=&count=5&_=1642735968089' \
+#   -H 'Connection: keep-alive' \
+#   -H 'Pragma: no-cache' \
+#   -H 'Cache-Control: no-cache' \
+#   -H 'sec-ch-ua: " Not;A Brand";v="99", "Google Chrome";v="97", "Chromium";v="97"' \
+#   -H 'sec-ch-ua-mobile: ?0' \
+#   -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36' \
+#   -H 'sec-ch-ua-platform: "macOS"' \
+#   -H 'Accept: */*' \
+#   -H 'Sec-Fetch-Site: same-site' \
+#   -H 'Sec-Fetch-Mode: no-cors' \
+#   -H 'Sec-Fetch-Dest: script' \
+#   -H 'Referer: https://www.eastmoney.com/' \
+#   -H 'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8' \
+#   -H 'Cookie: HAList=a-sh-601233-%u6850%u6606%u80A1%u4EFD; qgqp_b_id=c1eed7a455c20746fbcca97bf923dd73; st_si=04995025220768; st_pvi=04207278575540; st_sp=2021-09-06%2014%3A53%3A38; st_inirUrl=https%3A%2F%2Fwww.baidu.com%2Flink; st_sn=3; st_psi=20220121113256803-111000300841-1402358517; st_asi=20220121113256803-111000300841-1402358517-Web_so_srk-3' \
+#   --compressed
+
+# curl 'https://searchapi.eastmoney.com/api/suggest/get?cb=jQuery112408605893827100204_1642735968080&input=dfc&type=8&token=D43BF722C8E33BDC906FB84D85E326E8&markettype=&mktnum=&jys=&classify=&securitytype=&status=&count=4&_=1642735968090' \
+#   -H 'Connection: keep-alive' \
+#   -H 'Pragma: no-cache' \
+#   -H 'Cache-Control: no-cache' \
+#   -H 'sec-ch-ua: " Not;A Brand";v="99", "Google Chrome";v="97", "Chromium";v="97"' \
+#   -H 'sec-ch-ua-mobile: ?0' \
+#   -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36' \
+#   -H 'sec-ch-ua-platform: "macOS"' \
+#   -H 'Accept: */*' \
+#   -H 'Sec-Fetch-Site: same-site' \
+#   -H 'Sec-Fetch-Mode: no-cors' \
+#   -H 'Sec-Fetch-Dest: script' \
+#   -H 'Referer: https://www.eastmoney.com/' \
+#   -H 'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8' \
+#   -H 'Cookie: HAList=a-sh-601233-%u6850%u6606%u80A1%u4EFD; qgqp_b_id=c1eed7a455c20746fbcca97bf923dd73; st_si=04995025220768; st_pvi=04207278575540; st_sp=2021-09-06%2014%3A53%3A38; st_inirUrl=https%3A%2F%2Fwww.baidu.com%2Flink; st_sn=3; st_psi=20220121113256803-111000300841-1402358517; st_asi=20220121113256803-111000300841-1402358517-Web_so_srk-3' \
+#   --compressed
+
+# curl 'https://searchapi.eastmoney.com/api/suggest/get?cb=jQuery112408605893827100204_1642735968062&input=dfc&type=16%2C43%2C38%2C35%2C501%2C2%2C7%2C3&token=D43BF722C8E33BDC906FB84D85E326E8&markettype=&mktnum=&jys=&classify=&securitytype=&status=&count=1&_=1642735968091' \
+#   -H 'Connection: keep-alive' \
+#   -H 'Pragma: no-cache' \
+#   -H 'Cache-Control: no-cache' \
+#   -H 'sec-ch-ua: " Not;A Brand";v="99", "Google Chrome";v="97", "Chromium";v="97"' \
+#   -H 'sec-ch-ua-mobile: ?0' \
+#   -H 'User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/97.0.4692.71 Safari/537.36' \
+#   -H 'sec-ch-ua-platform: "macOS"' \
+#   -H 'Accept: */*' \
+#   -H 'Sec-Fetch-Site: same-site' \
+#   -H 'Sec-Fetch-Mode: no-cors' \
+#   -H 'Sec-Fetch-Dest: script' \
+#   -H 'Referer: https://www.eastmoney.com/' \
+#   -H 'Accept-Language: zh-CN,zh;q=0.9,en;q=0.8' \
+#   -H 'Cookie: HAList=a-sh-601233-%u6850%u6606%u80A1%u4EFD; qgqp_b_id=c1eed7a455c20746fbcca97bf923dd73; st_si=04995025220768; st_pvi=04207278575540; st_sp=2021-09-06%2014%3A53%3A38; st_inirUrl=https%3A%2F%2Fwww.baidu.com%2Flink; st_sn=3; st_psi=20220121113256803-111000300841-1402358517; st_asi=20220121113256803-111000300841-1402358517-Web_so_srk-3' \
+#   --compressed

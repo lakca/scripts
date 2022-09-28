@@ -8,6 +8,7 @@ stamp=`date +%s`
 function zxbb() {
   local url="https://emres.dfcfw.com/60/zxbb2018.js?callback=zxbb2018&_=$stamp"
   local text=`curl -s "$url"`
+
 }
 
 fields=(title link)
