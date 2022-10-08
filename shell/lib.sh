@@ -1,9 +1,33 @@
 #! /usr/bin/env bash
 
+pythonInstalled=$(which python >/dev/null && echo 1 || echo 0)
+
+if [[ `which python >/dev/null` ]]; then
+  function jsonparser() {
+    local OPTIND
+    local data
+    local format
+    while getopts 'd:f:' opt; do
+      case $opt in
+        d) data="$OPTARG";;
+        f) format="$OPTARG";;
+      esac
+    done
+    python -e "
+import json;
+import sys;
+
+data = json.loads('$data')
+
+    "
+  }
+fi
+
 function escapeUnicode() {
   printf '%s' "$*" | sed -E 's/\\u0([1-9a-f]{3})/\\x\1/gI' \
   | sed -E 's/\\u00([1-9a-f]{2})/\\x\1/gI' \
-  | sed -E 's/\\u000([1-9a-f]{1})/\\x\1/gI'
+  | sed -E 's/\\u000([1-9a-f]{1})/\\x\1/gI' \
+  | sed -E 's/\\"/\\x22/gI'
 }
 
 function escapeSpace() {
@@ -18,12 +42,14 @@ function escapeSpace() {
 function print_record() {
   local -a fields=()
   local -a values=()
+  local -a types=()
   local id=''
   local OPTIND
-  while getopts ':a:v:n:' opt; do
+  while getopts ':a:v:n:t:' opt; do
     case "$opt" in
       a) fields+=($OPTARG);;
       v) values+=($OPTARG);;
+      t) types+=($OPTARG);;
       n) id=$OPTARG;;
     esac
   done
@@ -33,6 +59,9 @@ function print_record() {
       echo -e "\033[33m${fields[@]:$index:1}\033[0m: 【"$id"】\033[1;31m${values[@]:$index:1}\033[0m"
     else
       echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[32m${values[@]:$index:1}\033[0m"
+      if [[ "${types[@]:$index:1}" = 'img' ]]; then
+        curl -s "${values[@]:$index:1}" | imgcat --height=5
+      fi
     fi
     primary=1
   done
@@ -49,10 +78,13 @@ function print_json() {
   local -a fieldIndexes
   local -a transformers
   local -a fieldKeys
+  local -a types
   local url=''
   local text=''
+  local raw=0
+  local jsonFormat=''
   local OPTIND
-  while getopts 'a:f:p:i:t:u:s:' opt; do
+  while getopts 'a:f:p:i:t:u:s:r:y:j:' opt; do
     case "$opt" in
       a) fieldAliases+=($OPTARG);;
       k) fieldKeys+=($OPTARG);;
@@ -62,14 +94,22 @@ function print_json() {
       t) transformers+=($OPTARG);;
       u) url="$OPTARG";;
       s) text="$OPTARG";;
+      r) raw=$OPTARG;;
+      y) types+=($OPTARG);;
+      j) jsonFormat=$OPTARG;;
       *) echo '未知选项 $opt'; exit 1;;
     esac
   done
   if [[ -z "$text" ]]; then
     text="$(escapeSpace $(escapeUnicode $(curl -s $url)))"
   fi
+  if [[ $raw -eq 1 ]]; then
+    printf '%s' "$text"
+  fi
 
-  printf '%s' "$text" > weibo.hot.post.json
+  if [[ `declare -f jsonparser` ]]; then
+    jsonparser "$jsonFormat"
+  fi
 
   local primaryKey="${fieldNames[@]:0:1}"
 
@@ -81,7 +121,7 @@ function print_json() {
     fi
     declare -a "arr_$field"
     while read -r line; do
-      declare "arr_$field+=(\"$line\")";
+      declare "arr_$field+=(\"${line:-~}\")";
     done < <(printf '%s' "$text" | grep -oE "$pattern" | cut -d'"' -f${fieldIndexes[@]:$index:1})
   done
 
@@ -114,7 +154,7 @@ function print_json() {
       values[$idx]="${_values[@]:$idx:1}"
     done
 
-    print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index`
+    print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index` -t "${types[*]}"
     echo
   done
 }

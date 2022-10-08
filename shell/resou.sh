@@ -1,5 +1,7 @@
 #! /usr/bin/env bash
 
+pythonInstalled=$(which python >/dev/null && echo 1 || echo 0)
+
 WEIBO_HOT_SEARCH_URL='https://s.weibo.com/top/summary?cate=top_hot'
 WEIBO_YAOWEN_URL='https://s.weibo.com/top/summary?cate=socialevent'
 WEIBO_WENYU_URL='https://s.weibo.com/top/summary?cate=entrank'
@@ -14,7 +16,7 @@ WEIBO_HOT_POST_URLS=(
   明星 'STAR' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034288&containerid=102803_ctg1_4288_-_ctg1_4288&extparam=discover%7Cnew_feed&max_id=0&count=10'
   抗疫 'ANTICOVID19' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600115&containerid=102803_ctg1_600115_-_ctg1_600115&extparam=discover%7Cnew_feed&max_id=0&count=10'
   好物 'GOODTHING' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600094&containerid=102803_ctg1_600094_-_ctg1_600094&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  搞笑 'FUNNY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034388&containerid=102803_ctg1_4388_-_ctg1_4388&extparam=discover%7Cnew_feed&max_id=0&count=10'
+  搞笑 'FUNNY' 'https://weibo.ccreated_atom/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034388&containerid=102803_ctg1_4388_-_ctg1_4388&extparam=discover%7Cnew_feed&max_id=0&count=10'
   颜值 'BEAUTY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600165&containerid=102803_ctg1_600165_-_ctg1_600165&extparam=discover%7Cnew_feed&max_id=0&count=10'
   社会 'SOCIETY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034188&containerid=102803_ctg1_4188_-_ctg1_4188&extparam=discover%7Cnew_feed&max_id=0&count=10'
   情感 'EMOTION' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028031988&containerid=102803_ctg1_1988_-_ctg1_1988&extparam=discover%7Cnew_feed&max_id=0&count=10'
@@ -203,6 +205,7 @@ function weiboJSON() {
       patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
       indexes=(4 4 4 4 4 4 4);
       transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
+      jsonFormat='statuses:内容(text_raw),来源(source),博主(user.screen_name),空间(user.idstr),地址(mblogid),地区(region_name),视频封面(page_info.page_pic),视频(media_info.mp4_sd_url),图片(pic_infos[*].original.url)'
       ;;
     hottopic|ht)
       url="$WEIBO_TOPIC_URL"
@@ -225,7 +228,7 @@ function weiboJSON() {
   if [[ -z "$url" ]]; then
     echo "没有地址" 1>&2; exit 1;
   fi
-  print_json -u "$url" -t "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}"
+  print_json -u "$url" -t "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat"
 }
 
 function baidu() {
@@ -302,6 +305,52 @@ function toutiao() {
   print_json -u "$url" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}"
 }
 
+function json_res() {
+  local url
+  local -a aliases
+  local -a fields
+  local -a patterns
+  local -a indexes
+  local -a transformers
+  local -a types
+  case $1 in
+    bilibili|bb)
+      aliases=(标题 作者 分类 浏览 点赞 链接 描述 图片)
+      fields=(title name tname view like short_link desc pic)
+      patterns=(_ _ _ '"view":[^,]*,' '"like":[^,]*,' _ _ _)
+      indexes=(4 4 4 3 3 4 4 4)
+      transformers=(_ _ _ _ _ _ _ '${values[@]:7:1}@412w_232h_1c.jpg')
+      types=(_ _ _ _ _ _ _ img)
+      case $2 in
+        hot|ht)
+          url='https://api.bilibili.com/x/web-interface/popular?ps=20&pn=1'
+          ;;
+        week|wk)
+          local week=$3
+          if [[ $week -eq 0 ]]; then
+            week=`curl -s https://api.bilibili.com/x/web-interface/popular/series/list | grep -oE '"number":[^,]*,' | head -1 | grep -oE '\d+'`
+          elif [[ -z $week ]]; then
+            json_res bb wkl
+            read -p '输入周编号:' week
+            echo -e "第\033[32m$week\033[0m周"
+          fi
+          url="https://api.bilibili.com/x/web-interface/popular/series/one?number=$week"
+          ;;
+        weeklist|wkl)
+          url='https://api.bilibili.com/x/web-interface/popular/series/list'
+          aliases=(主题 编号 名称)
+          fields=(subject number name)
+          patterns=(_ '"number":[^,]*,' _)
+          indexes=(4 3 4)
+          transformers=(_ '\\033[0m第\\033[31m${values[@]:1:1}\\033[0m周' _)
+          types=(_ _ _)
+          ;;
+      esac
+      ;;
+  esac
+  print_json -u "$url" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -y "${types[*]}"
+}
+
 case $1 in
   weibo|wb) weibo ${@:2};;
   baidu|bd) baidu ${@:2};;
@@ -313,12 +362,6 @@ case $1 in
     comment|cm [postUrl]
     hotsearch|hs
     hotpost|hp
-    hothour|hh
-    hotday1|hd1
-    hotday2|hd2
-    hotweek|hw
-    hotmale|hm
-    hotfemale|hf
     hottopic|ht)
 
   baidu|bd
@@ -333,4 +376,6 @@ case $1 in
     hot|ht
     hotsearch|hs
     '
+    ;;
+  *) json_res ${@:1};;
 esac
