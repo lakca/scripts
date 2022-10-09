@@ -1,6 +1,7 @@
 #! /usr/bin/env bash
 
 pythonInstalled=$(which python >/dev/null && echo 1 || echo 0)
+WEIBO_RESOU='https://weibo.com/ajax/side/hotSearch'
 
 WEIBO_HOT_SEARCH_URL='https://s.weibo.com/top/summary?cate=top_hot'
 WEIBO_YAOWEN_URL='https://s.weibo.com/top/summary?cate=socialevent'
@@ -205,7 +206,7 @@ function weiboJSON() {
       patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
       indexes=(4 4 4 4 4 4 4);
       transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
-      jsonFormat='statuses:内容(text_raw),来源(source),博主(user.screen_name),空间(user.idstr),地址(mblogid),地区(region_name),视频封面(page_info.page_pic),视频(media_info.mp4_sd_url),图片(pic_infos[*].original.url)'
+      jsonFormat='statuses:text_raw,source,user.screen_name,user.idstr,mblogid,region_name,page_info.page_pic,media_info.mp4_sd_url,pic_infos:original.url,thumbnail.url;page_info.cards:page_title,page_url;pic_infos*.original.url,page_info.cards*.page_title'
       ;;
     hottopic|ht)
       url="$WEIBO_TOPIC_URL"

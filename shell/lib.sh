@@ -2,7 +2,9 @@
 
 pythonInstalled=$(which python >/dev/null && echo 1 || echo 0)
 
-if [[ `which python >/dev/null` ]]; then
+_dirname=$(dirname $0)
+
+if [[ $pythonInstalled -eq 1 ]]; then
   function jsonparser() {
     local OPTIND
     local data
@@ -13,13 +15,7 @@ if [[ `which python >/dev/null` ]]; then
         f) format="$OPTARG";;
       esac
     done
-    python -e "
-import json;
-import sys;
-
-data = json.loads('$data')
-
-    "
+    python "$_dirname/lib.py" "$data"
   }
 fi
 
@@ -108,7 +104,7 @@ function print_json() {
   fi
 
   if [[ `declare -f jsonparser` ]]; then
-    jsonparser "$jsonFormat"
+    jsonparser -f "$jsonFormat" -d "$text"
   fi
 
   local primaryKey="${fieldNames[@]:0:1}"
