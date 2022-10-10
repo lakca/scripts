@@ -4,7 +4,7 @@ pythonInstalled=$(which python >/dev/null && echo 1 || echo 0)
 
 _dirname=$(dirname $0)
 
-if [[ $pythonInstalled -eq 1 ]]; then
+if [[ $pythonInstalled -eq 11 ]]; then
   function jsonparser() {
     local OPTIND
     local data
@@ -15,7 +15,7 @@ if [[ $pythonInstalled -eq 1 ]]; then
         f) format="$OPTARG";;
       esac
     done
-    python "$_dirname/lib.py" "$data"
+    printf %s "$data" | python $_dirname/lib.py "$format"
   }
 fi
 
@@ -105,53 +105,52 @@ function print_json() {
 
   if [[ `declare -f jsonparser` ]]; then
     jsonparser -f "$jsonFormat" -d "$text"
+  else
+    local primaryKey="${fieldNames[@]:0:1}"
+
+    for index in "${!fieldNames[@]}"; do
+      local field="${fieldNames[@]:$index:1}";
+      local pattern="${fieldPatterns[@]:$index:1}"
+      if [[ "$pattern" = '_' ]]; then
+        pattern='"'$field'":"[^"]*"'
+      fi
+      declare -a "arr_$field"
+      while read -r line; do
+        declare "arr_$field+=(\"${line:-~}\")";
+      done < <(printf '%s' "$text" | grep -oE "$pattern" | cut -d'"' -f${fieldIndexes[@]:$index:1})
+    done
+
+    local _primaryFieldsIndirection="arr_${primaryKey}[@]"
+    local primaryFields=("${!_primaryFieldsIndirection}")
+
+    # iterate records
+    for index in "${!primaryFields[@]}"; do
+      local -a values=()
+      for field in "${fieldNames[@]}"; do
+        local _fieldValuesIndirection="arr_${field}[@]"
+        local _fieldValues=("${!_fieldValuesIndirection}")
+        local value="${_fieldValues[@]:$index:1}"
+        if [[ "$value" =~ ^:[0-9]+,$ ]]; then # 数字类型
+          value=$(echo "$value" | grep -oE '\d+')
+        fi
+        values+=("$value")
+      done
+
+      # iterate fields
+      local _values=()
+      for idx in "${!fieldNames[@]}"; do
+        local tf="${transformers[@]:$idx:1}"
+        _values[$idx]="${values[@]:$idx:1}"
+        if [[ -n "$tf" && "$tf" != '_' ]]; then
+          _values[$idx]="`eval "printf '%s' $tf"`"
+        fi
+      done
+      for idx in "${!fieldNames[@]}"; do
+        values[$idx]="${_values[@]:$idx:1}"
+      done
+
+      print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index` -t "${types[*]}"
+      echo
+    done
   fi
-
-  local primaryKey="${fieldNames[@]:0:1}"
-
-  for index in "${!fieldNames[@]}"; do
-    local field="${fieldNames[@]:$index:1}";
-    local pattern="${fieldPatterns[@]:$index:1}"
-    if [[ "$pattern" = '_' ]]; then
-      pattern='"'$field'":"[^"]*"'
-    fi
-    declare -a "arr_$field"
-    while read -r line; do
-      declare "arr_$field+=(\"${line:-~}\")";
-    done < <(printf '%s' "$text" | grep -oE "$pattern" | cut -d'"' -f${fieldIndexes[@]:$index:1})
-  done
-
-  local _primaryFieldsIndirection="arr_${primaryKey}[@]"
-  local primaryFields=("${!_primaryFieldsIndirection}")
-
-  # iterate records
-  for index in "${!primaryFields[@]}"; do
-    local -a values=()
-    for field in "${fieldNames[@]}"; do
-      local _fieldValuesIndirection="arr_${field}[@]"
-      local _fieldValues=("${!_fieldValuesIndirection}")
-      local value="${_fieldValues[@]:$index:1}"
-      if [[ "$value" =~ ^:[0-9]+,$ ]]; then # 数字类型
-        value=$(echo "$value" | grep -oE '\d+')
-      fi
-      values+=("$value")
-    done
-
-    # iterate fields
-    local _values=()
-    for idx in "${!fieldNames[@]}"; do
-      local tf="${transformers[@]:$idx:1}"
-      _values[$idx]="${values[@]:$idx:1}"
-      if [[ -n "$tf" && "$tf" != '_' ]]; then
-        _values[$idx]="`eval "printf '%s' $tf"`"
-      fi
-    done
-    for idx in "${!fieldNames[@]}"; do
-      values[$idx]="${_values[@]:$idx:1}"
-    done
-
-    print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index` -t "${types[*]}"
-    echo
-  done
 }
-

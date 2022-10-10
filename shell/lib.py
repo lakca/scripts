@@ -1,147 +1,18 @@
+# coding=utf-8
+
 import json
-
-# jsonstr = json.load(open('./weibo.hot.post.json'))
-
-# jsonFormat='statuses:内容(text_raw),来源(source),博主(user.screen_name),空间(user.idstr),地址(mblogid),地区(region_name),视频封面(page_info.page_pic),视频(media_info.mp4_sd_url),图片(pic_infos:原始(original.url),图标(thumbnail.url))'
-
-jsonFormat='statuses:text_raw,source,user.screen_name,user.idstr,mblogid,region_name,page_info.page_pic,media_info.mp4_sd_url,pic_infos:original.url,thumbnail.url;page_info.cards:page_title,page_url;pic_infos*.original.url,page_info.cards*.page_title'
-
-"""
-{
-  "key": "statuses",
-  "keys": [
-    "statuses"
-  ],
-  "children": [
-    {
-      "key": "text_raw",
-      "keys": [
-        "text_raw"
-      ]
-    },
-    {
-      "key": "source",
-      "keys": [
-        "source"
-      ]
-    },
-    {
-      "key": "user.screen_name",
-      "keys": [
-        "user",
-        "screen_name"
-      ]
-    },
-    {
-      "key": "user.idstr",
-      "keys": [
-        "user",
-        "idstr"
-      ]
-    },
-    {
-      "key": "mblogid",
-      "keys": [
-        "mblogid"
-      ]
-    },
-    {
-      "key": "region_name",
-      "keys": [
-        "region_name"
-      ]
-    },
-    {
-      "key": "page_info.page_pic",
-      "keys": [
-        "page_info",
-        "page_pic"
-      ]
-    },
-    {
-      "key": "media_info.mp4_sd_url",
-      "keys": [
-        "media_info",
-        "mp4_sd_url"
-      ]
-    },
-    {
-      "key": "pic_infos",
-      "keys": [
-        "pic_infos"
-      ],
-      "children": [
-        {
-          "key": "original.url",
-          "keys": [
-            "original",
-            "url"
-          ]
-        },
-        {
-          "key": "thumbnail.url",
-          "keys": [
-            "thumbnail",
-            "url"
-          ]
-        }
-      ]
-    },
-    {
-      "key": "page_info.cards",
-      "keys": [
-        "page_info",
-        "cards"
-      ],
-      "children": [
-        {
-          "key": "page_title",
-          "keys": [
-            "page_title"
-          ]
-        },
-        {
-          "key": "page_url",
-          "keys": [
-            "page_url"
-          ]
-        }
-      ]
-    },
-    {
-      "key": "original.url",
-      "keys": [
-        "original",
-        "url"
-      ],
-      "iterKey": "pic_infos",
-      "iterKeys": [
-        "pic_infos"
-      ]
-    },
-    {
-      "key": "page_title",
-      "keys": [
-        "page_title"
-      ],
-      "iterKey": "page_info.cards",
-      "iterKeys": [
-        "page_info",
-        "cards"
-      ]
-    }
-  ]
-}
-"""
-
+import sys
 class Node:
-    def __init__(self, parent = None) -> None:
+    def __init__(self, parent = None):
         self.data = {}
-        self.data['key'] = ''
+        self.data['key'] = parent.data['key'] + ':' if parent else ''
         self.data['keys'] = []
         self.data['pipes'] = []
+        self.data['labels'] = []
+        self.data['label'] = ''
         self._key = ''
         self._piped = False
+        self._labeled = False
 
         if parent:
             parent.append(self)
@@ -149,47 +20,62 @@ class Node:
     def key(self, token, skipKeys = False):
         if not skipKeys:
             self._key += token
-        if not self._piped:
+        if not (self._piped or self._labeled):
             self.data['key'] += token
-
-    def keys(self):
-        if self._piped:
-            self.data['pipes'].append(self._key)
-            self._piped = False
-        elif self._key:
-            self.data['keys'].append(self._key)
-            self._key = ''
-
-    def iter(self):
-        self.data['iterKey'] = self.data['key']
-        self.data['iterKeys'] = self.data['keys']
-        self.data['key'] = ''
-        self.data['keys'] = []
 
     def pipe(self):
         self._piped = not self._piped
 
-    def parent(self):
-        return self._parent
+    def label(self, flag):
+        if flag:
+            self.keys()
+        else:
+            self.data['labels'].append(self._key)
+            self.data['label'] = self._key
+            self._key = ''
+        self._labeled = flag
+
+    def keys(self):
+        if self._labeled:
+            return
+        elif self._piped:
+            self.data['pipes'].append(self._key)
+            self._piped = False
+        elif self._key:
+            self.data['keys'].append(self._key)
+        self._key = ''
+
+    def iter(self):
+        if self._labeled:
+            return
+        self.data['iterKey'] = self.data['key']
+        self.data['iterKeys'] = self.data['keys']
+        self.data['keys'] = []
 
     def append(self, node = None):
-        node = node or Node()
-        node._parent = self
-        self.data['children'] = self.data.get('children') or []
-        self.data['children'].append(node.data)
+        if self._labeled:
+            return
+        if node:
+            node._parent = self
+            self.data['children'] = self.data.get('children') or []
+            self.data['children'].append(node.data)
+        else:
+            node = Node(self)
         return node
 
     def next(self, node = None):
-        node = node or Node()
-        node._parent = self._parent
-        self.parent().append(node)
+        if self._labeled:
+            return
+        if node:
+            self.parent().append(node)
+        else:
+            node = Node(self.parent())
         return node
 
-class Pipe:
-    def date(data):
-        return
+    def parent(self):
+        return self._parent
 
-def tokenize(fmt: str):
+def tokenize(fmt):
     root = Node()
     node = root
     escaped = False
@@ -203,11 +89,16 @@ def tokenize(fmt: str):
         # escape
         elif token == '\\':
             escaped = True
+        # label
+        elif not node._labeled and token == '(':
+            node.label(True)
+        elif node._labeled and token == ')':
+            node.label(False)
         # list
         elif token == ':':
             node.keys()
             node = node.append()
-        # property
+        # label
         elif token == '.':
             node.key(token, True)
             node.keys()
@@ -230,6 +121,7 @@ def tokenize(fmt: str):
                 index += 1
                 node.keys()
                 node.iter()
+                node.key('*.', True)
             else:
                 node.key(token)
         else:
@@ -245,15 +137,30 @@ def retrieve(obj, keys, default=None):
         else: return default
     return obj
 
+class Pipe:
+    @classmethod
+    def apply(cls, value, pipes):
+        for pipe in pipes:
+            value = cls[pipe](value)
+        return value
+    @classmethod
+    def date(v):
+        return
+    @classmethod
+    def red(v):
+        return '\033[31m{}\033[0m'.format(v)
+    @classmethod
+    def green(v):
+        return '\033[32m{}\033[0m'.format(v)
+    @classmethod
+    def blue(v):
+        return '\033[33m{}\033[0m'.format(v)
+
 class Parser:
 
-    def __init__(self, data, fmt) -> None:
-        self.data = data
-        self.fmt = fmt
-
-    def getRecords(self):
-        tokens = tokenize(self.fmt).data
-        return self.getValue(self.data, tokens)
+    @classmethod
+    def getTokens(cls, fmt):
+        return tokenize(fmt).data
 
     @classmethod
     def retrieve(cls, data, node):
@@ -283,8 +190,58 @@ class Parser:
                     result[child['key']] = value
             return results
 
+    @classmethod
+    def flatTokens(cls, tokens):
+        flatted = {}
+        flatted[tokens['key']] = tokens
+        if 'children' in tokens:
+            for child in tokens['children']:
+                flatted.update(cls.flatTokens(child))
+        return flatted
+
+    @classmethod
+    def applyPipes(cls, value, pipes):
+        return Pipe.apply(value, pipes)
+
+    @classmethod
+    def printValue(cls, value, meta, indent=0):
+        red = lambda v: '\033[31m{}\033[0m'.format(v or '~')
+        green = lambda v: '\033[32m{}\033[0m'.format(v or '~')
+        blue = lambda v: '\033[33m{}\033[0m'.format(v or '~')
+        scopedStdout = lambda *args: sys.stdout.write(' ' * indent + ''.join(list(*args)))
+        if isinstance(value, list):
+            scopedStdout('\n')
+            for item in value: cls.printValue(item, meta, indent + 2)
+        elif isinstance(value, dict):
+            for (key, val) in value.items():
+                label = meta[key]['label']
+                scopedStdout('{}: '.format(red(label)))
+                if isinstance(val, (list, dict)):
+                    cls.printValue(val, meta, indent + 2)
+                else:
+                    sys.stdout.write('{}\n'.format(cls.applyPipes(val, meta[key]['pipes'])))
+        else:
+            scopedStdout('{}\n'.format(cls.applyPipes(value, meta['pipes'])))
+
+    @classmethod
+    def print(cls, fmt, data):
+        tokens = cls.getTokens(fmt)
+        records = cls.getValue(data, tokens)
+        flatted = cls.flatTokens(tokens)
+        for record in records:
+            cls.printValue(record, flatted)
+            sys.stdout.write('\n------------------\n\n')
+
+
 if __name__ == '__main__':
     import sys
-    data = json.loads(sys.argv[1])
-    print(json.dumps(Parser(data, fmt).getRecords(), indent=2))
-jsonparser(jsonstr, jsonFormat)
+    fmt = sys.argv[1]
+    data = ''
+    for line in sys.stdin: data += line
+    # data = data.replace('\\', '\\\\')
+    data = json.loads(data)
+    # tokens = Parser.getTokens(fmt)
+    # records = Parser.getValue(data, tokens)
+    # print(json.dumps(tokens, indent=2))
+    # print(json.dumps(records, indent=2))
+    Parser.print(fmt, data)
