@@ -1,10 +1,10 @@
 #! /usr/bin/env bash
 
-pythonInstalled=$(which python >/dev/null && echo 1 || echo 0)
+pythonInstalled=$(which python3 >/dev/null && echo 1 || echo 0)
 
 _dirname=$(dirname $0)
 
-if [[ $pythonInstalled -eq 1 ]]; then
+if [[ $pythonInstalled -eq 1 && -z $PURE ]]; then
   function jsonparser() {
     local OPTIND
     local data
@@ -15,9 +15,13 @@ if [[ $pythonInstalled -eq 1 ]]; then
         f) format="$OPTARG";;
       esac
     done
-    printf %s "$data" | python $_dirname/lib.py "$format"
+    printf %s "$data" | python3 $_dirname/lib.py "$format"
   }
 fi
+
+function debug() {
+  [[ -n $DEBUG ]] && echo "\033[31m$*\033[0m"
+}
 
 function escapeUnicode() {
   printf '%s' "$*" | sed -E 's/\\u0([1-9a-f]{3})/\\x\1/gI' \
@@ -55,7 +59,7 @@ function print_record() {
       echo -e "\033[33m${fields[@]:$index:1}\033[0m: 【"$id"】\033[1;31m${values[@]:$index:1}\033[0m"
     else
       echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[32m${values[@]:$index:1}\033[0m"
-      if [[ "${types[@]:$index:1}" = 'img' ]]; then
+      if [[ -n $ITERM_SESSION_ID && "${types[@]:$index:1}" = 'img' ]]; then
         curl -s "${values[@]:$index:1}" | imgcat --height=5
       fi
     fi
@@ -96,16 +100,18 @@ function print_json() {
       *) echo '未知选项 $opt'; exit 1;;
     esac
   done
-  if [[ -z "$text" ]]; then
-    text="$(escapeSpace $(escapeUnicode $(curl -s $url)))"
-  fi
-  if [[ $raw -eq 1 ]]; then
-    printf '%s' "$text"
-  fi
 
-  if [[ `declare -f jsonparser` ]]; then
+  if [[ -n "$jsonFormat" && `declare -f jsonparser` ]]; then
+    [[ -z $text ]] && text="$(curl -s $url)"
     jsonparser -f "$jsonFormat" -d "$text"
   else
+    if [[ -z "$text" ]]; then
+      text="$(escapeSpace $(escapeUnicode $(curl -s $url)))"
+      debug "$text"
+    fi
+    if [[ $raw -eq 1 ]]; then
+      printf '%s' "$text"
+    fi
     local primaryKey="${fieldNames[@]:0:1}"
 
     for index in "${!fieldNames[@]}"; do
@@ -153,4 +159,6 @@ function print_json() {
       echo
     done
   fi
+  [[ ! -d $_dirname/xy ]] && mkdir -p $_dirname/xy
+  echo $text > "$_dirname/xy/${url//\//\\}.$(date +%s).json"
 }
