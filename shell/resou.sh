@@ -1,13 +1,53 @@
 #! /usr/bin/env bash
 
-pythonInstalled=$(which python >/dev/null && echo 1 || echo 0)
 WEIBO_RESOU='https://weibo.com/ajax/side/hotSearch'
 
-WEIBO_HOT_SEARCH_URL='https://s.weibo.com/top/summary?cate=top_hot'
-WEIBO_YAOWEN_URL='https://s.weibo.com/top/summary?cate=socialevent'
-WEIBO_WENYU_URL='https://s.weibo.com/top/summary?cate=entrank'
-# 热门
-WEIBO_HOT_POST_URL='https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=0&group_id=102803&containerid=102803&extparam=discover%7Cnew_feed&max_id=0&count=50'
+source `dirname $0`/lib.sh
+
+# 从 三维目标数组 获取地址
+function getUrl() {
+  local urls=($1)
+  local cate=$2
+  local length=$((${#urls[@]}-1))
+  if [[ -z $cate ]]; then
+    for i in `seq 0 3 $length`; do
+      [[ $((i/3%6)) -eq 0 ]] && echo 1>&2
+      printf '%b %b %b  |  ' "\033[31m$i\033[0m" "\033[32m${urls[@]:$i:1}\033[0m" "\033[37m${urls[@]:$((i+1)):1}\033[0m" 1>&2
+    done
+    echo 1>&2
+    read -p $'\n输入分类：' cate
+  fi
+  (
+  shopt -s nocasematch
+  for i in `seq 0 3 $length`; do
+    if [[ $cate = $i || "$cate" =~ ^${urls[@]:$i:1}$ || "$cate" =~ ^${urls[@]:$((i+1)):1}$ ]]; then
+      printf '搜索: %b\n' "\033[31m${urls[@]:$i:1}\033[0m" 1>&2
+      echo "${urls[@]:$((i+2)):1}"
+      echo
+      exit 0
+    fi
+  done
+  )
+}
+
+function resolveLink() {
+  local link=${1//\?*/}
+  link=${link//\\\?*/}
+  link=${link//\#*/}
+  link=${link//\\\#*/}
+  local parts=(`echo $link | grep -oE '[^\/]+'`)
+  echo "${parts[*]}"
+}
+
+function record() {
+  local title="$1"
+  local link="$2"
+  echo -e "\033[33m标题\033[0m: \033[1;31m$title\033[0m"
+  echo -e "\033[33m地址\033[0m: \033[4;32m$link\033[0m"
+}
+
+# 微博 #
+
 # 热门微博 https://weibo.com/hot/weibo/102803
 # https://weibo.com/5368633408/M7OL9bpQP
 WEIBO_HOT_POST_URLS=(
@@ -65,7 +105,7 @@ WEIBO_HOT_POST_URLS=(
   舞蹈 'DANCE' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038788&containerid=102803_ctg1_8788_-_ctg1_8788&extparam=discover%7Cnew_feed&max_id=0&count=10'
   辟谣 'DEBUNK' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028036988&containerid=102803_ctg1_6988_-_ctg1_6988&extparam=discover%7Cnew_feed&max_id=0&count=10'
   三农 'FARM' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028037188&containerid=102803_ctg1_7188_-_ctg1_7188&extparam=discover%7Cnew_feed&max_id=0&count=10'
-# 热门榜单：https://weibo.com/hot/list/1028039999
+  # 热门榜单：https://weibo.com/hot/list/1028039999
   小时榜 'HOUR' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&group_id=1028039999&containerid=102803_ctg1_9999_-_ctg1_9999_home&extparam=discover|new_feed&max_id=0&count=10'
   昨天榜 'DAY1' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038899&containerid=102803_ctg1_8899_-_ctg1_8899&extparam=discover|new_feed&max_id=0&count=10'
   前天榜 'DAY2' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038799&containerid=102803_ctg1_8799_-_ctg1_8799&extparam=discover%7Cnew_feed&max_id=0&count=10'
@@ -77,33 +117,12 @@ WEIBO_HOT_POST_URLS=(
 WEIBO_TOPIC_URL='https://weibo.com/ajax/statuses/topic_band?sid=v_weibopro&category=all&page=1&count=50'
 # 热搜榜：https://weibo.com/hot/search
 WEIBO_HOT_SEARCH_URL='https://weibo.com/ajax/statuses/hot_band'
+WEIBO_YAOWEN_URL='https://s.weibo.com/top/summary?cate=socialevent'
+WEIBO_WENYU_URL='https://s.weibo.com/top/summary?cate=entrank'
 # 单个微博
 WEIBO_POST_URL='https://weibo.com/ajax/statuses/show?id=0'
 # 微博评论
 WEIBO_COMMENT_URL='https://weibo.com/ajax/statuses/buildComments?is_reload=1&id=0&is_show_bulletin=2&is_mix=0&count=0&uid=0'
-
-BAIDU_HOT_URL='https://top.baidu.com/board?tab=realtime'
-
-ZHIHU_HOT_URL='https://www.zhihu.com/billboard'
-ZHIHU_HOUR_URL='https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=hour'
-ZHIHU_DAY_URL='https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=day'
-ZHIHU_WEEK_URL='https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=week'
-#ZHIHU_HOT_SEARCH_URL='https://www.zhihu.com/api/v4/topics/19964449/feeds/top_activity?limit=10'
-
-TOUTIAO_HOT_URL='https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc'
-TOUTIAO_HOT_SEARCH_URL='https://tsearch.snssdk.com/search/suggest/hot_words/'
-
-ZHIHU_CATE=(全部 数码 科技 互联网 商业财经 职场 教育 法律 军事 汽车 人文社科 自然科学 工程技术 情感 心理学 两性 母婴亲子 家居 健康 艺术 音乐 设计 影视娱乐 宠物 体育电竞 运动健身 动漫游戏 美食 旅行 时尚)
-ZHIHU_CATE_NUM=(0  100001  100002  100003  100004  100005  100006  100007  100008  100009  100010  100011  100012  100013  100014  100015  100016  100017  100018  100019  100020  100021  100022  100023  100024  100025  100026  100027  100028  100029)
-
-source `dirname $0`/lib.sh
-
-function record() {
-  local title="$1"
-  local link="$2"
-  echo -e "\033[33m标题\033[0m: \033[1;31m$title\033[0m"
-  echo -e "\033[33m地址\033[0m: \033[4;32m$link\033[0m"
-}
 
 function weibo() {
   local url="$WEIBO_HOT_SEARCH_URL"
@@ -126,13 +145,45 @@ function weibo() {
   done
 }
 
-function resolveLink() {
-  local link=${1//\?*/}
-  link=${link//\\\?*/}
-  link=${link//\#*/}
-  link=${link//\\\#*/}
-  local parts=(`echo $link | grep -oE '[^\/]+'`)
-  echo "${parts[*]}"
+function weiboJSON() {
+  local url
+  local -a fields
+  local -a indexes
+  local -a aliases
+  local -a patterns
+
+  case $1 in
+    hotpost|hp)
+      url=$(getUrl "${WEIBO_HOT_POST_URLS[*]}" $2)
+      aliases=('内容' '来源' '用户' '空间' 'mid' '地址' '地域');
+      fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
+      patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
+      indexes=(4 4 4 4 4 4 4);
+      transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
+      jsonFormat='statuses:(内容)text_raw|red|bold,(来源)source,(博主)user.screen_name,(空间)user.idstr,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url,(图片)pic_infos:(地址)original.url|image'
+      ;;
+    hottopic|ht)
+      url="$WEIBO_TOPIC_URL"
+      aliases=('标签' '内容' '分类' '阅读量' '讨论' '地址')
+      fields=('topic' 'summary' 'category' 'read' 'mention' 'mid')
+      patterns=('"topic":"[^"]*"' '"summary":"[^"]*"'  '"category":"[^"]*"' '"read":[^,]*,' '"mention":[^,]*,' '"mid":"[^"]"*')
+      indexes=(4 4 4 3 3 4)
+      transformers=('_' '_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
+      ;;
+    hotsearch|hs)
+      url="$WEIBO_HOT_SEARCH_URL";
+      aliases=('标题' '分类' '热度' '地址')
+      fields=('word' 'category' 'num' 'note')
+      patterns=('_' '"(category|ad_type)":"[^"]*"' '"num":[^,]*,' '_')
+      indexes=(4 4 3 4)
+      transformers=('_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
+      ;;
+     *) return;;
+  esac
+  if [[ -z "$url" ]]; then
+    echo "没有地址" 1>&2; exit 1;
+  fi
+  print_json -u "$url" -t "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat"
 }
 
 # https://weibo.com/1600463082/M74GseLpY
@@ -166,82 +217,82 @@ function weiboComment() {
   print_json -u "$url" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}"
 }
 
-# 从 三维目标数组 获取地址
-function getUrl() {
-  local urls=($1)
-  local cate=$2
-  local length=$((${#urls[@]}-1))
-  if [[ -z $cate ]]; then
-    for i in `seq 0 3 $length`; do
-      [[ $((i/3%6)) -eq 0 ]] && echo 1>&2
-      printf '%b %b %b  |  ' "\033[31m$i\033[0m" "\033[32m${urls[@]:$i:1}\033[0m" "\033[37m${urls[@]:$((i+1)):1}\033[0m" 1>&2
-    done
-    echo 1>&2
-    read -p $'\n输入分类：' cate
-  fi
-  (
-  shopt -s nocasematch
-  for i in `seq 0 3 $length`; do
-    if [[ $cate = $i || "$cate" =~ ^${urls[@]:$i:1}$ || "$cate" =~ ^${urls[@]:$((i+1)):1}$ ]]; then
-      printf '%b ' "\033[31m${urls[@]:$i:1}\033[0m" 1>&2
-      echo "${urls[@]:$((i+2)):1}"
-      exit 0
-    fi
-  done
-  )
-}
+# 百度 #
 
-function weiboJSON() {
+BAIDU_HOT_URLS=(
+  热搜 'HOT' 'https://top.baidu.com/board?tab=realtime'
+  小说 'NOVEL' 'https://top.baidu.com/board?tab=novel'
+  电影 'MOVIE' 'https://top.baidu.com/board?tab=movie'
+
+  电视剧 'TV' 'https://top.baidu.com/board?tab=teleplay'
+  中国大陆 'CN' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":" 中国大陆 "}'
+  古装 'COSTUME' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"古装","country":" 中国大陆 "}'
+  都市 'URBAN' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"都市","country":" 中国大陆 "}'
+  剧情 'DRAMA' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"剧情","country":" 中国大陆 "}'
+  犯罪 'CRIME' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"犯罪","country":" 中国大陆 "}'
+  悬疑 'SUSPENSE' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"悬疑","country":" 中国大陆 "}'
+  恐怖 'HORROR' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"恐怖","country":" 中国大陆 "}'
+  科幻 'SF' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"科幻","country":" 中国大陆 "}'
+  爱情 'LOVE' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"爱情","country":" 中国大陆 "}'
+  中国台湾 'TW' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":" 中国台湾 "}'
+  中国香港 'HK' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":" 中国香港 "}'
+  欧美 'WEST' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":" 欧美 "}'
+  韩国 'KR' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":" 韩国 "}'
+  日本 'JP' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":" 日本 "}'
+
+  汽车 'CAR' 'https://top.baidu.com/board?tab=car'
+  轿车 'SEDAN' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22%E8%BD%BF%E8%BD%A6%22}'
+  SUV 'SUV' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22SUV%22}'
+  新能源 'NCAR' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22%E6%96%B0%E8%83%BD%E6%BA%90%22}'
+  跑车 'SCAR' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22%E8%B7%91%E8%BD%A6%22}'
+  MPV 'MPV' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22MPV%22}'
+
+  游戏 'GAME' 'https://top.baidu.com/board?tab=game'
+  手游 'MGAME' 'https://top.baidu.com/board?platform=pc&tab=game&tag={%22category%22:%22%E6%89%8B%E6%9C%BA%E6%B8%B8%E6%88%8F%22}'
+  网游 'NGAME' 'https://top.baidu.com/board?platform=pc&tab=game&tag={%22category%22:%22%E7%BD%91%E7%BB%9C%E6%B8%B8%E6%88%8F%22}'
+  单机 'SGAME' 'https://top.baidu.com/board?platform=pc&tab=game&tag={%22category%22:%22%E5%8D%95%E6%9C%BA%E6%B8%B8%E6%88%8F%22}'
+)
+BAIDU_KEYWORDS='
+tab:热搜|hot|ht
+tab:小说|novel|nv;category:全部类型 都市 玄幻 奇幻 历史 科幻 军事 游戏 武侠 现代言情 古代言情 幻想言情 青春
+tab:电影|movie|mv;category:全部类型 爱情 喜剧 动作 剧情 科幻 恐怖 动画 惊悚 犯罪;country:全部地区 中国大陆 中国香港 中国台湾 欧美 日本 韩国
+tab:电视剧|tv;category:全部类型 爱情 搞笑 悬疑 古装 犯罪 动作 恐怖 科幻 剧情 都市;country:全部地区 中国大陆 中国台湾 中国香港 欧美 韩国 日本
+tab:汽车|car;category:全部 轿车 SUV 新能源 跑车 MPV
+tab:游戏|game|gm;category:全部类型 手机游戏 网络游戏 单机游戏
+'
+
+function baidu() {
   local url
   local -a fields
   local -a indexes
   local -a aliases
   local -a patterns
+  local tag=$1
 
-  case $1 in
-    hotpost|hp)
-      url=$(getUrl "${WEIBO_HOT_POST_URLS[*]}" $2)
-      aliases=('内容' '来源' '用户' '空间' 'mid' '地址' '地域');
-      fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
-      patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
-      indexes=(4 4 4 4 4 4 4);
-      transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
-      jsonFormat='statuses:(内容)text_raw|red,(来源)source,(博主)user.screen_name,(空间)user.idstr,(地址)mblogid,(地区)region_name,(视频封面)page_info.page_pic,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url,(图片)pic_infos:(地址)original.url'
+  case $tag in
+    hot|ht)
+      tab=$(ask -l "${BAIDU_KEYWORDS[*]}")
       ;;
-    hottopic|ht)
-      url="$WEIBO_TOPIC_URL"
-      aliases=('标签' '内容' '分类' '阅读量' '讨论' '地址')
-      fields=('topic' 'summary' 'category' 'read' 'mention' 'mid')
-      patterns=('"topic":"[^"]*"' '"summary":"[^"]*"'  '"category":"[^"]*"' '"read":[^,]*,' '"mention":[^,]*,' '"mid":"[^"]"*')
-      indexes=(4 4 4 3 3 4)
-      transformers=('_' '_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-      ;;
-    hotsearch|hs)
-      url="$WEIBO_HOT_SEARCH_URL";
-      aliases=('标题' '分类' '热度' '地址')
-      fields=('word' 'category' 'num' 'note')
-      patterns=('_' '"(category|ad_type)":"[^"]*"' '"num":[^,]*,' '_')
-      indexes=(4 4 3 4)
-      transformers=('_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-      ;;
-     *) return;;
   esac
-  if [[ -z "$url" ]]; then
-    echo "没有地址" 1>&2; exit 1;
-  fi
-  print_json -u "$url" -t "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat"
+
+  url=$(getUrl "${BAIDU_HOT_URLS[*]}" $2)
+  aliases=(关键词 描述 地址)
+  fields=(query desc rawUrl)
+  patterns=('_' '_' '_')
+  indexes=(4 4 4)
+  print_json -u "$url" -t "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}"
 }
 
-function baidu() {
-  local url="$BAIDU_HOT_URL"
-  local i=0
-  curl -s "$url" | grep -oE '<a[^"]*>[^"]*</a>' | grep -E 'class="title_' | sed -re 's/[^"]*"//' -e 's/"[^>]*>//' -e 's/<[^>]*>//' -e 's/<\/div>.*$//' |
-  while read line; do
-    record "[`expr $i + 1`] ${line##* }" "${line%% *}"
-    echo
-    i=`expr $i + 1`
-  done
-}
+# 知乎 #
+
+ZHIHU_HOT_URL='https://www.zhihu.com/billboard'
+ZHIHU_HOUR_URL='https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=hour'
+ZHIHU_DAY_URL='https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=day'
+ZHIHU_WEEK_URL='https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=week'
+#ZHIHU_HOT_SEARCH_URL='https://www.zhihu.com/api/v4/topics/19964449/feeds/top_activity?limit=10'
+
+ZHIHU_CATE=(全部 数码 科技 互联网 商业财经 职场 教育 法律 军事 汽车 人文社科 自然科学 工程技术 情感 心理学 两性 母婴亲子 家居 健康 艺术 音乐 设计 影视娱乐 宠物 体育电竞 运动健身 动漫游戏 美食 旅行 时尚)
+ZHIHU_CATE_NUM=(0  100001  100002  100003  100004  100005  100006  100007  100008  100009  100010  100011  100012  100013  100014  100015  100016  100017  100018  100019  100020  100021  100022  100023  100024  100025  100026  100027  100028  100029)
 
 function applyZhihuDomain() {
   local url=$1
@@ -284,6 +335,11 @@ function zhihu() {
   local -a aliases=(标题 链接)
   print_json -u "$url" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}"
 }
+
+# 头条 #
+
+TOUTIAO_HOT_URL='https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc'
+TOUTIAO_HOT_SEARCH_URL='https://tsearch.snssdk.com/search/suggest/hot_words/'
 
 function toutiao() {
   # https://www.toutiao.comhttps://tsearch.snssdk.com/search/suggest/hot_words/
