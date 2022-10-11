@@ -4,7 +4,7 @@ pythonInstalled=$(which python >/dev/null && echo 1 || echo 0)
 
 _dirname=$(dirname $0)
 
-if [[ $pythonInstalled -eq 11 ]]; then
+if [[ $pythonInstalled -eq 1 ]]; then
   function jsonparser() {
     local OPTIND
     local data
