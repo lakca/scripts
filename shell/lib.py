@@ -224,7 +224,7 @@ class Parser:
             scopedStdout('{}\n'.format(cls.applyPipes(value, meta['pipes'])))
 
     @classmethod
-    def print(cls, fmt, data):
+    def output(cls, fmt, data):
         tokens = cls.getTokens(fmt)
         records = cls.getValue(data, tokens)
         flatted = cls.flatTokens(tokens)
@@ -244,4 +244,4 @@ if __name__ == '__main__':
     # records = Parser.getValue(data, tokens)
     # print(json.dumps(tokens, indent=2))
     # print(json.dumps(records, indent=2))
-    Parser.print(fmt, data)
+    Parser.output(fmt, data)
