@@ -13,7 +13,9 @@ try:
 except:
     IMGCAT = False
 
-if os.environ.get('NOIMGCAT', None): IMGCAT = False
+if os.environ.get("NOIMGCAT", None):
+    IMGCAT = False
+
 
 class Node:
     def __init__(self, parent=None):
@@ -74,12 +76,12 @@ class Node:
             return
         # 如果在参数语法内
         elif self.usingArgs:
-            pipe = self.data['pipes'].pop()
+            pipe = self.data["pipes"].pop()
             if isinstance(pipe, list):
                 pipe.append(self._key)
             else:
                 pipe = [pipe, self._key]
-            self.data['pipes'].append(pipe)
+            self.data["pipes"].append(pipe)
         # 如果在管道语法内
         elif self.usingPipe:
             self.data["pipes"].append(self._key)
@@ -199,6 +201,7 @@ def tokenize(fmt):
         else:
             node.token(token)
         index += 1
+    node.keys()
     return root
 
 
@@ -213,20 +216,20 @@ def retrieve(obj, keys, default=None):
 
 class Pipe:
     STYLES = {
-        'red': '31',
-        'green': '32',
-        'yellow': '33',
-        'blue': '34',
-        'magenta': '35',
-        'cyan': '36',
-        'white': '37',
-        'bold': '1',
-        'dim': '2',
-        'italic': '3',
-        'underline': '4',
-        'blink': '5',
-        'reverse': '7',
-        'invisible': '8',
+        "red": "31",
+        "green": "32",
+        "yellow": "33",
+        "blue": "34",
+        "magenta": "35",
+        "cyan": "36",
+        "white": "37",
+        "bold": "1",
+        "dim": "2",
+        "italic": "3",
+        "underline": "4",
+        "blink": "5",
+        "reverse": "7",
+        "invisible": "8",
     }
 
     @classmethod
@@ -254,77 +257,80 @@ class Pipe:
         for style in styles:
             if style in cls.STYLES:
                 codes.append(cls.STYLES[style])
-        return '\033[' + ';'.join(codes) + f'm{v}\033[0m'
+        return "\033[" + ";".join(codes) + f"m{v}\033[0m"
 
     @classmethod
     def red(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['red'])
+        return cls.style(v, styles=["red"])
 
     @classmethod
     def green(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['green'])
+        return cls.style(v, styles=["green"])
 
     @classmethod
     def yellow(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['yellow'])
+        return cls.style(v, styles=["yellow"])
 
     @classmethod
     def blue(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['blue'])
+        return cls.style(v, styles=["blue"])
 
     @classmethod
     def magenta(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['magenta'])
+        return cls.style(v, styles=["magenta"])
 
     @classmethod
     def cyan(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['cyan'])
+        return cls.style(v, styles=["cyan"])
 
     @classmethod
     def white(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['white'])
+        return cls.style(v, styles=["white"])
 
     @classmethod
     def bold(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['bold'])
+        return cls.style(v, styles=["bold"])
 
     @classmethod
     def dim(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['dim'])
+        return cls.style(v, styles=["dim"])
 
     @classmethod
     def italic(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['italic'])
+        return cls.style(v, styles=["italic"])
 
     @classmethod
     def underline(cls, v, *args, **kwargs):
-        return cls.style(v, styles = ['underline'])
+        return cls.style(v, styles=["underline"])
 
     @classmethod
     def _image(cls, v, *args, **kwargs):
-        if v and v.startswith('http') and os.environ.get("ITERM_SESSION_ID", None):
-            imgcat(request.urlopen(v).read(), height=7)
+        if v and v.startswith("http") and os.environ.get("ITERM_SESSION_ID", None):
+            try:
+                imgcat(request.urlopen(v).read(), height=7)
+            except:
+                pass
 
     @classmethod
     def image(cls, v, *args, **kwargs):
         global IMGCAT
         if v and IMGCAT:
-            cls._image(re.sub(r'\/orj\d+\/', '/orj180/', v))
+            cls._image(re.sub(r"\/orj\d+\/", "/orj180/", v))
         return v
 
     @classmethod
-    def prepend(cls, v, text='', *args, **kwargs):
+    def prepend(cls, v, text="", *args, **kwargs):
         return text + v
 
     @classmethod
     def index(cls, v, *args, **kwargs):
-        index = kwargs.get('data', {}).get("__index", "")
-        return cls.white(f'【{index}】') + v
+        index = kwargs.get("data", {}).get("__index", "")
+        return cls.white(f"【{index}】") + v
 
     @classmethod
     def newline(cls, v, number=1, *args, **kwargs):
         number = int(number)
-        return '\n' * -number + v if number < 0 else v + '\n' * number
+        return "\n" * -number + v if number < 0 else v + "\n" * number
 
 
 class Parser:
@@ -380,11 +386,12 @@ class Parser:
         )
         for (key, val) in record.items():
 
-            if key.startswith('__'): continue
+            if key.startswith("__"):
+                continue
 
             label = meta[key]["label"]
 
-            scopedStdout("{}: ".format(Pipe.apply(label, ['yellow', 'italic'])))
+            scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
 
             if isinstance(val, dict):
                 cls.printRecord(val, meta, indent + INDENT)
@@ -398,36 +405,48 @@ class Parser:
                     else:
                         scopedStdout(
                             "  {}\n".format(
-                                Pipe.green(cls.applyPipes(item or '', meta[key]["pipes"], record))
+                                Pipe.green(
+                                    cls.applyPipes(
+                                        item or "", meta[key]["pipes"], record
+                                    )
+                                )
                             )
                         )
             else:
                 sys.stdout.write(
-                    "{}\n".format(Pipe.green(cls.applyPipes(val or '', meta[key]["pipes"], record)))
+                    "{}\n".format(
+                        Pipe.green(
+                            cls.applyPipes(val or "", meta[key]["pipes"], record)
+                        )
+                    )
                 )
 
     @classmethod
     def output(cls, fmt, data):
+        # print(data)
+        if fmt.startswith(":") and not isinstance(data, list):
+            data = [data]
         tokens = cls.getTokens(fmt)
+        # print(json.dumps(tokens, indent=2))
         records = cls.getValue(data, tokens)
+        # print(json.dumps(records, indent=2))
         flatted = cls.flatTokens(tokens)
         for i, record in enumerate(records):
-            record['__index'] = i + 1
+            record["__index"] = i + 1
             cls.printRecord(record, flatted)
-            sys.stdout.write('\n' + '-'*50 + '\n\n')
+            sys.stdout.write("\n" + "-" * 50 + "\n\n")
 
 
 if __name__ == "__main__":
     import sys
 
     fmt = sys.argv[1]
-    # fmt ='statuses:(内容)text_raw|red|bold|newline(-1)|index,(来源)source,(博主)user.screen_name,(空间)user.idstr,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
+    # fmt = "statuses:(内容)text_raw|red|bold|newline(-1)|index,(来源)source,(博主)user.screen_name,(空间)user.idstr,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image"
     data = ""
     for line in sys.stdin:
         data += line
-    data = json.loads(data)
-    # tokens = Parser.getTokens(fmt)
-    # records = Parser.getValue(data, tokens)
-    # print(json.dumps(tokens, indent=2))
-    # print(json.dumps(records, indent=2))
+    try:
+        data = json.loads(data)
+    except:
+        print(data)
     Parser.output(fmt, data)

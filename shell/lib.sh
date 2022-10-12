@@ -79,12 +79,13 @@ function print_json() {
   local -a transformers
   local -a fieldKeys
   local -a types
+  local -a curlparams
   local url=''
   local text=''
-  local raw=0
+  local raw=$RAW
   local jsonFormat=''
   local OPTIND
-  while getopts 'a:f:p:i:t:u:s:r:y:j:' opt; do
+  while getopts 'a:f:p:i:t:u:s:r:y:j:q:' opt; do
     case "$opt" in
       a) fieldAliases+=($OPTARG);;
       k) fieldKeys+=($OPTARG);;
@@ -92,72 +93,82 @@ function print_json() {
       p) fieldPatterns+=($OPTARG);;
       i) fieldIndexes+=($OPTARG);;
       t) transformers+=($OPTARG);;
+      y) types+=($OPTARG);;
       u) url="$OPTARG";;
+      q) curlparams+=($OPTARG);;
       s) text="$OPTARG";;
       r) raw=$OPTARG;;
-      y) types+=($OPTARG);;
       j) jsonFormat=$OPTARG;;
-      *) echo '未知选项 $opt'; exit 1;;
+      *) echo '未知选项 $opt' 1>&2; exit 1;;
     esac
   done
 
   if [[ -n "$jsonFormat" && `declare -f jsonparser` ]]; then
-    [[ -z $text ]] && text="$(curl -s $url)"
-    jsonparser -f "$jsonFormat" -d "$text"
-  else
-    if [[ -z "$text" ]]; then
-      text="$(escapeSpace $(escapeUnicode $(curl -s $url)))"
-      debug "$text"
-    fi
-    if [[ $raw -eq 1 ]]; then
+
+    [[ -z $text ]] && text="$(curl -s "$url" "${curlparams[*]}")"
+
+    if [[ -n $raw ]]; then
       printf '%s' "$text"
+    else
+      debug "$text"
+      jsonparser -f "$jsonFormat" -d "$text"
     fi
-    local primaryKey="${fieldNames[@]:0:1}"
 
-    for index in "${!fieldNames[@]}"; do
-      local field="${fieldNames[@]:$index:1}";
-      local pattern="${fieldPatterns[@]:$index:1}"
-      if [[ "$pattern" = '_' ]]; then
-        pattern='"'$field'":"[^"]*"'
-      fi
-      declare -a "arr_$field"
-      while read -r line; do
-        declare "arr_$field+=(\"${line:-~}\")";
-      done < <(printf '%s' "$text" | grep -oE "$pattern" | cut -d'"' -f${fieldIndexes[@]:$index:1})
-    done
+  else
 
-    local _primaryFieldsIndirection="arr_${primaryKey}[@]"
-    local primaryFields=("${!_primaryFieldsIndirection}")
+    [[ -z "$text" ]] && text="$(escapeSpace $(escapeUnicode $(curl -s "$url" "${curlparams[*]}")))"
 
-    # iterate records
-    for index in "${!primaryFields[@]}"; do
-      local -a values=()
-      for field in "${fieldNames[@]}"; do
-        local _fieldValuesIndirection="arr_${field}[@]"
-        local _fieldValues=("${!_fieldValuesIndirection}")
-        local value="${_fieldValues[@]:$index:1}"
-        if [[ "$value" =~ ^:[0-9]+,$ ]]; then # 数字类型
-          value=$(echo "$value" | grep -oE '\d+')
+    if [[ -n $raw ]]; then
+      printf '%s' "$text"
+    else
+      debug "$text"
+      local primaryKey="${fieldNames[@]:0:1}"
+
+      for index in "${!fieldNames[@]}"; do
+        local field="${fieldNames[@]:$index:1}";
+        local pattern="${fieldPatterns[@]:$index:1}"
+        if [[ "$pattern" = '_' ]]; then
+          pattern='"'$field'":"[^"]*"'
         fi
-        values+=("$value")
+        declare -a "arr_$field"
+        while read -r line; do
+          declare "arr_$field+=(\"${line:-~}\")";
+        done < <(printf '%s' "$text" | grep -oE "$pattern" | cut -d'"' -f${fieldIndexes[@]:$index:1})
       done
 
-      # iterate fields
-      local _values=()
-      for idx in "${!fieldNames[@]}"; do
-        local tf="${transformers[@]:$idx:1}"
-        _values[$idx]="${values[@]:$idx:1}"
-        if [[ -n "$tf" && "$tf" != '_' ]]; then
-          _values[$idx]="`eval "printf '%s' $tf"`"
-        fi
-      done
-      for idx in "${!fieldNames[@]}"; do
-        values[$idx]="${_values[@]:$idx:1}"
-      done
+      local _primaryFieldsIndirection="arr_${primaryKey}[@]"
+      local primaryFields=("${!_primaryFieldsIndirection}")
 
-      print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index` -t "${types[*]}"
-      echo
-    done
+      # iterate records
+      for index in "${!primaryFields[@]}"; do
+        local -a values=()
+        for field in "${fieldNames[@]}"; do
+          local _fieldValuesIndirection="arr_${field}[@]"
+          local _fieldValues=("${!_fieldValuesIndirection}")
+          local value="${_fieldValues[@]:$index:1}"
+          if [[ "$value" =~ ^:[0-9]+,$ ]]; then # 数字类型
+            value=$(echo "$value" | grep -oE '\d+')
+          fi
+          values+=("$value")
+        done
+
+        # iterate fields
+        local _values=()
+        for idx in "${!fieldNames[@]}"; do
+          local tf="${transformers[@]:$idx:1}"
+          _values[$idx]="${values[@]:$idx:1}"
+          if [[ -n "$tf" && "$tf" != '_' ]]; then
+            _values[$idx]="`eval "printf '%s' $tf"`"
+          fi
+        done
+        for idx in "${!fieldNames[@]}"; do
+          values[$idx]="${_values[@]:$idx:1}"
+        done
+
+        print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index` -t "${types[*]}"
+        echo
+      done
+    fi
   fi
   [[ ! -d $_dirname/xy ]] && mkdir -p $_dirname/xy
   echo $text > "$_dirname/xy/${url//\//\\}.$(date +%s).json"
