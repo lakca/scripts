@@ -4,6 +4,7 @@ import json
 import sys
 import re
 import os
+from tokenize import Number
 from urllib import request
 
 try:
@@ -12,59 +13,94 @@ try:
 except:
     IMGCAT = False
 
+if os.environ.get('NOIMGCAT', None): IMGCAT = False
 
 class Node:
     def __init__(self, parent=None):
         self.data = {}
+        # 属性的绝对路径名（属性id）
         self.data["key"] = parent.data["key"] + ":" if parent else ""
+        # 属性相对（语法支对象）路径
         self.data["keys"] = []
+        # 修饰函数及参数
         self.data["pipes"] = []
+        # 字段标签（名称等）
         self.data["labels"] = []
+        # 最新的（最后定义的）字段标签
         self.data["label"] = ""
+        # 当前分词（语法单元）
         self._key = ""
-        self._piped = False
-        self._labeled = False
+        self.usingPipe = False
+        self.usingLabel = False
+        self.usingArgs = False
 
         if parent:
             parent.append(self)
 
-    def key(self, token, skipKeys=False):
-        if not skipKeys:
-            self._key += token
-        if not (self._piped or self._labeled):
+    def token(self, token, ignoreKeys=False):
+        # 对于属性id（key）而言，所有token都是必须的；
+        if not (self.usingPipe or self.usingLabel or self.usingArgs):
             self.data["key"] += token
+        # 但对于属性路径（keys）而言，符号是需要去掉的
+        if not ignoreKeys:
+            self._key += token
 
+    # 进出管道
     def pipe(self):
-        self._piped = not self._piped
+        self.usingPipe = not self.usingPipe
 
-    def label(self, flag):
-        if flag:
-            self.keys()
-        else:
+    # 进出管道参数
+    def args(self):
+        self.usingArgs = not self.usingArgs
+
+    # 进出字段标签
+    def label(self):
+        # 退出标签语法
+        if self.usingLabel:
             self.data["labels"].append(self._key)
             self.data["label"] = self._key
+            # 重置语法单元内容
             self._key = ""
-        self._labeled = flag
+        # 进入标签语法
+        else:
+            # 结束上一个语法单元
+            self.keys()
+        self.usingLabel = not self.usingLabel
 
+    # 切割语法单元
     def keys(self):
-        if self._labeled:
+        # 如果在标签语法内
+        if self.usingLabel:
             return
-        elif self._piped:
+        # 如果在参数语法内
+        elif self.usingArgs:
+            pipe = self.data['pipes'].pop()
+            if isinstance(pipe, list):
+                pipe.append(self._key)
+            else:
+                pipe = [pipe, self._key]
+            self.data['pipes'].append(pipe)
+        # 如果在管道语法内
+        elif self.usingPipe:
             self.data["pipes"].append(self._key)
-            self._piped = False
+            self.usingPipe = False
+        # 如果在普通语法内（即处于最外层的属性定义语法）
         elif self._key:
             self.data["keys"].append(self._key)
+        # 重置语法单元内容
         self._key = ""
 
+    # 注明这之前的语法单元是一个遍历键，而不是属性相对路径
+    # 数组类型的深度属性如：colors*.name, colors*.vectors.red
     def iter(self):
-        if self._labeled:
+        if self.usingLabel or self.usingPipe:
             return
         self.data["iterKey"] = self.data["key"]
         self.data["iterKeys"] = self.data["keys"]
         self.data["keys"] = []
 
     def append(self, node=None):
-        if self._labeled:
+        if self.usingLabel:
             return
         if node:
             node._parent = self
@@ -75,7 +111,7 @@ class Node:
         return node
 
     def next(self, node=None):
-        if self._labeled:
+        if self.usingLabel:
             return
         if node:
             self.parent().append(node)
@@ -96,56 +132,73 @@ def tokenize(fmt):
     length = len(fmt)
     while index < length:
         token = fmt[index]
-        # raw
+        # 魔术语法，纯字面量
         if token == "$" and not escaped:
             raw = not raw
         elif raw:
-            node.key(token)
+            node.token(token)
         elif escaped:
-            node.key(token)
+            node.token(token)
             escaped = False
-        # escape
+        # 转义
         elif token == "\\":
             escaped = True
-        # label
-        elif not node._labeled and token == "(":
-            node.label(True)
-        elif node._labeled and token == ")":
-            node.label(False)
-        # list
+        # 属性标签、管道参数
+        elif token == "(":
+            # 管道参数
+            if node.usingPipe and not node.usingArgs:
+                node.keys()
+                node.args()
+            # 属性标签
+            elif not node.usingLabel:
+                node.keys()
+                node.label()
+        elif token == ")":
+            if node.usingArgs:
+                node.keys()
+                node.args()
+            elif node.usingLabel:
+                node.keys()
+                node.label()
+        # 下级对象
         elif token == ":":
-            node.keys()
-            node = node.append()
-        # label
+            if not node.usingArgs:
+                node.keys()
+                node = node.append()
+        # 属性路径
         elif token == ".":
-            node.key(token, True)
-            node.keys()
-        # pipe
+            if not node.usingArgs:
+                node.token(token, True)
+                node.keys()
+        # 管道（函数）
         elif token == "|":
-            node.keys()
-            node.pipe()
-        # next property
+            if not node.usingArgs:
+                node.keys()
+                node.pipe()
+        # 分割同级（属性、参数...）
         elif token == ",":
             node.keys()
-            node = node.next()
-        # parent
+            if not node.usingArgs:
+                node = node.next()
+        # 分割父级（结束当前级别的分支对象）
         elif token == ";":
-            node.keys()
-            node = node.parent()
-            node = node.next()
-        # iterate
-        elif token == "*":
-            if fmt[index + 1] == ".":
-                index += 1
+            if not node.usingArgs:
                 node.keys()
-                node.iter()
-                node.key("*.", True)
-            else:
-                node.key(token)
+                node = node.parent()
+                node = node.next()
+        # 遍历键
+        elif token == "*":
+            if not node.usingArgs:
+                if fmt[index + 1] == ".":
+                    index += 1
+                    node.keys()
+                    node.iter()
+                    node.token("*.", True)
+                else:
+                    node.token(token)
         else:
-            node.key(token)
+            node.token(token)
         index += 1
-    node.keys()
     return root
 
 
@@ -159,48 +212,119 @@ def retrieve(obj, keys, default=None):
 
 
 class Pipe:
+    STYLES = {
+        'red': '31',
+        'green': '32',
+        'yellow': '33',
+        'blue': '34',
+        'magenta': '35',
+        'cyan': '36',
+        'white': '37',
+        'bold': '1',
+        'dim': '2',
+        'italic': '3',
+        'underline': '4',
+        'blink': '5',
+        'reverse': '7',
+        'invisible': '8',
+    }
+
     @classmethod
-    def apply(cls, value, pipes, data):
+    def apply(cls, v, pipes, data={}):
         for pipe in pipes:
+            args = []
+            if isinstance(pipe, list):
+                args = pipe[1:]
+                pipe = pipe[0]
             attr = getattr(cls, pipe, None)
-            value = (
-                attr(value)
+            v = (
+                attr(v, *args, data=data)
                 if attr
                 else re.sub(r"\{([^\}]+)\}", lambda m: data.get(m.group(1), ""), pipe)
             )
-        return value
+        return v
 
     @classmethod
-    def date(cls, v):
+    def date(cls, v, *args, **kwargs):
         return
 
     @classmethod
-    def red(cls, v):
-        return "\033[31m{}\033[0m".format(v)
+    def style(cls, v, styles=[], *args, **kwargs):
+        codes = []
+        for style in styles:
+            if style in cls.STYLES:
+                codes.append(cls.STYLES[style])
+        return '\033[' + ';'.join(codes) + f'm{v}\033[0m'
 
     @classmethod
-    def green(cls, v):
-        return "\033[32m{}\033[0m".format(v)
+    def red(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['red'])
 
     @classmethod
-    def blue(cls, v):
-        return "\033[33m{}\033[0m".format(v)
+    def green(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['green'])
 
     @classmethod
-    def bold(cls, v):
-        return "\033[1m{}\033[0m".format(v)
+    def yellow(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['yellow'])
 
     @classmethod
-    def _image(cls, v):
-        if os.environ.get("ITERM_SESSION_ID", None):
+    def blue(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['blue'])
+
+    @classmethod
+    def magenta(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['magenta'])
+
+    @classmethod
+    def cyan(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['cyan'])
+
+    @classmethod
+    def white(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['white'])
+
+    @classmethod
+    def bold(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['bold'])
+
+    @classmethod
+    def dim(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['dim'])
+
+    @classmethod
+    def italic(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['italic'])
+
+    @classmethod
+    def underline(cls, v, *args, **kwargs):
+        return cls.style(v, styles = ['underline'])
+
+    @classmethod
+    def _image(cls, v, *args, **kwargs):
+        if v and v.startswith('http') and os.environ.get("ITERM_SESSION_ID", None):
             imgcat(request.urlopen(v).read(), height=7)
 
     @classmethod
-    def image(cls, v):
+    def image(cls, v, *args, **kwargs):
         global IMGCAT
-        if IMGCAT:
-            cls._image(v)
+        if v and IMGCAT:
+            cls._image(re.sub(r'\/orj\d+\/', '/orj180/', v))
         return v
+
+    @classmethod
+    def prepend(cls, v, text='', *args, **kwargs):
+        return text + v
+
+    @classmethod
+    def index(cls, v, *args, **kwargs):
+        index = kwargs.get('data', {}).get("__index", "")
+        return cls.white(f'【{index}】') + v
+
+    @classmethod
+    def newline(cls, v, number=1, *args, **kwargs):
+        number = int(number)
+        return '\n' * -number + v if number < 0 else v + '\n' * number
 
 
 class Parser:
@@ -210,12 +334,7 @@ class Parser:
 
     @classmethod
     def retrieve(cls, data, node):
-        data = retrieve(data, node["keys"])
-        result = data
-        # if "pipes" in node:
-        #     for pipe in node["pipes"]:
-        #         result = getattr(Pipe, pipe)(result)
-        return result
+        return retrieve(data, node["keys"])
 
     @classmethod
     def getValue(cls, data, node):
@@ -254,33 +373,37 @@ class Parser:
         return Pipe.apply(value, pipes, data)
 
     @classmethod
-    def printRecord(cls, value, meta, indent=0):
+    def printRecord(cls, record, meta, indent=0):
         INDENT = 2
-        red = lambda v: "\033[31m{}\033[0m".format(v or "~")
-        green = lambda v: "\033[32m{}\033[0m".format(v or "~")
-        blue = lambda v: "\033[33m{}\033[0m".format(v or "~")
         scopedStdout = lambda *args: sys.stdout.write(
             " " * indent + "".join(list(*args))
         )
-        for (key, val) in value.items():
+        for (key, val) in record.items():
+
+            if key.startswith('__'): continue
+
             label = meta[key]["label"]
-            scopedStdout("{}: ".format(blue(label)))
+
+            scopedStdout("{}: ".format(Pipe.apply(label, ['yellow', 'italic'])))
+
             if isinstance(val, dict):
                 cls.printRecord(val, meta, indent + INDENT)
+
             elif isinstance(val, list):
                 scopedStdout("\n")
+
                 for item in val:
                     if isinstance(item, dict):
                         cls.printRecord(item, meta, indent + INDENT)
                     else:
                         scopedStdout(
                             "  {}\n".format(
-                                green(cls.applyPipes(item, meta[key]["pipes"], value))
+                                Pipe.green(cls.applyPipes(item or '', meta[key]["pipes"], record))
                             )
                         )
             else:
                 sys.stdout.write(
-                    "{}\n".format(green(cls.applyPipes(val, meta[key]["pipes"], value)))
+                    "{}\n".format(Pipe.green(cls.applyPipes(val or '', meta[key]["pipes"], record)))
                 )
 
     @classmethod
@@ -288,15 +411,17 @@ class Parser:
         tokens = cls.getTokens(fmt)
         records = cls.getValue(data, tokens)
         flatted = cls.flatTokens(tokens)
-        for record in records:
+        for i, record in enumerate(records):
+            record['__index'] = i + 1
             cls.printRecord(record, flatted)
-            sys.stdout.write("\n------------------\n\n")
+            sys.stdout.write('\n' + '-'*50 + '\n\n')
 
 
 if __name__ == "__main__":
     import sys
 
     fmt = sys.argv[1]
+    # fmt ='statuses:(内容)text_raw|red|bold|newline(-1)|index,(来源)source,(博主)user.screen_name,(空间)user.idstr,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
     data = ""
     for line in sys.stdin:
         data += line
