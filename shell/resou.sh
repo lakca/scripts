@@ -160,7 +160,7 @@ function weiboJSON() {
       patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
       indexes=(4 4 4 4 4 4 4);
       transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
-      jsonFormat='statuses:(内容)text_raw|red|bold,(来源)source,(博主)user.screen_name,(空间)user.idstr,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url,(图片)pic_infos:(地址)original.url|image'
+      jsonFormat='statuses:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
       ;;
     hottopic|ht)
       url="$WEIBO_TOPIC_URL"

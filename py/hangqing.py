@@ -109,6 +109,8 @@ def print_result(list_map, old_list_map):
     LINES = len(list_map.keys())
     for key in list_map.keys():
         cur = list_map[key]
+        if key == sys.argv[2]:
+            sys.stdout.write('\033];{}\007'.format(prop(cur, 'percent')))
         prev = prop(old_list_map, key, {})
         color = getColor(prop(cur, 'price', 0), prop(prev, 'price', 0))
         percent = prop(cur, 'percent')
