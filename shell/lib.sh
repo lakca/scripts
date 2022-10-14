@@ -59,7 +59,7 @@ function print_record() {
       echo -e "\033[33m${fields[@]:$index:1}\033[0m: 【"$id"】\033[1;31m${values[@]:$index:1}\033[0m"
     else
       echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[32m${values[@]:$index:1}\033[0m"
-      if [[ -n $ITERM_SESSION_ID && "${types[@]:$index:1}" = 'img' ]]; then
+      if [[ -n $ITERM_SESSION_ID && $IMGCAT && "${types[@]:$index:1}" = 'img' ]]; then
         curl -s "${values[@]:$index:1}" | imgcat --height=5
       fi
     fi
