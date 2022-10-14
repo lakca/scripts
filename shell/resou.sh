@@ -39,11 +39,33 @@ function resolveLink() {
   echo "${parts[*]}"
 }
 
-function record() {
-  local title="$1"
-  local link="$2"
-  echo -e "\033[33m标题\033[0m: \033[1;31m$title\033[0m"
-  echo -e "\033[33m地址\033[0m: \033[4;32m$link\033[0m"
+function ask() {
+  local values=($1)
+  local value="$2"
+  for i in "${!values[@]}"; do
+    if [[ $value = $i || $value = ${values[@]:$i:1} ]]; then
+      printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
+      echo ${values[@]:$i:1}
+      ASK_INDEX=$i
+      return
+    fi
+  done
+  for i in "${!values[@]}"; do
+    printf '%b %b | ' "\033[31m$i\033[0m" "\033[32m${values[@]:$i:1}\033[0m" 1>&2
+  done
+  read -p $'\n输入值：'
+  (
+  shopt -s nocasematch
+  for i in "${!values[@]}"; do
+    if [[ "$REPLY" = $i  || "$REPLY" = "${values[@]:$i:1}" ]]; then
+      printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
+      echo "${values[@]:$i:1}"
+      ASK_INDEX=$i
+      echo
+      exit 0
+    fi
+  done
+  )
 }
 
 # 微博 #
@@ -218,121 +240,106 @@ function weibo() {
 
 # 百度 #
 
-BAIDU_HOT_URLS=(
-  热搜 'HOT' 'https://top.baidu.com/board?tab=realtime'
-  小说 'NOVEL' 'https://top.baidu.com/board?tab=novel'
-  电影 'MOVIE' 'https://top.baidu.com/board?tab=movie'
-
-  电视剧 'TV' 'https://top.baidu.com/board?tab=teleplay'
-  中国大陆 'CN' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":"中国大陆"}'
-  古装 'COSTUME' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"古装","country":"中国大陆"}'
-  都市 'URBAN' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"都市","country":"中国大陆"}'
-  剧情 'DRAMA' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"剧情","country":"中国大陆"}'
-  犯罪 'CRIME' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"犯罪","country":"中国大陆"}'
-  悬疑 'SUSPENSE' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"悬疑","country":"中国大陆"}'
-  恐怖 'HORROR' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"恐怖","country":"中国大陆"}'
-  科幻 'SF' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"科幻","country":"中国大陆"}'
-  爱情 'LOVE' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"爱情","country":"中国大陆"}'
-  中国台湾 'TW' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":"中国台湾"}'
-  中国香港 'HK' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":"中国香港"}'
-  欧美 'WEST' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":"欧美"}'
-  韩国 'KR' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":"韩国"}'
-  日本 'JP' 'https://top.baidu.com/board?platform=pc&tab=teleplay&tag={"category":"全部类型","country":"日本"}'
-
-  汽车 'CAR' 'https://top.baidu.com/board?tab=car'
-  轿车 'SEDAN' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22%E8%BD%BF%E8%BD%A6%22}'
-  SUV 'SUV' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22SUV%22}'
-  新能源 'NCAR' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22%E6%96%B0%E8%83%BD%E6%BA%90%22}'
-  跑车 'SCAR' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22%E8%B7%91%E8%BD%A6%22}'
-  MPV 'MPV' 'https://top.baidu.com/board?platform=pc&tab=car&tag={%22category%22:%22MPV%22}'
-
-  游戏 'GAME' 'https://top.baidu.com/board?tab=game'
-  手游 'MGAME' 'https://top.baidu.com/board?platform=pc&tab=game&tag={%22category%22:%22%E6%89%8B%E6%9C%BA%E6%B8%B8%E6%88%8F%22}'
-  网游 'NGAME' 'https://top.baidu.com/board?platform=pc&tab=game&tag={%22category%22:%22%E7%BD%91%E7%BB%9C%E6%B8%B8%E6%88%8F%22}'
-  单机 'SGAME' 'https://top.baidu.com/board?platform=pc&tab=game&tag={%22category%22:%22%E5%8D%95%E6%9C%BA%E6%B8%B8%E6%88%8F%22}'
-)
-BAIDU_KEYWORDS='
-tab:热搜|hot|ht
-tab:小说|novel|nv;category:全部类型 都市 玄幻 奇幻 历史 科幻 军事 游戏 武侠 现代言情 古代言情 幻想言情 青春
-tab:电影|movie|mv;category:全部类型 爱情 喜剧 动作 剧情 科幻 恐怖 动画 惊悚 犯罪;country:全部地区 中国大陆 中国香港 中国台湾 欧美 日本 韩国
-tab:电视剧|tv;category:全部类型 爱情 搞笑 悬疑 古装 犯罪 动作 恐怖 科幻 剧情 都市;country:全部地区 中国大陆 中国台湾 中国香港 欧美 韩国 日本
-tab:汽车|car;category:全部 轿车 SUV 新能源 跑车 MPV
-tab:游戏|game|gm;category:全部类型 手机游戏 网络游戏 单机游戏
-'
-
 function baidu() {
   local url
   local -a fields
   local -a indexes
   local -a aliases
   local -a patterns
-  local tag=$1
+  local jsonFormat
 
-  case $tag in
-    hot|ht)
-      tab=$(ask -l "${BAIDU_KEYWORDS[*]}")
-      ;;
+  url="https://top.baidu.com/board"
+
+  case ${1:-realtime} in
+    realtime|rt)
+      url="$url?tab=realtime"
+    ;;
+    novel|nv)
+      url="$url?tab=novel"
+      local category=$(ask "全部类型 都市 玄幻 奇幻 历史 科幻 军事 游戏 武侠 现代言情 古代言情 幻想言情 青春" "$2")
+      url="$url&tag={\"category\":\"$category\"}"
+    ;;
+    movie|mv)
+      url="$url?tab=movie"
+      local category=$(ask "全部类型 爱情 喜剧 动作 剧情 科幻 恐怖 动画 惊悚 犯罪" "$2")
+      local country=$(ask "全部地区 中国大陆 中国香港 中国台湾 欧美 日本 韩国" "$2")
+      url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
+    ;;
+    teleplay|tv)
+      url="$url?tab=teleplay"
+      local category=$(ask "全部类型 爱情 搞笑 悬疑 古装 犯罪 动作 恐怖 科幻 剧情 都市" "$2")
+      local country=$(ask "全部地区 中国大陆 中国台湾 中国香港 欧美 韩国 日本" "$2")
+      url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
+    ;;
+    car)
+      url="$url?tab=car"
+      local category=$(ask "全部 轿车 SUV 新能源 跑车 MPV" "$2")
+      url="$url&tag={\"category\":\"$category\"}"
+    ;;
+    game)
+      url="$url?tab=game"
+      local category=$(ask "全部类型 手机游戏 网络游戏 单机游戏" "$2")
+      url="$url&tag={\"category\":\"$category\"}"
+    ;;
   esac
-
-  url=$(getUrl "${BAIDU_HOT_URLS[*]}" $2)
-  aliases=(关键词 描述 地址)
-  fields=(query desc rawUrl)
-  patterns=('_' '_' '_')
-  indexes=(4 4 4)
-  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}"
+  text=$(curl -s "$url" | grep -oE '<!--s-data:.*}-->' | sed -nE 's/<!--s-data:(.*)-->/\1/p')
+  aliases=(关键词 描述 地址 图片)
+  fields=(query desc rawUrl img)
+  patterns=('_' '_' '_' '_')
+  indexes=(4 4 4 4)
+  jsonFormat='data.cards.0.content:(关键词)word|index|red|bold,(描述)desc,(地址)rawUrl,(图片)img|image'
+  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
 }
 
 # 知乎 #
 
 ZHIHU_HOT_URL='https://www.zhihu.com/billboard'
-ZHIHU_HOUR_URL='https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=hour'
-ZHIHU_DAY_URL='https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=day'
-ZHIHU_WEEK_URL='https://www.zhihu.com/api/v4/creators/rank/hot?domain=0&period=week'
 #ZHIHU_HOT_SEARCH_URL='https://www.zhihu.com/api/v4/topics/19964449/feeds/top_activity?limit=10'
 
-ZHIHU_CATE=(全部 数码 科技 互联网 商业财经 职场 教育 法律 军事 汽车 人文社科 自然科学 工程技术 情感 心理学 两性 母婴亲子 家居 健康 艺术 音乐 设计 影视娱乐 宠物 体育电竞 运动健身 动漫游戏 美食 旅行 时尚)
-ZHIHU_CATE_NUM=(0  100001  100002  100003  100004  100005  100006  100007  100008  100009  100010  100011  100012  100013  100014  100015  100016  100017  100018  100019  100020  100021  100022  100023  100024  100025  100026  100027  100028  100029)
-
-function applyZhihuDomain() {
-  local url=$1
-  local cate=$2
-  local domain=''
-  if [[ ! "$url" =~ 'domain=' ]]; then
-    echo "$url"
-    return
-  fi
-  echo "${ZHIHU_CATE[@]}" 1>&2
-  while true; do
-    if [[ -n "$cate" ]]; then
-      for i in "${!ZHIHU_CATE[@]}"; do
-        local name="${ZHIHU_CATE[@]:$i:1}"
-        if [[ $name =~ "$cate" ]]; then
-          echo "匹配到：$name" 1>&2
-          domain="${ZHIHU_CATE_NUM[@]:$i:1}"
-          break
-        fi
-      done
-    fi
-    [[ -z "$domain" ]] && read -p $'\033[32m输入分类\033[0m: ' cate || break
-  done
-    echo "${url/domain\=0/domain=$domain}"
-}
+ZHIHU_DOMAINS=(全部 数码 科技 互联网 商业财经 职场 教育 法律 军事 汽车 人文社科 自然科学 工程技术 情感 心理学 两性 母婴亲子 家居 健康 艺术 音乐 设计 影视娱乐 宠物 体育电竞 运动健身 动漫游戏 美食 旅行 时尚)
+ZHIHU_DOMAINS_NUM=(0  100001  100002  100003  100004  100005  100006  100007  100008  100009  100010  100011  100012  100013  100014  100015  100016  100017  100018  100019  100020  100021  100022  100023  100024  100025  100026  100027  100028  100029)
 
 function zhihu() {
-  local url="$ZHIHU_HOT_URL"
+  local url
+  local -a aliases
+  local -a fields
   local -a patterns
   local -a indexes
-  local type="$1"
-  local domain="$2"
-  case ${type:=hot} in
-    hot|ht|hour) url="$ZHIHU_HOUR_URL"; patterns=('"title":"[^"]*"' '"url":"[^"]*"'); indexes=(4 4);;
-    day) url="$ZHIHU_DAY_URL"; patterns=('"title":"[^"]*"' '"url":"[^"]*"'); indexes=(4 4);;
-    week) url="$ZHIHU_WEEK_URL"; patterns=('"title":"[^"]*"' '"url":"[^"]*"'); indexes=(4 4);;
+  case ${1:-hot} in
+    hot|ht|热搜)
+      # https://www.zhihu.com/knowledge-plan/hot-question/hot/0/hour
+      url='https://www.zhihu.com/api/v4/creators/rank/hot?domain={domain}&period={period}'
+      fields=(title link)
+      aliases=(标题 链接)
+      patterns=('"title":"[^"]*"' '"url":"[^"]*"')
+      indexes=(4 4)
+      jsonFormat='data:(标题)question.title,(链接)question.url,(时间)question.created|date,(标签)question.topics*.name'
+      case $2 in
+        day)
+          url=${url//\{period\}/day}
+          domain=$(ask "${ZHIHU_DOMAINS[*]}" "$3")
+          url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+        ;;
+        week)
+          url=${url//\{period\}/week}
+          domain=$(ask "${ZHIHU_DOMAINS[*]}" "$3")
+          url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+        ;;
+        hot|ht|hour)
+          url=${url//\{period\}/hour}
+          domain=$(ask "${ZHIHU_DOMAINS[*]}" "$3")
+          url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+        ;;
+        *)
+          url=${url//\{period\}/hour}
+          domain=$(ask "${ZHIHU_DOMAINS[*]}" "$2")
+          url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+        ;;
+      esac
+    ;;
   esac
-  url=`applyZhihuDomain $url $domain`
-  local -a fields=(title link)
-  local -a aliases=(标题 链接)
-  print_json -u "$url" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}"
+  echo $url
+  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
 }
 
 # 头条 #
@@ -358,7 +365,7 @@ function toutiao() {
   esac
   local -a fields=(title link)
   local -a aliases=(标题 链接)
-  print_json -u "$url" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}"
+  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
 }
 
 function json_res() {
@@ -422,7 +429,12 @@ case $1 in
     comment|cm  [postUrl|postid]
 
   baidu|bd
-    hot|ht
+    realtime|rt
+    novel|nv
+    movie|mv
+    teleplay|tv
+    car
+    game
 
   zhihu|zh
     hot|ht

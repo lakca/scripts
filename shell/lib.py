@@ -1,19 +1,21 @@
 # coding=utf-8
 
+from curses.ascii import isdigit
 import json
 import sys
 import re
 import os
-from tokenize import Number
+import time
 from urllib import request
 
-try:
+IMGCAT = False
+
+if os.environ.get("IMGCAT", None):
     IMGCAT = True
+
+try:
     from imgcat import imgcat
 except:
-    IMGCAT = False
-
-if os.environ.get("NOIMGCAT", None):
     IMGCAT = False
 
 
@@ -207,8 +209,14 @@ def tokenize(fmt):
 
 def retrieve(obj, keys, default=None):
     for key in keys:
-        if obj and key in obj:
-            obj = obj[key]
+        if obj:
+            if key.isdigit() and isinstance(obj, list):
+                index = int(key)
+                if len(obj) > index:
+                    obj = obj[index]
+            else:
+                if key in obj:
+                    obj = obj[key]
         else:
             return default
     return obj
@@ -249,6 +257,12 @@ class Pipe:
 
     @classmethod
     def date(cls, v, *args, **kwargs):
+        if isdigit(v):
+            v = int(v)
+            v = v / 1000 if len(str(v)) == 13 else v
+            time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(v))
+        else:
+            time.strptime(v, '')
         return
 
     @classmethod
