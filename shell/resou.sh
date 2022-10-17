@@ -73,7 +73,7 @@ function ask() {
 # 热门微博 https://weibo.com/hot/weibo/102803
 # https://weibo.com/5368633408/M7OL9bpQP
 WEIBO_HOT_POST_URLS=(
-  热门 'HOT' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=0&group_id=102803&containerid=102803&extparam=discover%7Cnew_feed&max_id=0&count=10'
+  热门 'HOT' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803&containerid=102803&extparam=discover%7Cnew_feed&max_id=0&count=10'
   同城 'CITY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028032222&containerid=102803_2222&extparam=discover%7Cnew_feed&max_id=0&count=10'
   榜单 'LIST' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600169&containerid=102803_ctg1_600169_-_ctg1_600169&extparam=discover%7Cnew_feed&max_id=0&count=10'
   明星 'STAR' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034288&containerid=102803_ctg1_4288_-_ctg1_4288&extparam=discover%7Cnew_feed&max_id=0&count=10'
@@ -150,147 +150,6 @@ WEIBO_COMMENT_URL='https://weibo.com/ajax/statuses/buildComments?is_reload=1&id=
 
 WEIBO_COOKIE='XSRF-TOKEN=LJu7ywtXAMJrk23wzwPBSn4D; SUB=_2AkMUbAblf8NxqwJRmP8cym7maYVxzA_EieKiMPc-JRMxHRl-yj9jqnYTtRB6P-woCiESbtf6EHlSgKmMG7dCXC4FjogI; SUBP=0033WrSXqPxfM72-Ws9jqgMF55529P9D9WFWfCTPhyRMY-ccV7R.KDN9; UPSTREAM-V-WEIBO-COM=35846f552801987f8c1e8f7cec0e2230; _s_tentry=-; Apache=4137248597898.631.1664186064613; SINAGLOBAL=4137248597898.631.1664186064613; ULV=1664186064653:1:1:1:4137248597898.631.1664186064613:; ariaDefaultTheme=default; ariaFixed=true; ariaReadtype=1; ariaMouseten=null; ariaStatus=false; WBPSESS=5fStQf4aE0d6e7rh9d-P6rAZHIfnn4KMIW6OYN7Abf6Gesg736Dnb_kiyOlc_BgTFoOIoutH2mmNJVt4Q03NE4SRWHVAauIsrCpR-oEcgKDRCbR6ohoMh8B8GMQkrsJdeir3sUwdnTOpVB8WJzK3tAbj0OFt2pHMIUKm8Gh-RiQ='
 
-function weibo() {
-  local url
-  local -a fields
-  local -a indexes
-  local -a aliases
-  local -a patterns
-  local -a curlparams
-
-  case $1 in
-    hotpost|hp)
-      url=$(getUrl "${WEIBO_HOT_POST_URLS[*]}" $2)
-      aliases=('内容' '来源' '博主' '空间' 'mid' '地址' '地域');
-      fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
-      patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
-      indexes=(4 4 4 4 4 4 4);
-      transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
-      jsonFormat='statuses:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{statuses:user.idstr}$,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
-      ;;
-    userpost|up)
-      uid="$2"
-      page=${3:-1}
-      url="$WEIBO_USER_POSTS_URL"
-      url="${url//\{uid\}/$uid}"
-      url="${url//\{page\}/$page}"
-      curlparams=('-b' "$WEIBO_COOKIE")
-      aliases=('内容' '来源' '博主' '空间' 'mid' '地址' '地域');
-      fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
-      patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
-      indexes=(4 4 4 4 4 4 4);
-      transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
-      jsonFormat='data.list:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{data.list:user.idstr}$,(地址)mblogid|$https://weibo.com/{data.list:user.idstr}/{data.list:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
-      ;;
-    hottopic|ht)
-      url="$WEIBO_TOPIC_URL"
-      aliases=('标签' '内容' '分类' '阅读量' '讨论' '地址')
-      fields=('topic' 'summary' 'category' 'read' 'mention' 'mid')
-      patterns=('"topic":"[^"]*"' '"summary":"[^"]*"'  '"category":"[^"]*"' '"read":[^,]*,' '"mention":[^,]*,' '"mid":"[^"]"*')
-      indexes=(4 4 4 3 3 4)
-      transformers=('_' '_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-      ;;
-    hotsearch|hs)
-      url="$WEIBO_HOT_SEARCH_URL";
-      aliases=('标题' '分类' '热度' '地址')
-      fields=('word' 'category' 'num' 'note')
-      patterns=('_' '"(category|ad_type)":"[^"]*"' '"num":[^,]*,' '_')
-      indexes=(4 4 3 4)
-      transformers=('_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-      ;;
-    post|ps)
-      local postid="$2" # M7OL9bpQP
-      if [[ $postid =~ ^http ]]; then
-        local parts=(`resolveLink $2`)
-        postid=${parts[@]:3:1}
-      fi
-      local posturl=${WEIBO_POST_URL//\{postid\}/$postid}
-      text=`curl -s "$posturl"`
-      aliases=('内容' '来源' '博主' '空间' 'mid' '地址' '地域');
-      fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
-      patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
-      indexes=(4 4 4 4 4 4 4);
-      transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
-      jsonFormat=':(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{:user.idstr}$,(地址)mblogid|$https://weibo.com/{:user.idstr}/{:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
-      ;;
-    comment|cm)
-      local count=${3:-10}
-      local post=`RAW=1 weibo post $2`
-      # 4816863043518870
-      local id=`echo $post | grep -oE '"idstr":".+?"' | head -1 | cut -d'"' -f4`
-      # 1600463082
-      local uid=`echo $post | grep -oE '"idstr":".+?"' | tail -1 | cut -d'"' -f4`
-      url="$WEIBO_COMMENT_URL"
-      url=${url//\{uid\}/$uid}
-      url=${url//\{id\}/$id}
-      url=${url//\{count\}/$count}
-      aliases=('内容' '来源' '用户' '粉丝' '空间')
-      fields=('content' 'source' 'user' 'follewers' 'url')
-      patterns=('"text_raw":"[^"]*"' '"source":"[^"]*"' '"screen_name":"[^"]*"' '"followers_count_str":"[^"]*"' '"profile_url":"[^"]*"')
-      indexes=(4 4 4 4 4)
-      transformers=('_' '_' '_' '_' 'https://weibo.com${values[@]:4:1}')
-      ;;
-     *) return;;
-  esac
-  if [[ -z "$text" && -z "$url" ]]; then
-    echo "没有地址" 1>&2; exit 1;
-  fi
-  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
-}
-
-# 百度 #
-
-function baidu() {
-  local url
-  local -a fields
-  local -a indexes
-  local -a aliases
-  local -a patterns
-  local jsonFormat
-
-  url="https://top.baidu.com/board"
-
-  case ${1:-realtime} in
-    realtime|rt)
-      url="$url?tab=realtime"
-    ;;
-    novel|nv)
-      url="$url?tab=novel"
-      local category=$(ask "全部类型 都市 玄幻 奇幻 历史 科幻 军事 游戏 武侠 现代言情 古代言情 幻想言情 青春" "$2")
-      url="$url&tag={\"category\":\"$category\"}"
-    ;;
-    movie|mv)
-      url="$url?tab=movie"
-      local category=$(ask "全部类型 爱情 喜剧 动作 剧情 科幻 恐怖 动画 惊悚 犯罪" "$2")
-      local country=$(ask "全部地区 中国大陆 中国香港 中国台湾 欧美 日本 韩国" "$2")
-      url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
-    ;;
-    teleplay|tv)
-      url="$url?tab=teleplay"
-      local category=$(ask "全部类型 爱情 搞笑 悬疑 古装 犯罪 动作 恐怖 科幻 剧情 都市" "$2")
-      local country=$(ask "全部地区 中国大陆 中国台湾 中国香港 欧美 韩国 日本" "$2")
-      url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
-    ;;
-    car)
-      url="$url?tab=car"
-      local category=$(ask "全部 轿车 SUV 新能源 跑车 MPV" "$2")
-      url="$url&tag={\"category\":\"$category\"}"
-    ;;
-    game)
-      url="$url?tab=game"
-      local category=$(ask "全部类型 手机游戏 网络游戏 单机游戏" "$2")
-      url="$url&tag={\"category\":\"$category\"}"
-    ;;
-  esac
-  text=$(curl -s "$url" | grep -oE '<!--s-data:.*}-->' | sed -nE 's/<!--s-data:(.*)-->/\1/p')
-  aliases=(关键词 描述 地址 图片)
-  fields=(query desc rawUrl img)
-  patterns=('_' '_' '_' '_')
-  indexes=(4 4 4 4)
-  jsonFormat='data.cards.0.content:(关键词)word|index|red|bold,(描述)desc,(地址)rawUrl,(图片)img|image'
-  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
-}
-
 # 知乎 #
 
 ZHIHU_HOT_URL='https://www.zhihu.com/billboard'
@@ -298,75 +157,6 @@ ZHIHU_HOT_URL='https://www.zhihu.com/billboard'
 
 ZHIHU_DOMAINS=(全部 数码 科技 互联网 商业财经 职场 教育 法律 军事 汽车 人文社科 自然科学 工程技术 情感 心理学 两性 母婴亲子 家居 健康 艺术 音乐 设计 影视娱乐 宠物 体育电竞 运动健身 动漫游戏 美食 旅行 时尚)
 ZHIHU_DOMAINS_NUM=(0  100001  100002  100003  100004  100005  100006  100007  100008  100009  100010  100011  100012  100013  100014  100015  100016  100017  100018  100019  100020  100021  100022  100023  100024  100025  100026  100027  100028  100029)
-
-function zhihu() {
-  local url
-  local -a aliases
-  local -a fields
-  local -a patterns
-  local -a indexes
-  case ${1:-hot} in
-    hot|ht|热搜)
-      # https://www.zhihu.com/knowledge-plan/hot-question/hot/0/hour
-      url='https://www.zhihu.com/api/v4/creators/rank/hot?domain={domain}&period={period}'
-      fields=(title link)
-      aliases=(标题 链接)
-      patterns=('"title":"[^"]*"' '"url":"[^"]*"')
-      indexes=(4 4)
-      jsonFormat='data:(标题)question.title,(链接)question.url,(时间)question.created|date,(标签)question.topics*.name'
-      case $2 in
-        day)
-          url=${url//\{period\}/day}
-          domain=$(ask "${ZHIHU_DOMAINS[*]}" "$3")
-          url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
-        ;;
-        week)
-          url=${url//\{period\}/week}
-          domain=$(ask "${ZHIHU_DOMAINS[*]}" "$3")
-          url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
-        ;;
-        hot|ht|hour)
-          url=${url//\{period\}/hour}
-          domain=$(ask "${ZHIHU_DOMAINS[*]}" "$3")
-          url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
-        ;;
-        *)
-          url=${url//\{period\}/hour}
-          domain=$(ask "${ZHIHU_DOMAINS[*]}" "$2")
-          url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
-        ;;
-      esac
-    ;;
-  esac
-  echo $url
-  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
-}
-
-# 头条 #
-
-TOUTIAO_HOT_URL='https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc'
-TOUTIAO_HOT_SEARCH_URL='https://tsearch.snssdk.com/search/suggest/hot_words/'
-
-function toutiao() {
-  # https://www.toutiao.comhttps://tsearch.snssdk.com/search/suggest/hot_words/
-  local type=$1
-  local url=''
-  local -a patterns
-  local -a indexes
-  local -a transformers
-  case ${type:=hot} in
-    hot|ht) url="$TOUTIAO_HOT_URL";
-      patterns=('"Title":"[^"]*"' '"Url":"[^"]*"');
-      indexes=(4 4);;
-    hs|search) url="$TOUTIAO_HOT_SEARCH_URL";
-      patterns=('"query":"[^"]*"' '"query":"[^"]*"');
-      indexes=(4 4);
-      transformers=('$title' 'https://so.toutiao.com/search?dvpf=pc\&source=trending_card\&keyword=$title');;
-  esac
-  local -a fields=(title link)
-  local -a aliases=(标题 链接)
-  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
-}
 
 function json_res() {
   local url
@@ -376,7 +166,189 @@ function json_res() {
   local -a indexes
   local -a transformers
   local -a types
+  local jsonFormat
+  local curlparams
   case $1 in
+    # 微博
+    weibo|wb)
+      case $2 in
+        groups|gps)
+          url='https://weibo.com/ajax/feed/allGroups?is_new_segment=1&fetch_hot=1'
+          jsonFormat=''
+        ;;
+        hotpost|hp)
+          url=$(getUrl "${WEIBO_HOT_POST_URLS[*]}" $3)
+          aliases=('内容' '来源' '博主' '空间' 'mid' '地址' '地域');
+          fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
+          patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
+          indexes=(4 4 4 4 4 4 4);
+          transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
+          jsonFormat='statuses:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{statuses:user.idstr}$,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
+          ;;
+        userpost|up)
+          uid="$3"
+          page=${4:-1}
+          url="$WEIBO_USER_POSTS_URL"
+          url="${url//\{uid\}/$uid}"
+          url="${url//\{page\}/$page}"
+          curlparams=('-b' "$WEIBO_COOKIE")
+          aliases=('内容' '来源' '博主' '空间' 'mid' '地址' '地域');
+          fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
+          patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
+          indexes=(4 4 4 4 4 4 4);
+          transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
+          jsonFormat='data.list:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{data.list:user.idstr}$,(地址)mblogid|$https://weibo.com/{data.list:user.idstr}/{data.list:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
+          ;;
+        hottopic|ht)
+          url="$WEIBO_TOPIC_URL"
+          aliases=('标签' '内容' '分类' '阅读量' '讨论' '地址')
+          fields=('topic' 'summary' 'category' 'read' 'mention' 'mid')
+          patterns=('"topic":"[^"]*"' '"summary":"[^"]*"'  '"category":"[^"]*"' '"read":[^,]*,' '"mention":[^,]*,' '"mid":"[^"]"*')
+          indexes=(4 4 4 3 3 4)
+          transformers=('_' '_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
+          ;;
+        hotsearch|hs)
+          url="$WEIBO_HOT_SEARCH_URL";
+          aliases=('标题' '分类' '热度' '地址')
+          fields=('word' 'category' 'num' 'note')
+          patterns=('_' '"(category|ad_type)":"[^"]*"' '"num":[^,]*,' '_')
+          indexes=(4 4 3 4)
+          transformers=('_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
+          ;;
+        post|ps)
+          local postid="$3" # M7OL9bpQP
+          if [[ $postid =~ ^http ]]; then
+            local parts=(`resolveLink $3`)
+            postid=${parts[@]:3:1}
+          fi
+          local posturl=${WEIBO_POST_URL//\{postid\}/$postid}
+          text=`curl -s "$posturl"`
+          aliases=('内容' '来源' '博主' '空间' 'mid' '地址' '地域');
+          fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
+          patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
+          indexes=(4 4 4 4 4 4 4);
+          transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
+          jsonFormat=':(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{:user.idstr}$,(地址)mblogid|$https://weibo.com/{:user.idstr}/{:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
+          ;;
+        comment|cm)
+          local count=${4:-10}
+          local post=`RAW=1 json_res weibo post $3`
+          # 4816863043518870
+          local id=`echo $post | grep -oE '"idstr":".+?"' | head -1 | cut -d'"' -f4`
+          # 1600463082
+          local uid=`echo $post | grep -oE '"idstr":".+?"' | tail -1 | cut -d'"' -f4`
+          url="$WEIBO_COMMENT_URL"
+          url=${url//\{uid\}/$uid}
+          url=${url//\{id\}/$id}
+          url=${url//\{count\}/$count}
+          aliases=('内容' '来源' '用户' '粉丝' '空间')
+          fields=('content' 'source' 'user' 'follewers' 'url')
+          patterns=('"text_raw":"[^"]*"' '"source":"[^"]*"' '"screen_name":"[^"]*"' '"followers_count_str":"[^"]*"' '"profile_url":"[^"]*"')
+          indexes=(4 4 4 4 4)
+          transformers=('_' '_' '_' '_' 'https://weibo.com${values[@]:4:1}')
+          ;;
+        *) return;;
+      esac
+    ;;
+    # 知乎
+    zhihu|zh)
+      case ${2:-hot} in
+        hot|ht|热搜)
+          # https://www.zhihu.com/knowledge-plan/hot-question/hot/0/hour
+          url='https://www.zhihu.com/api/v4/creators/rank/hot?domain={domain}&period={period}'
+          fields=(title link)
+          aliases=(标题 链接)
+          patterns=('"title":"[^"]*"' '"url":"[^"]*"')
+          indexes=(4 4)
+          jsonFormat='data:(标题)question.title|red|bold|index,(链接)question.url,(时间)question.created|date,(标签)question.topics*.name'
+          case $3 in
+            day)
+              url=${url//\{period\}/day}
+              domain=$(ask "${ZHIHU_DOMAINS[*]}" "$4")
+              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+            ;;
+            week)
+              url=${url//\{period\}/week}
+              domain=$(ask "${ZHIHU_DOMAINS[*]}" "$4")
+              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+            ;;
+            hot|ht|hour)
+              url=${url//\{period\}/hour}
+              domain=$(ask "${ZHIHU_DOMAINS[*]}" "$4")
+              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+            ;;
+            *)
+              url=${url//\{period\}/hour}
+              domain=$(ask "${ZHIHU_DOMAINS[*]}" "$3")
+              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+            ;;
+          esac
+        ;;
+      esac
+    ;;
+    # 百度
+    baidu|bd)
+      url="https://top.baidu.com/board"
+      case ${2:-realtime} in
+        realtime|rt)
+          url="$url?tab=realtime"
+        ;;
+        novel|nv)
+          url="$url?tab=novel"
+          local category=$(ask "全部类型 都市 玄幻 奇幻 历史 科幻 军事 游戏 武侠 现代言情 古代言情 幻想言情 青春" "$3")
+          url="$url&tag={\"category\":\"$category\"}"
+        ;;
+        movie|mv)
+          url="$url?tab=movie"
+          local category=$(ask "全部类型 爱情 喜剧 动作 剧情 科幻 恐怖 动画 惊悚 犯罪" "$3")
+          local country=$(ask "全部地区 中国大陆 中国香港 中国台湾 欧美 日本 韩国" "$3")
+          url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
+        ;;
+        teleplay|tv)
+          url="$url?tab=teleplay"
+          local category=$(ask "全部类型 爱情 搞笑 悬疑 古装 犯罪 动作 恐怖 科幻 剧情 都市" "$3")
+          local country=$(ask "全部地区 中国大陆 中国台湾 中国香港 欧美 韩国 日本" "$3")
+          url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
+        ;;
+        car)
+          url="$url?tab=car"
+          local category=$(ask "全部 轿车 SUV 新能源 跑车 MPV" "$3")
+          url="$url&tag={\"category\":\"$category\"}"
+        ;;
+        game)
+          url="$url?tab=game"
+          local category=$(ask "全部类型 手机游戏 网络游戏 单机游戏" "$3")
+          url="$url&tag={\"category\":\"$category\"}"
+        ;;
+      esac
+      text=$(curl -s "$url" | grep -oE '<!--s-data:.*}-->' | sed -nE 's/<!--s-data:(.*)-->/\1/p')
+      aliases=(关键词 描述 地址 图片)
+      fields=(query desc rawUrl img)
+      patterns=('_' '_' '_' '_')
+      indexes=(4 4 4 4)
+      jsonFormat='data.cards.0.content:(关键词)word|red|bold|index,(描述)desc|white,(地址)rawUrl,(图片)img|image'
+    ;;
+    # 头条
+    toutiao|tt)
+      fields=(title link)
+      aliases=(标题 链接)
+      case ${2:=hot} in
+        hot|ht)
+          url='https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc';
+          patterns=('"Title":"[^"]*"' '"Url":"[^"]*"');
+          indexes=(4 4)
+          jsonFormat='data:(标题)Title,(链接)Url,(图片)Image.url_list'
+          ;;
+        hs|search)
+          url='https://tsearch.snssdk.com/search/suggest/hot_words/';
+          patterns=('"query":"[^"]*"' '"query":"[^"]*"');
+          indexes=(4 4);
+          transformers=('$title' 'https://so.toutiao.com/search?dvpf=pc\&source=trending_card\&keyword=$title')
+          jsonFormat='data:(标题)query,(链接)query|$https://so.toutiao.com/search?dvpf=pc&source=trending_card&keyword={data:query}$'
+          ;;
+      esac
+    ;;
+    # bilibili
     bilibili|bb)
       aliases=(标题 作者 分类 浏览 点赞 链接 描述 图片)
       fields=(title name tname view like short_link desc pic)
@@ -411,14 +383,13 @@ function json_res() {
       esac
       ;;
   esac
-  print_json -u "$url" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -y "${types[*]}"
+  if [[ -z "$text" && -z "$url" ]]; then
+    echo "没有地址" 1>&2; exit 1;
+  fi
+  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
 }
 
 case $1 in
-  weibo|wb) weibo ${@:2};;
-  baidu|bd) baidu ${@:2};;
-  zhihu|zh) zhihu ${@:2};;
-  toutiao|tt) toutiao ${@:2};;
   -h) echo '
   weibo|wb
     hotsearch|hs

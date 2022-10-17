@@ -103,6 +103,8 @@ function print_json() {
     esac
   done
 
+  echo $url 1>&2
+
   if [[ -n "$jsonFormat" && `declare -f jsonparser` ]]; then
 
     [[ -z $text ]] && text="$(curl -s "$url" "${curlparams[*]}")"
@@ -171,5 +173,87 @@ function print_json() {
     fi
   fi
   [[ ! -d $_dirname/xy ]] && mkdir -p $_dirname/xy
-  echo $text > "$_dirname/xy/${url//\//\\}.$(date +%s).json"
+  echo $text > "$_dirname/xy/$(date +%s).${url//\//\\}.json"
+}
+
+# path:
+# groups[*]
+# https://www.rfc-editor.org/rfc/rfc7159
+function getJson() {
+  local json="$1"
+  local -i objects=0
+  local -i arrays=0
+  local -i numbers=0
+  local -i strings=0
+  local -i nulls=0
+  local -i trues=0
+  local -i falses=0
+  local chars=''
+  local char=''
+  local line=1
+  local column=1
+  while read -n1 char; do
+    # if [[ $char = $'\n' ]]; then
+    #   line=$((line + 1))
+    #   column=1
+    # else
+    #   column=$((column + 1))
+    # fi
+    case $char in
+      # 结构字符
+      '[')
+        arrays=$((arrays + 1))
+      ;;
+      ']')
+        arrays=$((arrays - 1))
+      ;;
+      '{')
+        objects=$((objects + 1))
+      ;;
+      '}')
+        objects=$((objects - 1))
+      ;;
+      ':')
+        if [[ $strings > 0 ]]; then
+          chars="$chars$char"
+          continue
+        elif [[ $objects > 0 ]]; then
+          continue
+        fi
+      ;;
+      ',')
+      ;;
+      # 结构字符前后允许的（任意数量空白）字符：' \t\n\r'
+      $'\x20'|$'\x09'|$'\x0A'|$'\x0D')
+        continue
+      ;;
+      # 字符串标识符
+      '"')
+      ;;
+      # 负数、指数符号
+      '-')
+      ;;
+      # 指数符号
+      '+')
+      ;;
+      # 小数点
+      '.')
+      ;;
+      # 指数标识符
+      'e'|'E')
+      ;;
+      # 数字
+      [0-9])
+      ;;
+      # 字符串
+      *)
+      ;;
+    esac
+    echo "Unexpected token: $char in $line:$column."
+    exit 1
+  done < <(printf "%s" "$json")
+}
+
+function tokens() {
+  printf %s $*
 }

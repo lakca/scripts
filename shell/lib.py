@@ -214,9 +214,13 @@ def retrieve(obj, keys, default=None):
                 index = int(key)
                 if len(obj) > index:
                     obj = obj[index]
+                else:
+                    return default
             else:
                 if key in obj:
                     obj = obj[key]
+                else:
+                    return default
         else:
             return default
     return obj
@@ -248,22 +252,28 @@ class Pipe:
                 args = pipe[1:]
                 pipe = pipe[0]
             attr = getattr(cls, pipe, None)
-            v = (
-                attr(v, *args, data=data)
-                if attr
-                else re.sub(r"\{([^\}]+)\}", lambda m: data.get(m.group(1), ""), pipe)
-            )
+            if attr:
+                v = (
+                    attr(v, *args, data=data)
+                    if attr
+                    else re.sub(r"\{([^\}]+)\}", lambda m: data.get(m.group(1), ""), pipe)
+                )
         return v
 
     @classmethod
     def date(cls, v, *args, **kwargs):
-        if isdigit(v):
+        if isdigit(v) or isinstance(v, int):
             v = int(v)
             v = v / 1000 if len(str(v)) == 13 else v
-            time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(v))
+            return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(v))
         else:
-            time.strptime(v, '')
+            # time.strptime(v, '')
+            return
         return
+
+    def number(cls, v, type='', *args, **kwargs):
+        if type == '':
+            return '{:,d}'.format(v)
 
     @classmethod
     def style(cls, v, styles=[], *args, **kwargs):
@@ -346,6 +356,10 @@ class Pipe:
         number = int(number)
         return "\n" * -number + v if number < 0 else v + "\n" * number
 
+    @classmethod
+    def join(cls, v, delimiter=', ', number=1, *args, **kwargs):
+        return delimiter.join(v) if isinstance(v, list) else v
+
 
 class Parser:
     @classmethod
@@ -392,6 +406,9 @@ class Parser:
     def applyPipes(cls, value, pipes, data):
         return Pipe.apply(value, pipes, data)
 
+    def applyListPipes(cls, value, pipes, data):
+        return Pipe.apply(value, pipes, data)
+
     @classmethod
     def printRecord(cls, record, meta, indent=0):
         INDENT = 2
@@ -403,7 +420,7 @@ class Parser:
             if key.startswith("__"):
                 continue
 
-            label = meta[key]["label"]
+            label = meta[key].get("label", key)
 
             scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
 
@@ -445,6 +462,10 @@ class Parser:
         records = cls.getValue(data, tokens)
         # print(json.dumps(records, indent=2))
         flatted = cls.flatTokens(tokens)
+
+        if not records:
+            return print('没有数据')
+
         for i, record in enumerate(records):
             record["__index"] = i + 1
             cls.printRecord(record, flatted)
