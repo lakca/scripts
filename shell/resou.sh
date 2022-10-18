@@ -45,96 +45,34 @@ function ask() {
   for i in "${!values[@]}"; do
     if [[ $value = $i || $value = ${values[@]:$i:1} ]]; then
       printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
-      echo ${values[@]:$i:1}
-      ASK_INDEX=$i
+      _ASK_RESULT=${values[@]:$i:1}
+      _ASK_INDEX=$i
       return
     fi
   done
   for i in "${!values[@]}"; do
-    printf '%b %b | ' "\033[31m$i\033[0m" "\033[32m${values[@]:$i:1}\033[0m" 1>&2
+    printf '%b %b	' "\033[31m$i\033[0m" "\033[32m${values[@]:$i:1}\033[0m" 1>&2
   done
   read -p $'\n输入值：'
-  (
+  local revoke=$(shopt -p nocasematch)
   shopt -s nocasematch
   for i in "${!values[@]}"; do
     if [[ "$REPLY" = $i  || "$REPLY" = "${values[@]:$i:1}" ]]; then
       printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
-      echo "${values[@]:$i:1}"
-      ASK_INDEX=$i
-      echo
-      exit 0
+      _ASK_RESULT="${values[@]:$i:1}"
+      _ASK_INDEX=$i
+      debug $_ASK_RESULT
+      break
     fi
   done
-  )
+  eval $revoke
 }
 
 # 微博 #
 
 # 热门微博 https://weibo.com/hot/weibo/102803
 # https://weibo.com/5368633408/M7OL9bpQP
-WEIBO_HOT_POST_URLS=(
-  热门 'HOT' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803&containerid=102803&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  同城 'CITY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028032222&containerid=102803_2222&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  榜单 'LIST' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600169&containerid=102803_ctg1_600169_-_ctg1_600169&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  明星 'STAR' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034288&containerid=102803_ctg1_4288_-_ctg1_4288&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  抗疫 'ANTICOVID19' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600115&containerid=102803_ctg1_600115_-_ctg1_600115&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  好物 'GOODTHING' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600094&containerid=102803_ctg1_600094_-_ctg1_600094&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  搞笑 'FUNNY' 'https://weibo.ccreated_atom/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034388&containerid=102803_ctg1_4388_-_ctg1_4388&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  颜值 'BEAUTY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600165&containerid=102803_ctg1_600165_-_ctg1_600165&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  社会 'SOCIETY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034188&containerid=102803_ctg1_4188_-_ctg1_4188&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  情感 'EMOTION' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028031988&containerid=102803_ctg1_1988_-_ctg1_1988&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  新时代 'NEWERA' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028037968&containerid=102803_ctg1_7968_-_ctg1_7968&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  电视剧 'TV' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028032488&containerid=102803_ctg1_2488_-_ctg1_2488&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  美食 'FOOD' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028032688&containerid=102803_ctg1_2688_-_ctg1_2688&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  国际 'I18N' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028036288&containerid=102803_ctg1_6288_-_ctg1_6288&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  深度 'DEEP' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600155&containerid=102803_ctg1_600155_-_ctg1_600155&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  财经 'FINANCIAL' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028036388&containerid=102803_ctg1_6388_-_ctg1_6388&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  读书 'READ' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034588&containerid=102803_ctg1_4588_-_ctg1_4588&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  摄影 'PHOTO' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034988&containerid=102803_ctg1_4988_-_ctg1_4988&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  汽车 'CAR' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028035188&containerid=102803_ctg1_5188_-_ctg1_5188&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  电影 'MOVIE' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028033288&containerid=102803_ctg1_3288_-_ctg1_3288&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  体育 'SPORT' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028031388&containerid=102803_ctg1_1388_-_ctg1_1388&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  数码 'DIGITAL' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028035088&containerid=102803_ctg1_5088_-_ctg1_5088&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  综艺 'SHOW' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034688&containerid=102803_ctg1_4688_-_ctg1_4688&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  时尚 'FASHION' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034488&containerid=102803_ctg1_4488_-_ctg1_4488&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  星座 'CONSTELLATION' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028031688&containerid=102803_ctg1_1688_-_ctg1_1688&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  军事 'MILITTARY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028036688&containerid=102803_ctg1_6688_-_ctg1_6688&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  股市 'STOCK' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028031288&containerid=102803_ctg1_1288_-_ctg1_1288&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  家居 'HOME' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028035888&containerid=102803_ctg1_5888_-_ctg1_5888&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  萌宠 'PET' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028032788&containerid=102803_ctg1_2788_-_ctg1_2788&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  科技 'TECH' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028032088&containerid=102803_ctg1_2088_-_ctg1_2088&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  科普 'SCIENCE' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028035988&containerid=102803_ctg1_5988_-_ctg1_5988&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  动漫 'COMIC' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028032388&containerid=102803_ctg1_2388_-_ctg1_2388&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  健身 'FITNESS' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034788&containerid=102803_ctg1_4788_-_ctg1_4788&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  旅游 'TRIP' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028032588&containerid=102803_ctg1_2588_-_ctg1_2588&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  瘦身 'SLIM' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028036488&containerid=102803_ctg1_6488_-_ctg1_6488&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  历史 'HISTORY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028036788&containerid=102803_ctg1_6788_-_ctg1_6788&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  艺术 'ART' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028035488&containerid=102803_ctg1_5488_-_ctg1_5488&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  美妆 'MAKEUP' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028031588&containerid=102803_ctg1_1588_-_ctg1_1588&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  法律 'LAW' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028037388&containerid=102803_ctg1_7388_-_ctg1_7388&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  设计 'DESIGN' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028035388&containerid=102803_ctg1_5388_-_ctg1_5388&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  健康 'HEALTH' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028032188&containerid=102803_ctg1_2188_-_ctg1_2188&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  音乐 'MUSIC' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028035288&containerid=102803_ctg1_5288_-_ctg1_5288&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  游戏 'GAME' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028034888&containerid=102803_ctg1_4888_-_ctg1_4888&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  校园 'CAMPUS' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600177&containerid=102803_ctg1_600177_-_ctg1_600177&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  收藏 'COLLECTION' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038189&containerid=102803_ctg1_8189_-_ctg1_8189&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  政务 'GOV' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028035788&containerid=102803_ctg1_5788_-_ctg1_5788&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  养生 'REGIMEN' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028036588&containerid=102803_ctg1_6588_-_ctg1_6588&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  育儿 'CHILDCARE' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028033188&containerid=102803_ctg1_3188_-_ctg1_3188&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  抽奖 'LOTTERY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600037&containerid=102803_ctg1_600037_-_ctg1_600037&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  国学 'SINOLOGY' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600032&containerid=102803_ctg1_600032_-_ctg1_600032&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  教育 'EDU' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=102803600080&containerid=102803_ctg1_600080_-_ctg1_600080&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  舞蹈 'DANCE' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038788&containerid=102803_ctg1_8788_-_ctg1_8788&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  辟谣 'DEBUNK' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028036988&containerid=102803_ctg1_6988_-_ctg1_6988&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  三农 'FARM' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028037188&containerid=102803_ctg1_7188_-_ctg1_7188&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  # 热门榜单：https://weibo.com/hot/list/1028039999
-  小时榜 'HOUR' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&group_id=1028039999&containerid=102803_ctg1_9999_-_ctg1_9999_home&extparam=discover|new_feed&max_id=0&count=10'
-  昨天榜 'DAY1' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038899&containerid=102803_ctg1_8899_-_ctg1_8899&extparam=discover|new_feed&max_id=0&count=10'
-  前天榜 'DAY2' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038799&containerid=102803_ctg1_8799_-_ctg1_8799&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  周榜 'WEEK' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038698&containerid=102803_ctg1_8698_-_ctg1_8698&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  男性榜 'MALE' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038998&containerid=102803_ctg1_8998_-_ctg1_8998&extparam=discover%7Cnew_feed&max_id=0&count=10'
-  女性榜 'FEMALE' 'https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id=1028038997&containerid=102803_ctg1_8997_-_ctg1_8997&extparam=discover%7Cnew_feed&max_id=0&count=10'
-)
+WEIBO_HOT_POST_URL='https://weibo.com/ajax/feed/hottimeline?since_id=0&refresh=1&group_id={gid}&containerid={containerid}&extparam=discover%7Cnew_feed&max_id=0&count={count}'
 # 话题榜：https://weibo.com/hot/topic
 WEIBO_TOPIC_URL='https://weibo.com/ajax/statuses/topic_band?sid=v_weibopro&category=all&page=1&count=50'
 # 热搜榜：https://weibo.com/hot/search
@@ -174,10 +112,44 @@ function json_res() {
       case $2 in
         groups|gps)
           url='https://weibo.com/ajax/feed/allGroups?is_new_segment=1&fetch_hot=1'
-          jsonFormat=''
+          local recording=3
+          local -a gids=()
+          local -a groups=()
+          local -a containerids=()
+          local gid
+          while read line; do
+            if [[ $line =~ ^gid && $recording > 1 ]]; then
+              [[ $recording = 2 ]] && containerids+=($gid)
+              gid=${line//gid /}
+              gids+=($gid)
+              recording=1
+            elif [[ $line =~ ^title && $recording = 1 ]]; then
+              groups+=(${line//title /})
+              recording=2
+            elif [[ $line =~ ^containerid && $recording = 2 ]]; then
+              containerids+=(${line//containerid /})
+              recording=3
+            fi
+          done < <(curl -s "$url" | grep -oE '"(gid|containerid|title)":"[^"]*"' | sed -n 's/"//g;s/:/ /p')
+          ask "${groups[*]}" $3
+          local group=$_ASK_RESULT
+          debug $_ASK_RESULT
+          debug ${groups[@]}
+          debug ${gids[@]}
+          debug ${containerids[@]}
+          debug ${_ASK_INDEX}
+          echo "$group ${gids[@]:$_ASK_INDEX:1} ${containerids[@]:$_ASK_INDEX:1}"
+          exit 0
         ;;
         hotpost|hp)
-          url=$(getUrl "${WEIBO_HOT_POST_URLS[*]}" $3)
+          local group=($(json_res wb groups $3))
+          local gid=${group[@]:1:1}
+          local containerid=${group[@]:2:1}
+          local count=${4:-10}
+          url="$WEIBO_HOT_POST_URL"
+          url=${url//\{gid\}/$gid}
+          url=${url//\{containerid\}/$containerid}
+          url=${url//\{count\}/$count}
           aliases=('内容' '来源' '博主' '空间' 'mid' '地址' '地域');
           fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
           patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
@@ -264,23 +236,27 @@ function json_res() {
           case $3 in
             day)
               url=${url//\{period\}/day}
-              domain=$(ask "${ZHIHU_DOMAINS[*]}" "$4")
-              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+              ask "${ZHIHU_DOMAINS[*]}" "$4"
+              domain=$_ASK_RESULT
+              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
             ;;
             week)
               url=${url//\{period\}/week}
-              domain=$(ask "${ZHIHU_DOMAINS[*]}" "$4")
-              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+              ask "${ZHIHU_DOMAINS[*]}" "$4"
+              domain=$_ASK_RESULT
+              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
             ;;
             hot|ht|hour)
               url=${url//\{period\}/hour}
-              domain=$(ask "${ZHIHU_DOMAINS[*]}" "$4")
-              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+              ask "${ZHIHU_DOMAINS[*]}" "$4"
+              domain=$_ASK_RESULT
+              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
             ;;
             *)
               url=${url//\{period\}/hour}
-              domain=$(ask "${ZHIHU_DOMAINS[*]}" "$3")
-              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$ASK_INDEX:1}}
+              ask "${ZHIHU_DOMAINS[*]}" "$3"
+              domain=$_ASK_RESULT
+              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
             ;;
           esac
         ;;
@@ -295,29 +271,36 @@ function json_res() {
         ;;
         novel|nv)
           url="$url?tab=novel"
-          local category=$(ask "全部类型 都市 玄幻 奇幻 历史 科幻 军事 游戏 武侠 现代言情 古代言情 幻想言情 青春" "$3")
+          ask "全部类型 都市 玄幻 奇幻 历史 科幻 军事 游戏 武侠 现代言情 古代言情 幻想言情 青春" "$3"
+          local category=$_ASK_RESULT
           url="$url&tag={\"category\":\"$category\"}"
         ;;
         movie|mv)
           url="$url?tab=movie"
-          local category=$(ask "全部类型 爱情 喜剧 动作 剧情 科幻 恐怖 动画 惊悚 犯罪" "$3")
-          local country=$(ask "全部地区 中国大陆 中国香港 中国台湾 欧美 日本 韩国" "$3")
+          ask "全部类型 爱情 喜剧 动作 剧情 科幻 恐怖 动画 惊悚 犯罪" "$3"
+          local category=$_ASK_RESULT
+          ask "全部地区 中国大陆 中国香港 中国台湾 欧美 日本 韩国" "$3"
+          local country=$_ASK_RESULT
           url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
         ;;
         teleplay|tv)
           url="$url?tab=teleplay"
-          local category=$(ask "全部类型 爱情 搞笑 悬疑 古装 犯罪 动作 恐怖 科幻 剧情 都市" "$3")
-          local country=$(ask "全部地区 中国大陆 中国台湾 中国香港 欧美 韩国 日本" "$3")
+          ask "全部类型 爱情 搞笑 悬疑 古装 犯罪 动作 恐怖 科幻 剧情 都市" "$3"
+          local category=$_ASK_RESULT
+          ask "全部地区 中国大陆 中国台湾 中国香港 欧美 韩国 日本" "$3"
+          local country=$_ASK_RESULT
           url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
         ;;
         car)
           url="$url?tab=car"
-          local category=$(ask "全部 轿车 SUV 新能源 跑车 MPV" "$3")
+          ask "全部 轿车 SUV 新能源 跑车 MPV" "$3"
+          local category=$_ASK_RESULT
           url="$url&tag={\"category\":\"$category\"}"
         ;;
         game)
           url="$url?tab=game"
-          local category=$(ask "全部类型 手机游戏 网络游戏 单机游戏" "$3")
+          ask "全部类型 手机游戏 网络游戏 单机游戏" "$3"
+          local category=$_ASK_RESULT
           url="$url&tag={\"category\":\"$category\"}"
         ;;
       esac
