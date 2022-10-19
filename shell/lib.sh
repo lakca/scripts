@@ -72,8 +72,22 @@ function print_record() {
   done
 }
 
-function urlencode() {
-  printf '%s' urlencode
+function selectColumns() {
+  local array=($1)
+  local skip=${2:-1}
+  local length=${#array[@]}
+  local -a left=()
+  debug $1
+  debug $2
+  for i in $(seq 0 $((skip+1)) $((length-1))); do
+    left+=(${array[@]:$i:1})
+  done
+  debug ${left[@]}
+  echo ${left[@]}
+}
+
+function ensureFolder() {
+  [[ ! -d $1 ]] && mkdir -p $1
 }
 
 function print_json() {
@@ -123,7 +137,9 @@ function print_json() {
 
   else
 
-    [[ -z "$text" ]] && text="$(escapeSpace $(escapeUnicode $(curl -s "$url" "${curlparams[*]}")))"
+    [[ -z "$text" ]] && text="$(curl -s "$url" "${curlparams[*]}")"
+
+    text=$(escapeSpace $(escapeUnicode $text))
 
     if [[ -n $raw ]]; then
       printf '%s' "$text"
@@ -139,6 +155,7 @@ function print_json() {
         fi
         declare -a "arr_$field"
         while read -r line; do
+          debug $line
           declare "arr_$field+=(\"${line:-~}\")";
         done < <(printf '%s' "$text" | grep -oE "$pattern" | cut -d'"' -f${fieldIndexes[@]:$index:1})
       done
@@ -177,6 +194,8 @@ function print_json() {
       done
     fi
   fi
-  [[ ! -d $_dirname/xy ]] && mkdir -p $_dirname/xy
-  echo $text > "$_dirname/xy/$(date +%s).${url//\//\\}.json"
+
+  local folder"=$_dirname/xy/${url//\//-}"
+  ensureFolder $folder
+  echo $text > "$folder/$(date '+%Y-%m-%dT%H:%M:%S').json"
 }

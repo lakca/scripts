@@ -9,9 +9,13 @@ import time
 from urllib import request
 
 IMGCAT = False
+SIMPLE = False
 
 if os.environ.get("IMGCAT", None):
     IMGCAT = True
+
+if os.environ.get("SIMPLE", None):
+    SIMPLE = True
 
 try:
     from imgcat import imgcat
@@ -252,28 +256,35 @@ class Pipe:
                 args = pipe[1:]
                 pipe = pipe[0]
             attr = getattr(cls, pipe, None)
-            if attr:
-                v = (
-                    attr(v, *args, data=data)
-                    if attr
-                    else re.sub(r"\{([^\}]+)\}", lambda m: data.get(m.group(1), ""), pipe)
-                )
+            v = (
+                attr(v, *args, data=data)
+                if attr
+                else re.sub(r"\{([^\}]+)\}", lambda m: data.get(m.group(1), ""), pipe)
+            )
         return v
 
     @classmethod
     def date(cls, v, *args, **kwargs):
-        if isdigit(v) or isinstance(v, int):
+        if v.isdigit() or isinstance(v, int):
             v = int(v)
             v = v / 1000 if len(str(v)) == 13 else v
             return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(v))
         else:
             # time.strptime(v, '')
-            return
+            return v
         return
 
-    def number(cls, v, type='', *args, **kwargs):
-        if type == '':
-            return '{:,d}'.format(v)
+    @classmethod
+    def number(cls, v, type=',', *args, **kwargs):
+        if not v: return v
+        if type == ',':
+            return '{:,}'.format(v)
+        elif type == '%':
+            return '{:.2%}'.format(v)
+        elif type == '+%':
+            return '{:+.2%}'.format(v)
+        else:
+            return type.format(v)
 
     @classmethod
     def style(cls, v, styles=[], *args, **kwargs):
@@ -411,16 +422,21 @@ class Parser:
 
     @classmethod
     def printRecord(cls, record, meta, indent=0):
+        global SIMPLE
         INDENT = 2
         scopedStdout = lambda *args: sys.stdout.write(
             " " * indent + "".join(list(*args))
         )
+        index = 0
         for (key, val) in record.items():
+            index += 1
 
             if key.startswith("__"):
                 continue
 
             label = meta[key].get("label", key)
+
+            if SIMPLE and index != 1 and label not in ['链接']: continue
 
             scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
 
