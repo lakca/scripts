@@ -266,23 +266,27 @@ class Pipe:
     @classmethod
     def date(cls, v, *args, **kwargs):
         if v.isdigit() or isinstance(v, int):
-            v = int(v)
-            v = v / 1000 if len(str(v)) == 13 else v
-            return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(v))
+            v = str(v)
+            v = int(v) / 1000 if len(v) == 13 and "." not in v else float(v)
+            v = time.localtime(v)
         else:
-            # time.strptime(v, '')
-            return v
-        return
+            try:
+                # "Tue, 18 Oct 2022 23:00:23 +0800"
+                v = time.strptime(v, "%a, %d %b %Y %H:%M:%S %z")
+            except:
+                return v
+        return time.strftime("%Y-%m-%d %H:%M:%S", v)
 
     @classmethod
-    def number(cls, v, type=',', *args, **kwargs):
-        if not v: return v
-        if type == ',':
-            return '{:,}'.format(v)
-        elif type == '%':
-            return '{:.2%}'.format(v)
-        elif type == '+%':
-            return '{:+.2%}'.format(v)
+    def number(cls, v, type=",", *args, **kwargs):
+        if not v:
+            return v
+        if type == ",":
+            return "{:,}".format(v)
+        elif type == "%":
+            return "{:.2%}".format(v)
+        elif type == "+%":
+            return "{:+.2%}".format(v)
         else:
             return type.format(v)
 
@@ -368,7 +372,7 @@ class Pipe:
         return "\n" * -number + v if number < 0 else v + "\n" * number
 
     @classmethod
-    def join(cls, v, delimiter=', ', number=1, *args, **kwargs):
+    def join(cls, v, delimiter=", ", number=1, *args, **kwargs):
         return delimiter.join(v) if isinstance(v, list) else v
 
 
@@ -436,7 +440,8 @@ class Parser:
 
             label = meta[key].get("label", key)
 
-            if SIMPLE and index != 1 and label not in ['链接']: continue
+            if SIMPLE and index != 1 and label not in ["链接"]:
+                continue
 
             scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
 
@@ -480,7 +485,7 @@ class Parser:
         flatted = cls.flatTokens(tokens)
 
         if not records:
-            return print('没有数据')
+            return print("没有数据")
 
         for i, record in enumerate(records):
             record["__index"] = i + 1

@@ -70,8 +70,7 @@ function question() {
   local msg="$1"
   local default="$2"
   if [[ $PROGRESS ]]; then
-    read -p $'\033[32m'$1$'\033[0m\033[31m'
-    printf '%c' '\033[0m'
+    read -p $'\033[33m'"【默认值："$default"】"$1$'\033[0m\033[31m'
     debug $REPLY
     [[ -z $REPLY ]] && echo $default || echo $REPLY
   else
@@ -460,15 +459,15 @@ function json_res() {
             军事新闻-分享数排行 wbrmzfjsxw
           )
           local category=$3
-          local date=${4:-$(date '+%Y%m%d')}
-          local type=$(question '输入类型（day/week/month分别代表日/周/月排行榜）：' day)
-          local count=$(question '输入数量：' 20)
           ask "$(selectColumns "${categories[*]}" 1)" $category
-          local category=${categories[@]:$((ASK_INDEX+1)):1}
+          category=${categories[@]:$((ASK_INDEX+1)):1}
           debug $category
-          url=${url//\{type\}/$type}
-          url=${url//\{date\}/$date}
           url=${url//\{category\}/$category}
+          local date=$(question "输入排行榜时间：" "${4:-$(date '+%Y%m%d')}")
+          url=${url//\{date\}/$date}
+          local type=$(question "输入排行榜类型（可选值：day/week/month，分别代表日/周/月排行榜）：" "${5:-day}")
+          url=${url//\{type\}/$type}
+          local count=$(question "输入排行榜新闻数量：" "${6:-20}")
           url=${url//\{count\}/$count}
           text=$(curl -s "$url" | grep -oE '{.*}')
           # text=`cat sina.rank.json | grep -oE '{.*}'`
@@ -521,6 +520,9 @@ case $1 in
 
   sogou|sg
     hotsearch|hs
+
+  sina
+    rank [category [date [type [count]]]]
     '
     ;;
   *) json_res ${@:1};;
