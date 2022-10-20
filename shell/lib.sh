@@ -90,6 +90,56 @@ function ensureFolder() {
   [[ ! -d $1 ]] && mkdir -p $1
 }
 
+function resolveLink() {
+  local link=${1//\?*/}
+  link=${link//\\\?*/}
+  link=${link//\#*/}
+  link=${link//\\\#*/}
+  local parts=(`echo $link | grep -oE '[^\/]+'`)
+  echo "${parts[*]}"
+}
+
+function ask() {
+  local values=($1)
+  local value="$2"
+  for i in "${!values[@]}"; do
+    if [[ $value = $i || $value = ${values[@]:$i:1} ]]; then
+      printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
+      _ASK_RESULT=${values[@]:$i:1}
+      _ASK_INDEX=$i
+      return
+    fi
+  done
+  for i in "${!values[@]}"; do
+    printf '%b %b	' "\033[31m$i\033[0m" "\033[32m${values[@]:$i:1}\033[0m" 1>&2
+  done
+  read -p $'\n输入值：'
+  local revoke=$(shopt -p nocasematch)
+  shopt -s nocasematch
+  for i in "${!values[@]}"; do
+    if [[ "$REPLY" = $i  || "$REPLY" = "${values[@]:$i:1}" ]]; then
+      printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
+      _ASK_RESULT="${values[@]:$i:1}"
+      _ASK_INDEX=$i
+      debug $_ASK_RESULT
+      break
+    fi
+  done
+  eval $revoke
+}
+
+function question() {
+  local msg="$1"
+  local default="$2"
+  if [[ $PROGRESS ]]; then
+    read -p $'\033[33m'"【默认值："$default"】"$1$'\033[0m\033[31m'
+    debug $REPLY
+    [[ -z $REPLY ]] && echo $default || echo $REPLY
+  else
+    echo $default
+  fi
+}
+
 function print_json() {
   local -a fieldNames
   local -a fieldAliases
