@@ -21,18 +21,73 @@ fi
 
 function debug() {
   if [[ -n "$DEBUG" ]]; then
-    echo $* | while IFS=$'\n' read line ; do
+    echo "$*" | while IFS=$'\n' read line ; do
       # echo ${FUNCNAME[@]} ${BASH_SOURCE[@]}, ${BASH_LINENO[@]} 1>&2
       printf "\033[0;31m[DEBUG:`realpath ${BASH_SOURCE[@]:1:1}`:${BASH_LINENO[@]:0:1}]\033[0m \033[0;37m%s\033[0m\n" "$line" 1>&2
     done
   fi
 }
 
+function UnicodePointToUtf8() {
+    local x="$1"               # ok if '0x2620'
+    x=${x/\\u/0x}              # '\u2620' -> '0x2620'
+    x=${x/U+/0x}; x=${x/u+/0x} # 'U-2620' -> '0x2620'
+    x=$((x)) # from hex to decimal
+    local y=$x n=0
+    [ $x -ge 0 ] || return 1
+    while [ $y -gt 0 ]; do y=$((y>>1)); n=$((n+1)); done
+    if [ $n -le 7 ]; then       # 7
+        y=$x
+    elif [ $n -le 11 ]; then    # 5+6
+        y=" $(( ((x>> 6)&0x1F)+0xC0 )) \
+            $(( (x&0x3F)+0x80 ))"
+    elif [ $n -le 16 ]; then    # 4+6+6
+        y=" $(( ((x>>12)&0x0F)+0xE0 )) \
+            $(( ((x>> 6)&0x3F)+0x80 )) \
+            $(( (x&0x3F)+0x80 ))"
+    else                        # 3+6+6+6
+        y=" $(( ((x>>18)&0x07)+0xF0 )) \
+            $(( ((x>>12)&0x3F)+0x80 )) \
+            $(( ((x>> 6)&0x3F)+0x80 )) \
+            $(( (x&0x3F)+0x80 ))"
+    fi
+    printf -v y '\\x%x' $y
+    echo $y
+}
+
 function escapeUnicode() {
-  printf '%s' "$*" | sed -E 's/\\u0([1-9a-f]{3})/\\x\1/gI' \
-  | sed -E 's/\\u00([1-9a-f]{2})/\\x\1/gI' \
-  | sed -E 's/\\u000([1-9a-f]{1})/\\x\1/gI' \
-  | sed -E 's/\\"/\\x22/gI'
+  local raw_text="$*"
+    local text=''
+    local prev=''
+    local char
+    for i in $(seq 0 $((${#raw_text} - 1))); do
+        char="${raw_text[@]:$i:1}"
+        if [[ -z "$prev" && "$char" == '\' ]]; then
+          prev="$prev$char"
+        elif [[ "$prev" == '\' ]]; then
+            if [[ "$char" == 'u' ]]; then
+                prev="$prev$char"
+            else
+                text="$text$prev$char"
+                prev=''
+            fi
+        elif [[ "$prev" =~ ^\\u[0-9a-f]{0,3}$ ]]; then
+            if [[ "$char" == [0-9a-f] ]]; then
+                prev="$prev$char"
+            else
+                text="$text$prev$char"
+                prev=''
+            fi
+        else
+            text="$text$prev$char"
+            prev=''
+        fi
+        if [[ "$prev" =~ ^\\u[0-9a-f]{4}$ ]]; then
+            text="$text$(UnicodePointToUtf8 "$prev")"
+            prev=''
+        fi
+    done
+    printf %s "$text"
 }
 
 function escapeSpace() {
@@ -41,7 +96,8 @@ function escapeSpace() {
     | sed -E 's/\\t/\\x9/g' \
     | sed -E 's/\\v/\\xb/g' \
     | sed -E 's/\\f/\\xc/g' \
-    | sed -E 's/\\r/\\xd/g'
+    | sed -E 's/\\r/\\xd/g' \
+    | sed -E 's/\\"/\\x22/gI'
 }
 
 function print_record() {
@@ -107,6 +163,7 @@ function ask() {
       printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
       _ASK_RESULT=${values[@]:$i:1}
       _ASK_INDEX=$i
+      debug $_ASK_RESULT, $_ASK_INDEX
       return
     fi
   done
@@ -121,7 +178,7 @@ function ask() {
       printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
       _ASK_RESULT="${values[@]:$i:1}"
       _ASK_INDEX=$i
-      debug $_ASK_RESULT
+      debug $_ASK_RESULT, $_ASK_INDEX
       break
     fi
   done
@@ -189,7 +246,7 @@ function print_json() {
 
     [[ -z "$text" ]] && text="$(curl -s "$url" "${curlparams[*]}")"
 
-    text=$(escapeSpace $(escapeUnicode $text))
+    text=$(escapeSpace $(escapeUnicode "$text"))
 
     if [[ -n $raw ]]; then
       printf '%s' "$text"

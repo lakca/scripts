@@ -502,7 +502,8 @@ if __name__ == "__main__":
     for line in sys.stdin:
         data += line
     try:
-        data = json.loads(data)
-    except:
+        data = json.loads(data.rstrip())
+    except Exception as e:
         print(data)
+        print(e)
     Parser.output(fmt, data)
