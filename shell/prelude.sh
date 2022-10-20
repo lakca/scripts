@@ -417,7 +417,7 @@ function define() {
   local nameDisplay
   local mixedArgs
   local def=()
-  while getopts ":n:p:a:f:x:d:h:v:z:N:H" opt; do
+  while getopts ":n:p:a:f:x:d:h:v:z:N:c:H" opt; do
     local encoded=`encode "$OPTARG"`
     case $opt in
     a) mixedArgs="$OPTARG" ;;
@@ -429,6 +429,7 @@ function define() {
     h) def+=(-h "$encoded") ;;
     v) def+=(-v "$encoded") ;;
     z) def+=(-z "$encoded") ;;
+    c) def+=(-c "$encoded") ;;
     N) nameDisplay="$OPTARG";;
     H)
       green "Usage: define [OPTIONS]
@@ -445,6 +446,7 @@ function define() {
         -h <header> e.g. -h 'Content-Type:application/json' -h 'Accept:application/json'
         -v <arguments default value> value prefixed with '<argName>:', e.g. -v 'USERNAME:admin' -v 'TOKEN:123456'
         -z <sorts> e.g. -z '+created,-name'
+        -c <more curl options>
         -H help message
       "
       return
@@ -493,7 +495,7 @@ function parseDefine() {
   shift
   local OPTARG
   local OPTIND
-  while getopts ":p:a:o:f:m:d:h:v:N:z:" opt; do
+  while getopts ":p:a:o:f:m:d:h:v:N:z:c:" opt; do
     debug "df opts origin '$opt': $OPTARG"
     local decoded=`decode "$OPTARG" 2>/dev/null`
     debug "df opts decode '$opt': $decoded"
@@ -509,6 +511,7 @@ function parseDefine() {
     h) _headers+=($decoded);;
     v) _defaults+=($decoded);;
     z) _sorts="$decoded" ;;
+    c) _curloptions+=($decoded) ;;
     esac
   done
 }
@@ -526,6 +529,7 @@ function invoke() {
   local _defaults=()
   local _sorts
   local _nameDisplay
+  local _curloptions=()
   parseDefine "$_name"
   debug "invoke $_name:"
   debug "  path: $_path"
@@ -538,6 +542,7 @@ function invoke() {
   debug "  defaults: $_defaults"
   debug "  sorts: $_sorts"
   debug "  nameDisplay: $_nameDisplay"
+  debug "  curloptions: $_curloptions"
   local _argsList=($(grep -o '[A-Z][A-Z0-9_]\+!\?' <<<$_args))
   local _pureArgsList=($(grep -o '[A-Z][A-Z0-9_]\+' <<<$_args))
   local _optsList=($(grep -o '[a-zA-Z]' <<<$_opts))
@@ -629,15 +634,21 @@ function invoke() {
   # assign arguments values in the path and data
   local _realPath="$_path"
   local _realData="$_data"
+  local _realCurlOptions=(${_curloptions[@]})
   for idx in ${_argIdxList[@]}; do
     _realPath=${_realPath//"\$${_pureArgsList[idx]}"/"${!_pureArgsList[idx]}"}
     _realData=${_realData//"\$${_pureArgsList[idx]}"/"${!_pureArgsList[idx]}"}
+    for i in ${!_realCurlOptions[@]}; do
+      local item="${_realCurlOptions[@]:$i:1}"
+      _realCurlOptions[$i]=${item//"\$${_pureArgsList[idx]}"/"${!_pureArgsList[idx]}"}
+    done
   done
   # send
   local _sendArgs=("$_realPath")
 
   [[ -n "$_method" ]] && _sendArgs+=(-X "$_method")
   [[ -n "$_realData" ]] && _sendArgs+=(-d "$_realData")
+  [[ -n "$_realCurlOptions" ]] && _sendArgs+=("${_realCurlOptions[@]}")
   for _h in "${_headers[@]}"; do
     _sendArgs+=(-H "$_h")
   done

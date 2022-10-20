@@ -19,7 +19,7 @@ Object.assign(FILTERS, {
 
 function send() {
   [[ $GI_VERBOSE -gt 0 ]] && echo "curl -s $@" | red 1>&2;
-  [[ $GI_VERBOSE -gt 1 ]] && curl -v $@ || curl -s $@;
+  [[ $GI_VERBOSE -gt 1 ]] && curl -v "$@" || curl -s "$@";
 }
 
 function getToken() {
@@ -59,18 +59,19 @@ define -N '获取token' -n 'token'\
 # https://www.eastmoney.com
 
 define -N '搜索证券' -n 'search'\
-  -p "https://searchapi.eastmoney.com/api/suggest/get?cb=$jsonp&input=\$INPUT&type=14&token=\$TOKEN&markettype=&mktnum=&jys=&classify=&securitytype=&status=&count=\$SIZE&_=$stamp"\
-  -a 'TOKEN!,INPUT!;t:i:' -v "JSONP:$jsonp"\
+  -p "https://searchapi.eastmoney.com/api/suggest/get?cb=$jsonp&type=14&token=\$TOKEN&markettype=&mktnum=&jys=&classify=&securitytype=&status=&count=\$SIZE&_=$stamp"\
+  -c "-G --data-urlencode input=\$INPUT"\
+  -a 'TOKEN!,INPUT!,SIZE;t:i:s' -v "JSONP:$jsonp" -v "SIZE:10"\
   -f 'QuotationCodeTable.Data:SecurityTypeName,Code,PinYin,Name'
 
 define -N '搜索股吧' -n 'search:guba'\
   -p "https://searchapi.eastmoney.com/api/suggest/get?cb=$jsonp&input=\$INPUT&type=8&token=\$TOKEN&markettype=&mktnum=&jys=&classify=&securitytype=&status=&count=\$SIZE&_=$stamp"\
-  -a 'TOKEN!,INPUT!;t:i:' -v "JSONP:$jsonp"\
+  -a 'TOKEN!,INPUT!,SIZE;t:i:s' -v "JSONP:$jsonp" -v "SIZE:10"\
   -f 'GubaCodeTable.Data:OuterCode,HeadCharacter,Url,ShortName'
 
 define -n 'xxx'\
   -p "https://searchapi.eastmoney.com/api/suggest/get?cb=$jsonp&input=\$INPUT&type=16%2C43%2C38%2C35%2C501%2C2%2C7%2C3&token=\$TOKEN&markettype=&mktnum=&jys=&classify=&securitytype=&status=&count=\$SIZE&_=$stamp"\
-  -a 'TOKEN!,INPUT!;t:i:' -v "JSONP:$jsonp"\
+  -a 'TOKEN!,INPUT!,SIZE;t:i:s' -v "JSONP:$jsonp" -v "SIZE:10"\
   -f 'QuotationCodeTable.Data:SecurityTypeName,Code,PinYin,Name'
 
 define -N '最新播报' -n 'zxbb'\
