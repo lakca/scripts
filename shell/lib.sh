@@ -55,49 +55,50 @@ function UnicodePointToUtf8() {
     echo $y
 }
 
+export -f UnicodePointToUtf8
+
 function escapeUnicode() {
   local raw_text="$*"
-    local text=''
-    local prev=''
-    local char
-    for i in $(seq 0 $((${#raw_text} - 1))); do
-        char="${raw_text[@]:$i:1}"
-        if [[ -z "$prev" && "$char" == '\' ]]; then
-          prev="$prev$char"
-        elif [[ "$prev" == '\' ]]; then
-            if [[ "$char" == 'u' ]]; then
-                prev="$prev$char"
-            else
-                text="$text$prev$char"
-                prev=''
-            fi
-        elif [[ "$prev" =~ ^\\u[0-9a-f]{0,3}$ ]]; then
-            if [[ "$char" == [0-9a-f] ]]; then
-                prev="$prev$char"
-            else
-                text="$text$prev$char"
-                prev=''
-            fi
-        else
-            text="$text$prev$char"
-            prev=''
-        fi
-        if [[ "$prev" =~ ^\\u[0-9a-f]{4}$ ]]; then
-            text="$text$(UnicodePointToUtf8 "$prev")"
-            prev=''
-        fi
-    done
-    printf %s "$text"
+  local text=''
+  local prev=''
+  local char
+  for i in $(seq 0 $((${#raw_text} - 1))); do
+      char="${raw_text[@]:$i:1}"
+      if [[ -z "$prev" && "$char" == '\' ]]; then
+        prev="$prev$char"
+      elif [[ "$prev" == '\' ]]; then
+          if [[ "$char" == 'u' ]]; then
+              prev="$prev$char"
+          else
+              text="$text$prev$char"
+              prev=''
+          fi
+      elif [[ "$prev" =~ ^\\u[0-9a-f]{0,3}$ ]]; then
+          if [[ "$char" == [0-9a-f] ]]; then
+              prev="$prev$char"
+          else
+              text="$text$prev$char"
+              prev=''
+          fi
+      else
+          text="$text$prev$char"
+          prev=''
+      fi
+      if [[ "$prev" =~ ^\\u[0-9a-f]{4}$ ]]; then
+          text="$text$(UnicodePointToUtf8 "$prev")"
+          prev=''
+      fi
+  done
+  printf %s "$text"
+}
+
+function escapeUnicode2() {
+  local cmd=$(echo -en "$*" | sed 's/\((\|)\)/"\0"/g;s/\\u[0-9a-f]\{4\}/$(UnicodePointToUtf8 "\0")/g')
+  eval "echo -e $cmd"
 }
 
 function escapeSpace() {
-  printf '%s' "$*" | sed -E 's/ /\\x20/g' \
-    | sed -E 's/\\n/\\xa/g' \
-    | sed -E 's/\\t/\\x9/g' \
-    | sed -E 's/\\v/\\xb/g' \
-    | sed -E 's/\\f/\\xc/g' \
-    | sed -E 's/\\r/\\xd/g' \
-    | sed -E 's/\\"/\\x22/gI'
+  printf '%s' "$*" | sed 's/ /\\x20/g;s/\n/\\xa/g;s/\t/\\x9/g;s/\v/\\xb/g;s/\f/\\xc/g;s/\r/\\xd/g;s/\\"/\\x22/gI'
 }
 
 function print_record() {
@@ -115,11 +116,14 @@ function print_record() {
     esac
   done
   local primary=0
+  local value
   for index in "${!fields[@]}"; do
+    value="${values[@]:$index:1}"
+    value="$(escapeUnicode $value)"
     if [[ $primary -eq 0 ]]; then
-      echo -e "\033[33m${fields[@]:$index:1}\033[0m: 【"$id"】\033[1;31m${values[@]:$index:1}\033[0m"
+      echo -e "\033[33m${fields[@]:$index:1}\033[0m: 【"$id"】\033[1;31m$value\033[0m"
     else
-      echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[32m${values[@]:$index:1}\033[0m"
+      echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[32m$value\033[0m"
       if [[ -n $ITERM_SESSION_ID && $IMGCAT && "${types[@]:$index:1}" = 'img' ]]; then
         curl -s "${values[@]:$index:1}" | imgcat --height=5
       fi
@@ -197,6 +201,13 @@ function question() {
   fi
 }
 
+function save() {
+  local folder=$_dirname/xy/"$(echo ${1//\//-} | sed 's/\(=\)[0-9]\{10\}/\1/g')"
+  debug folder: $folder
+  ensureFolder "$folder"
+  tee "$folder/$(date '+%Y-%m-%dT%H:%M:%S').json" 1>/dev/null
+}
+
 function print_json() {
   local -a fieldNames
   local -a fieldAliases
@@ -235,6 +246,8 @@ function print_json() {
 
     [[ -z $text ]] && text="$(curl -s "$url" "${curlparams[*]}")"
 
+    printf %s "$text" | save $url
+
     if [[ -n $raw ]]; then
       printf '%s' "$text"
     else
@@ -246,7 +259,9 @@ function print_json() {
 
     [[ -z "$text" ]] && text="$(curl -s "$url" "${curlparams[*]}")"
 
-    text=$(escapeSpace $(escapeUnicode "$text"))
+    printf %s "$text" | save $url
+
+    text=$(escapeSpace "$text")
 
     if [[ -n $raw ]]; then
       printf '%s' "$text"
@@ -301,8 +316,4 @@ function print_json() {
       done
     fi
   fi
-
-  local folder"=$_dirname/xy/${url//\//-}"
-  ensureFolder $folder
-  echo $text > "$folder/$(date '+%Y-%m-%dT%H:%M:%S').json"
 }

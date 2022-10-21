@@ -395,13 +395,17 @@ function json_res() {
           url=${url//\{type\}/$type}
           local count=$(question "输入排行榜新闻数量：" "${6:-20}")
           url=${url//\{count\}/$count}
-          text=$(curl -s "$url" | grep -o '{.*}')
-          # text=`cat sina.rank.json | grep -o '{.*}'`
+          # text=$(curl -s "$url" | grep -o '{.*}')
+          text=`cat sina.rank.json | grep -o '{.*}'`
           debug $text
+          aliases=(标题 媒体 链接)
+          fields=(title media url)
+          patterns=(_ _ _)
+          indexes=(4 4 4)
           jsonFormat='data:(标题)title|red|bold|index,(媒体)media|cyan,(链接)url,(时间)time|date'
         ;;
         roll)
-          url="https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=50&page=1&r=0.$RANDOM$RANDOM$RANDOM${RANDOM:1:1}&callback=jQuery111205718232756906676_1666270898448&_=$(date +%s)${RANDOM:0:3}"
+          url="https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=50&page=1&r=$(date +%s)&callback=jQuery111205718232756906676_1666270898448&_=$(date +%s)"
           # text=$(curl -s "$url" | grep -o '({.*})' | sed -n 's/^.//p;s/.$//p' | tr -d '\n')
           text=`cat sina.roll.json | grep -o '({.*})' | sed -n 's/^.//;s/.$//p' | tr -d '\n'`
           aliases=(标题 简介 媒体 链接)
