@@ -1,11 +1,12 @@
 # coding=utf-8
 
-from curses.ascii import isdigit
+from functools import cmp_to_key
 import json
 import sys
 import re
 import os
 import time
+from tkinter.tix import IMAGE
 from urllib import request
 
 IMGCAT = False
@@ -41,6 +42,8 @@ class Node:
         self.usingPipe = False
         self.usingLabel = False
         self.usingArgs = False
+        self.usingList = False
+        self.usingKarg = False
 
         if parent:
             parent.append(self)
@@ -60,6 +63,25 @@ class Node:
     # 进出管道参数
     def args(self):
         self.usingArgs = not self.usingArgs
+        if self.usingArgs:
+            pipe = self.data["pipes"].pop()
+            self.data["pipes"].append([pipe])
+
+    # 进出管道数组类型参数
+    def list(self):
+        self.usingList = not self.usingList
+        if self.usingList:
+            prev = self.data["pipes"][-1][-1]
+            if isinstance(prev, tuple):
+                self.data["pipes"][-1][-1] = (prev[0], [])
+            else:
+                self.data["pipes"][-1].append([])
+
+    def karg(self):
+        self.usingKarg = not self.usingKarg
+        if self.usingKarg:
+            arg = self.data["pipes"][-1].pop()
+            self.data["pipes"][-1].append((arg,))
 
     # 进出字段标签
     def label(self):
@@ -82,12 +104,28 @@ class Node:
             return
         # 如果在参数语法内
         elif self.usingArgs:
-            pipe = self.data["pipes"].pop()
-            if isinstance(pipe, list):
-                pipe.append(self._key)
+            # 列表
+            if self.usingList:
+                if isinstance(self.data["pipes"][-1][-1], tuple):
+                    self.data["pipes"][-1][-1][-1].append(self._key)
+                else:
+                    self.data["pipes"][-1][-1].append(self._key)
+            elif self.usingKarg:
+                tup = self.data["pipes"][-1][-1]
+                arg = tup[0]
+                val = tup[1] if len(tup) > 1 else self._key
+                if not val:
+                    return
+                self.data["pipes"][-1].pop()
+                if isinstance(self.data["pipes"][-1][-1], dict):
+                    self.data["pipes"][-1][-1][arg] = val
+                else:
+                    obj = dict.fromkeys([arg], val)
+                    obj["__kwarg"] = True
+                    self.data["pipes"][-1].append(obj)
+                self.karg()
             else:
-                pipe = [pipe, self._key]
-            self.data["pipes"].append(pipe)
+                self.data["pipes"][-1].append(self._key)
         # 如果在管道语法内
         elif self.usingPipe:
             self.data["pipes"].append(self._key)
@@ -168,14 +206,32 @@ def tokenize(fmt):
             elif node.usingLabel:
                 node.keys()
                 node.label()
+        # 命名参数
+        elif token == "=":
+            if node.usingArgs and not node.usingList:
+                node.keys()
+                node.karg()
+            else:
+                node.token(token)
+        # 数组
+        elif token == "[" or token == "]":
+            if node.usingArgs:
+                node.keys()
+                node.list()
+            else:
+                node.token(token)
         # 下级对象
         elif token == ":":
-            if not node.usingArgs:
+            if node.usingArgs:
+                node.token(token)
+            else:
                 node.keys()
                 node = node.append()
         # 属性路径
         elif token == ".":
-            if not node.usingArgs:
+            if node.usingArgs:
+                node.token(token)
+            else:
                 node.token(token, True)
                 node.keys()
         # 管道（函数）
@@ -214,7 +270,7 @@ def tokenize(fmt):
 def retrieve(obj, keys, default=None):
     for key in keys:
         if obj:
-            if key.isdigit() and isinstance(obj, list):
+            if str(key).isdigit() and isinstance(obj, list, int):
                 index = int(key)
                 if len(obj) > index:
                     obj = obj[index]
@@ -252,20 +308,27 @@ class Pipe:
     def apply(cls, v, pipes, data={}):
         for pipe in pipes:
             args = []
+            kwargs = {}
             if isinstance(pipe, list):
-                args = pipe[1:]
+                for e in pipe[1:]:
+                    if isinstance(e, dict) and e["__kwarg"]:
+                        kwargs = e
+                    else:
+                        args.append(e)
                 pipe = pipe[0]
             attr = getattr(cls, pipe, None)
             v = (
-                attr(v, *args, data=data)
+                attr(v, *args, data=data, **kwargs)
                 if attr
-                else re.sub(r"\{([^\}]+)\}", lambda m: data.get(m.group(1), ""), pipe)
+                else re.sub(
+                    r"\{([^\}]+)\}", lambda m: str(data.get(m.group(1), "")), pipe
+                )
             )
         return v
 
     @classmethod
     def date(cls, v, *args, **kwargs):
-        if v.isdigit() or isinstance(v, int):
+        if isinstance(v, int) or v.isdigit():
             v = str(v)
             v = int(v) / 1000 if len(v) == 13 and "." not in v else float(v)
             v = time.localtime(v)
@@ -354,12 +417,17 @@ class Pipe:
     def image(cls, v, *args, **kwargs):
         global IMGCAT
         if v and IMGCAT:
+            v = v if v.startswith("http") else "https:" + v
             cls._image(re.sub(r"\/orj\d+\/", "/orj180/", v))
         return v
 
     @classmethod
     def prepend(cls, v, text="", *args, **kwargs):
         return text + v
+
+    @classmethod
+    def append(cls, v, text="", *args, **kwargs):
+        return v + text
 
     @classmethod
     def index(cls, v, *args, **kwargs):
@@ -372,8 +440,34 @@ class Pipe:
         return "\n" * -number + v if number < 0 else v + "\n" * number
 
     @classmethod
-    def join(cls, v, delimiter=", ", number=1, *args, **kwargs):
+    def join(cls, v, delimiter=", ", *args, **kwargs):
         return delimiter.join(v) if isinstance(v, list) else v
+
+    @classmethod
+    def hr(cls, v, dividing="-" * 50 + "\n", *args, **kwargs):
+        return v + dividing
+
+    @classmethod
+    def sort(cls, v, *args, **kwargs):
+        if not v:
+            return v
+        useKwargs = {}
+        if kwargs["key"]:
+            getVal = lambda e: e[kwargs["key"]]
+            if kwargs["sorts"]:
+                getIndex = (
+                    lambda k: kwargs["sorts"].index(k)
+                    if k in kwargs["sorts"]
+                    else float("inf")
+                )
+                useKwargs["key"] = cmp_to_key(
+                    lambda a, b: getIndex(getVal(a)) - getIndex(getVal(b))
+                )
+            else:
+                useKwargs["key"] = getVal
+        v.sort(**useKwargs)
+        return v
+        # if isinstance(v, list):
 
 
 class Parser:
@@ -387,25 +481,29 @@ class Parser:
 
     @classmethod
     def getValue(cls, data, node):
-        if data and "iterKeys" in node:
-            items = retrieve(data, node["iterKeys"], [])
-            items = items.values() if isinstance(items, dict) else items
-            return [retrieve(item, node["keys"]) for item in items]
+        if "iterKeys" in node:
+            if data:
+                items = retrieve(data, node["iterKeys"], [])
+                items = items.values() if isinstance(items, dict) else items
+                return [retrieve(item, node["keys"]) for item in items]
+            else:
+                return []
 
         data = cls.retrieve(data, node)
-        if data and "children" in node:
-            data = data.values() if isinstance(data, dict) else data
+        if "children" in node:
             results = []
-            for item in data:
-                result = {}
-                results.append(result)
-                for child in node["children"]:
-                    value = (
-                        cls.getValue(item, child)
-                        if "children" in child or "iterKeys" in child
-                        else cls.retrieve(item, child)
-                    )
-                    result[child["key"]] = value
+            if data:
+                data = data.values() if isinstance(data, dict) else data
+                for item in data:
+                    result = {}
+                    results.append(result)
+                    for child in node["children"]:
+                        value = (
+                            cls.getValue(item, child)
+                            if "children" in child or "iterKeys" in child
+                            else cls.retrieve(item, child)
+                        )
+                        result[child["key"]] = value
             return results
 
     @classmethod
@@ -454,6 +552,9 @@ class Parser:
                 for item in val:
                     if isinstance(item, dict):
                         cls.printRecord(item, meta, indent + INDENT)
+                        scopedStdout(
+                            cls.applyPipes(" " * INDENT, meta[key]["pipes"], record)
+                        )
                     else:
                         scopedStdout(
                             "  {}\n".format(
@@ -484,13 +585,20 @@ class Parser:
         # print(json.dumps(records, indent=2))
         flatted = cls.flatTokens(tokens)
 
+        with open(
+            "/Users/dgrocsky/Documents/github/scripts/shell/records.json", "w"
+        ) as f:
+            f.write(json.dumps(records))
+
         if not records:
             return print("没有数据")
+
+        records = Pipe.apply(records, tokens["pipes"])
 
         for i, record in enumerate(records):
             record["__index"] = i + 1
             cls.printRecord(record, flatted)
-            sys.stdout.write("\n" + "-" * 50 + "\n\n")
+            sys.stdout.write("-" * 50 + "\n")
 
 
 if __name__ == "__main__":

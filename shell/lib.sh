@@ -174,7 +174,7 @@ function ask() {
   for i in "${!values[@]}"; do
     printf '%b %b	' "\033[31m$i\033[0m" "\033[32m${values[@]:$i:1}\033[0m" 1>&2
   done
-  read -p $'\n输入值：'
+  read -p $'\n'${_ASK_MSG:-输入值：}''
   local revoke=$(shopt -p nocasematch)
   shopt -s nocasematch
   for i in "${!values[@]}"; do
@@ -192,7 +192,7 @@ function ask() {
 function question() {
   local msg="$1"
   local default="$2"
-  if [[ $PROGRESS ]]; then
+  if [[ $PROGRESS || -z $default ]]; then
     read -p $'\033[33m'"【默认值："$default"】"$1$'\033[0m\033[31m'
     debug $REPLY
     [[ -z $REPLY ]] && echo $default || echo $REPLY
@@ -240,11 +240,13 @@ function print_json() {
     esac
   done
 
-  echo $url 1>&2
+  local cmd="curl -s "$url" "${curlparams[@]}""
+
+  echo "$cmd" 1>&2
 
   if [[ -n "$jsonFormat" && `declare -f jsonparser` ]]; then
 
-    [[ -z $text ]] && text="$(curl -s "$url" "${curlparams[*]}")"
+    [[ -z "$text" ]] && text="$($cmd)"
 
     printf %s "$text" | save $url
 
@@ -257,7 +259,7 @@ function print_json() {
 
   else
 
-    [[ -z "$text" ]] && text="$(curl -s "$url" "${curlparams[*]}")"
+    [[ -z "$text" ]] && text="$($cmd)"
 
     printf %s "$text" | save $url
 
