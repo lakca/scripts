@@ -44,9 +44,9 @@ function json_res() {
   local curlparams
   case $1 in
     # 微博
-    weibo|wb)
+    weibo|wb) # 微博
       case $2 in
-        groups|gps)
+        groups|gps) # 分组
           url='https://weibo.com/ajax/feed/allGroups?is_new_segment=1&fetch_hot=1'
           text=$(curl -s "$url")
           debug $text
@@ -79,7 +79,7 @@ function json_res() {
           echo "$group ${gids[@]:$_ASK_INDEX:1} ${containerids[@]:$_ASK_INDEX:1}"
           exit 0
         ;;
-        hotpost|hp)
+        hotpost|hp) # 热门微博
           local group=($(json_res wb groups $3))
           local gid=${group[@]:1:1}
           local containerid=${group[@]:2:1}
@@ -95,7 +95,7 @@ function json_res() {
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
           jsonFormat='statuses:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{statuses:user.idstr}$,(链接)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
         ;;
-        userpost|up)
+        userpost|up) # 用户微博
           uid="$3"
           page=${4:-1}
           url="$WEIBO_USER_POSTS_URL"
@@ -109,7 +109,7 @@ function json_res() {
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
           jsonFormat='data.list:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{data.list:user.idstr}$,(链接)mblogid|$https://weibo.com/{data.list:user.idstr}/{data.list:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
         ;;
-        hottopic|ht)
+        hottopic|ht) # 话题榜
           url="$WEIBO_TOPIC_URL"
           aliases=('标签' '内容' '分类' '阅读量' '讨论' '链接')
           fields=('topic' 'summary' 'category' 'read' 'mention' 'mid')
@@ -118,7 +118,7 @@ function json_res() {
           transformers=('_' '_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
           jsonFormat='data.statuses:(标签)topic|red|bold|index,(内容)summary|white|dim,(分类)category,(阅读量)read|number,(讨论数)mention|number,(链接)mid|$https://s.weibo.com/weibo?q=%23{data.statuses:mid}%23$,(图片)images_url|image'
         ;;
-        hotsearch|hs)
+        hotsearch|hs) # 热搜榜
           url="$WEIBO_HOT_SEARCH_URL";
           aliases=('标题' '分类' '热度' '原始热度' '链接')
           fields=('word' 'category' 'num' 'raw_hot' 'note')
@@ -127,7 +127,7 @@ function json_res() {
           transformers=('_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
           jsonFormat='data.band_list:(标题)word|red|bold|index,(分类)category,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word}%23$'
         ;;
-        post|ps)
+        post|ps) # 微博
           local postid="$3" # M7OL9bpQP
           if [[ $postid =~ ^http ]]; then
             local parts=(`resolveLink $3`)
@@ -142,7 +142,7 @@ function json_res() {
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
           jsonFormat=':(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{:user.idstr}$,(链接)mblogid|$https://weibo.com/{:user.idstr}/{:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
         ;;
-        comment|cm)
+        comment|cm) # 微博评论
           local count=${4:-10}
           local post=`RAW=1 json_res weibo post $3`
           # 4816863043518870
@@ -163,10 +163,9 @@ function json_res() {
       esac
     ;;
     # 知乎
-    zhihu|zh)
+    zhihu|zh) # 知乎
       case ${2:-hs} in
-        hot|ht)
-          # https://www.zhihu.com/knowledge-plan/hot-question/hot/0/hour
+        hot|ht) # 热榜 https://www.zhihu.com/knowledge-plan/hot-question/hot/0/hour
           url='https://www.zhihu.com/api/v4/creators/rank/hot?domain={domain}&period={period}&limit=50'
           fields=(title link)
           aliases=(标题 链接)
@@ -174,19 +173,19 @@ function json_res() {
           indexes=(4 4)
           jsonFormat='data:(标题)question.title|red|bold|index,(链接)question.url,(时间)question.created|date,(标签)question.topics*.name'
           case $3 in
-            day)
+            day) # 日榜
               url=${url//\{period\}/day}
               ask "${ZHIHU_DOMAINS[*]}" "$4"
               domain=$_ASK_RESULT
               url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
             ;;
-            week)
+            week) # 周榜
               url=${url//\{period\}/week}
               ask "${ZHIHU_DOMAINS[*]}" "$4"
               domain=$_ASK_RESULT
               url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
             ;;
-            hot|ht|hour)
+            hot|ht|hour) # 小时榜
               url=${url//\{period\}/hour}
               ask "${ZHIHU_DOMAINS[*]}" "$4"
               domain=$_ASK_RESULT
@@ -200,7 +199,7 @@ function json_res() {
             ;;
           esac
         ;;
-        hotsearch|hs|billboard|bb)
+        hotsearch|hs|billboard|bb) # 热搜
           url='https://www.zhihu.com/billboard'
           text=$(curl -s "$url" | grep -oE '<script id="js-initialData" type="text/json">.*<\/script>' | sed -nE 's/<script[^>]*>//;s/<\/script>.*//p')
           aliases=(标题 描述 热度 链接 图片)
@@ -212,21 +211,21 @@ function json_res() {
       esac
     ;;
     # 百度
-    baidu|bd)
+    baidu|bd) # 百度
       case ${2:-hotsearch} in
-        hotsearch|hs)
+        hotsearch|hs) # 热搜
           url="https://top.baidu.com/board"
           case ${3:-realtime} in
-            realtime|rt)
+            realtime|rt) # 实时热搜
               url="$url?tab=realtime"
             ;;
-            novel|nv)
+            novel|nv) # 小说
               url="$url?tab=novel"
               ask "全部类型 都市 玄幻 奇幻 历史 科幻 军事 游戏 武侠 现代言情 古代言情 幻想言情 青春" "$4"
               local category=$_ASK_RESULT
               url="$url&tag={\"category\":\"$category\"}"
             ;;
-            movie|mv)
+            movie|mv) # 电影
               url="$url?tab=movie"
               ask "全部类型 爱情 喜剧 动作 剧情 科幻 恐怖 动画 惊悚 犯罪" "$4"
               local category=$_ASK_RESULT
@@ -234,7 +233,7 @@ function json_res() {
               local country=$_ASK_RESULT
               url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
             ;;
-            teleplay|tv)
+            teleplay|tv) # 电视剧
               url="$url?tab=teleplay"
               ask "全部类型 爱情 搞笑 悬疑 古装 犯罪 动作 恐怖 科幻 剧情 都市" "$4"
               local category=$_ASK_RESULT
@@ -242,13 +241,13 @@ function json_res() {
               local country=$_ASK_RESULT
               url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
             ;;
-            car)
+            car) # 汽车
               url="$url?tab=car"
               ask "全部 轿车 SUV 新能源 跑车 MPV" "$4"
               local category=$_ASK_RESULT
               url="$url&tag={\"category\":\"$category\"}"
             ;;
-            game)
+            game) # 游戏
               url="$url?tab=game"
               ask "全部类型 手机游戏 网络游戏 单机游戏" "$4"
               local category=$_ASK_RESULT
@@ -265,17 +264,17 @@ function json_res() {
       esac
     ;;
     # 头条
-    toutiao|tt)
+    toutiao|tt) # 今日头条
       fields=(title link)
       aliases=(标题 链接)
       case ${2:-hot} in
-        hot|ht)
+        hot|ht) # 热榜
           url='https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc';
           patterns=('"Title":"[^"]*"' '"Url":"[^"]*"');
           indexes=(4 4)
           jsonFormat='data:(标题)Title|red|bold|index,(链接)Url,(图片)Image.url_list*.url|image'
         ;;
-        hotsearch|hs)
+        hotsearch|hs) # 热搜
           url='https://tsearch.snssdk.com/search/suggest/hot_words/';
           patterns=('"query":"[^"]*"' '"query":"[^"]*"');
           indexes=(4 4);
@@ -285,19 +284,19 @@ function json_res() {
       esac
     ;;
     # bilibili
-    bilibili|bb)
+    bilibili|bb) # bilibili
       aliases=(标题 作者 分类 浏览 点赞 链接 描述 图片)
       fields=(title name tname view like short_link desc pic)
       patterns=(_ _ _ '"view":[^,]*,' '"like":[^,]*,' _ _ _)
       indexes=(4 4 4 3 3 4 4 4)
       transformers=(_ _ _ _ _ _ _ '${values[@]:7:1}@412w_232h_1c.jpg')
       types=(_ _ _ _ _ _ _ img)
-      jsonFormat='data.list:(标题)title|red|bold|index,(描述)desc|white|dim,(作者)owner.name,(分类)tname,(浏览)stat.view|number,(点赞)stat.like|number,(链接)short_link,(图片)pic|image,(发布时间)pubdate|date'
+      jsonFormat='data.list:(标题)title|red|bold|index,(描述)desc|white|dim,(作者)owner.name,(分类)tname|magenta,(浏览)stat.view|number,(点赞)stat.like|number,(链接)short_link|dim,(图片)pic|image|dim,(发布时间)pubdate|date'
       case $2 in
-        hot|ht)
+        hot|ht) # 热榜
           url='https://api.bilibili.com/x/web-interface/popular?ps=20&pn=1'
         ;;
-        week|wk)
+        week|wk) # 周榜
           local week=$3
           if [[ $week = 0 ]]; then
             week=`curl -s https://api.bilibili.com/x/web-interface/popular/series/list | grep -oE '"number":[^,]*,' | head -1 | grep -oE '\d+'`
@@ -308,7 +307,7 @@ function json_res() {
           fi
           url="https://api.bilibili.com/x/web-interface/popular/series/one?number=$week"
         ;;
-        weeklist|wkl)
+        weeklist|wkl) # 历史周榜
           url='https://api.bilibili.com/x/web-interface/popular/series/list'
           aliases=(主题 编号 名称)
           fields=(subject number name)
@@ -318,7 +317,7 @@ function json_res() {
           types=(_ _ _)
           jsonFormat=''
         ;;
-        hotsearch|hs)
+        hotsearch|hs) # 热搜
           # https://www.bilibili.com/blackboard/activity-trending-topic.html?navhide=1
           url='https://app.bilibili.com/x/v2/search/trending/ranking?limit=30'
           text=$(cat bilibili.hotsearch.json)
@@ -328,7 +327,7 @@ function json_res() {
           indexes=(4)
           jsonFormat='data.list:(关键词)show_name'
         ;;
-        searchsuggest|ss)
+        searchsuggest|suggest) # 搜索建议
           url="https://s.search.bilibili.com/main/suggest?func=suggest&suggest_type=accurate&sub_type=tag&main_ver=v1&highlight=&userid=18358716&bangumi_acc_num=1&special_acc_num=1&topic_acc_num=1&upuser_acc_num=3&tag_num=10&special_num=10&bangumi_num=10&upuser_num=3&rnd=$(date +%s)"
           curlparams="-G --data-urlencode term={term}"
           local term=$(question '输入搜索词：' $3)
@@ -339,7 +338,7 @@ function json_res() {
           jsonFormat='result.tag:(建议词)term'
           # text=$(cat bilibili.searchsuggest.json)
         ;;
-        search|s)
+        search|s) # 搜索
           url="https://api.bilibili.com/x/web-interface/search/all/v2?__refresh__=true&page=1&page_size=42&platform=pc"
           curlparams=("-b buvid3=oc; -G")
           local keyword=$(question '输入搜索词：' $3)
@@ -347,14 +346,15 @@ function json_res() {
           # text=$(cat bilibili.search.json)
           jsonFormat='data.result|sort(key=data.result:result_type,sorts=[video,user]):(搜索结果类型)result_type,(结果列表)data|hr:(标题)title,(UP主)author,(标签)tag,(类型)typename,(项目类型)type,(链接)arcurl,(图片)upic'
 
-          _ASK_MSG='如果不需要排序，直接回车；请输入排序：' ask "最多点击 最新发布 最多弹幕 最多收藏" $4
           local orders=(click pubdate dm stow)
+          _ASK_MSG='如果不需要排序，直接回车；请输入排序：' ask "最多点击 最新发布 最多弹幕 最多收藏" $4
           local order=${orders[@]:$_ASK_INDEX:1}
           [[ $order ]] && curlparams+=("--data-urlencode order=$order")
 
-          _ASK_MSG='如果不需要排序，直接回车；请输入排序：' ask "视频 番剧 影视 直播 专栏 话题 用户" $5
+          local type=$(index "video anime film live article topic user" $5)
           local types=(video media_bangumi media_ft live article topic bili_user)
-          local type=${types[@]:$_ASK_INDEX:1}
+          _ASK_MSG='如果不需要排序，直接回车；请输入排序：' ask "视频 番剧 影视 直播 专栏 话题 用户" $type
+          type=${types[@]:$_ASK_INDEX:1}
           [[ $type ]] && curlparams+=("--data-urlencode search_type=$type")
 
           if [[ $order || $type ]]; then
@@ -364,7 +364,10 @@ function json_res() {
             video)
               jsonFormat='data.result:(标题)title|red|bold|index,(播放量)play|number,(点赞数)favorites|number,(收藏量)video_review|number,(弹幕数)danmaku|number,(UP主)author,(空间)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description|white|dim,(类型)typename,(链接)arcurl|dim,(图片)pic|image|dim'
             ;;
-            media_ft|media_bangumi)
+            media_ft|film)
+              jsonFormat='data.result:(标题)title|red|bold|index,(类型)styles,(地区)areas,(简介)desc|white|dim,(演职人员)staff,(媒体类型)season_type_name|magenta,(链接)url|dim,(图片)cover|image|dim'
+            ;;
+            media_bangumi|anime)
               jsonFormat='data.result:(标题)title|red|bold|index,(类型)styles,(地区)areas,(简介)desc|white|dim,(演职人员)staff,(媒体类型)season_type_name|magenta,(链接)url|dim,(图片)cover|image|dim'
             ;;
             live)
@@ -376,12 +379,12 @@ function json_res() {
             topic)
               jsonFormat='data.result:(标题)title|red|bold|index,(UP主)author,(空间)mid$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description,(描述)description,(发布时间)pubdate,(链接)arcurl|dim,(图片)cover|image|dim'
             ;;
-            bili_user)
+            bili_user|user|up)
               jsonFormat='data.result:(UP主)uname|red|bold|index,(官方认证)official_verify.desc,(简介)usign,(视频数)videos,(链接)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(头像)upic,(作品)res:(标题)title,(链接)arcurl,(发布时间)pubdate|date'
             ;;
           esac
         ;;
-        space)
+        space|up) # 用户投稿
           url="https://api.bilibili.com/x/space/arc/search?mid={upid}&pn={PAGE}&ps={SIZE}&index=1&order={order}&order_avoided=true&jsonp=jsonp"
           curlparams='-H User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'
           # 482324117, 在美国的福建人, https://space.bilibili.com/482324117
@@ -402,14 +405,15 @@ function json_res() {
           url=${url//\{order\}/$order}
           url=${url//\{PAGE\}/${PAGE:-1}}
           url=${url//\{SIZE\}/${SIZE:-25}}
-          jsonFormat='data.list.vlist:(标题)title|red|bold|index,(简介)description|white|dim,(播放量)play|number,(收藏量)video_review,(评论数)comment|number,(发布时间)created|date(format=md)|magenta,(链接)bvid|$https://www.bilibili.com/video/{data.list:bvid}$|white|dim,(图片)pic|image|white|dim'
+          jsonFormat='data.list.vlist:(标题)title|red|bold|index,(简介)description|white|dim,(播放量)play|number,(弹幕数)video_review,(评论数)comment|number,(发布时间)created|date(format=md)|magenta,(链接)bvid|$https://www.bilibili.com/video/{data.list.vlist:bvid}$|white|dim,(图片)pic|image|white|dim'
         ;;
       esac
     ;;
     # sogou
-    sogou|sg)
+    sogou|sg) # 搜狗
       case ${2:-hotsearch} in
-        hotsearch|hs)
+        hotsearch|hs) # 热搜
+          # https://ie.sogou.com/top/
           url="https://go.ie.sogou.com/hot_ranks?callback=jQuery112403809296729897269_1666168486497&h=0&r=0&v=0&_=$(date +%s)"
           text=$(curl -s "$url" | grep -oE '{.*}')
           # text=$(cat sogou.hot.json)
@@ -423,10 +427,9 @@ function json_res() {
       esac
     ;;
     # sina
-    sina)
+    sina) # 新浪
       case ${2:-rank} in
-        rank)
-          # https://sinanews.sina.cn/h5/top_news_list.d.html
+        rank) # 排行榜 https://sinanews.sina.cn/h5/top_news_list.d.html
           # （历史）首页 http://news.sina.com.cn/head/news20221020am.shtml
           # （历史）排行榜 https://news.sina.com.cn/hotnews/
           url='https://top.news.sina.com.cn/ws/GetTopDataList.php?top_type={type}&top_cat={category}&top_time={date}&top_show_num={count}&top_order=DESC&js_var=channel_'
@@ -481,8 +484,8 @@ function json_res() {
           url=${url//\{type\}/$type}
           local count=$(question "输入排行榜新闻数量：" "${6:-20}")
           url=${url//\{count\}/$count}
-          # text=$(curl -s "$url" | grep -o '{.*}')
-          text=`cat sina.rank.json | grep -o '{.*}'`
+          text=$(curl -s "$url" | grep -o '{.*}')
+          # text=`cat sina.rank.json | grep -o '{.*}'`
           debug $text
           aliases=(标题 媒体 链接)
           fields=(title media url)
@@ -490,8 +493,7 @@ function json_res() {
           indexes=(4 4 4)
           jsonFormat='data:(标题)title|red|bold|index,(媒体)media|cyan,(链接)url,(时间)time|date'
         ;;
-        roll)
-          # https://news.sina.com.cn/roll
+        roll) # 滚动新闻 https://news.sina.com.cn/roll
           url="https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=50&page=1&r=$(date +%s)&callback=jQuery111205718232756906676_$(date +%s)&_=$(date +%s)"
           text=$(curl -s "$url" | grep -o '({.*})' | sed -n 's/^.//;s/.$//;p' | tr -d '\n')
           # text=`cat sina.roll.json | grep -o '({.*})' | sed -n 's/^.//;s/.$//p' | tr -d '\n'`
@@ -500,6 +502,48 @@ function json_res() {
           patterns=(_ _ _ _)
           indexes=(4 4 4 4)
           jsonFormat='result.data:(标题)title|red|bold|index,(简介)intro|white|dim,(媒体)media_name|cyan,(链接)url,(时间)ctime|date,(图片)images*.u'
+        ;;
+        hot) # 热榜 https://sinanews.sina.cn/h5/top_news_list.d.html
+          local categories=(top trend ent video baby car fashion trip)
+          local category=$(index "${categories[*]}" "$3")
+          ask "新浪热榜 潮流热榜 娱乐热榜 视频热榜 汽车热榜 育儿热榜 时尚热榜 旅游热榜" $category
+          category=${categories[@]:$((_ASK_INDEX)):1}
+
+          case ${category:-top} in
+            top) # 新浪热榜
+              url='https://sinanews.sina.cn/h5/top_news_list.d.html'
+              text=$(curl -s $url | grep -oE '<script>SM = {.*};</script>' | sed 's/<script>SM = //;s/;<\/script>//;')
+              jsonFormat='data.data.result:(标题)text|red|bold|index,(分类)queryClass|magenta,(热度)hotValue,(链接)link|dim,(图片)imgUrl|image|dim'
+            ;;
+            trend) # 潮流热榜
+              url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-trend&localCityCode=&wm='
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(热度)info.hotValue,(图片)info.pic*.url|image|dim,(链接)base.base.url'
+            ;;
+            ent) # 娱乐热榜
+              url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-ent&localCityCode=&wm='
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(图片)info.pic*.url|image|dim,(链接)base.base.url'
+            ;;
+            video) # 视频热榜
+              url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-minivideo&localCityCode=&wm='
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(热度)info.intro,(媒体)media_info.name,(视频)stream:(链接)playUrl,(清晰度)definitionType'
+            ;;
+            car) # 汽车热榜
+              url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-auto&localCityCode=&wm='
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
+            ;;
+            baby) # 育儿热榜
+              url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-mother&localCityCode=&wm='
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
+            ;;
+            fashion) # 时尚热榜
+              url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-fashion&localCityCode=&wm='
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
+            ;;
+            trip) # 旅游热榜
+              url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-travel&localCityCode=&wm='
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
+            ;;
+          esac
         ;;
       esac
     ;;
@@ -510,46 +554,11 @@ function json_res() {
   print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
 }
 
-case $1 in
-  -h) echo '
-  weibo|wb
-    groups|gps
-    hotpost|hp  [category]
-    userpost|up [userid] [page=1]
-    hottopic|ht
-    hotsearch|hs
-    post|ps [postUrl|postid]
-    comment|cm  [postUrl|postid]
+for i in $@; do
+  if [[ $i == '-h' ]]; then
+    echo -e "$(cat $0 | grep -oE '^\s*\w+(\|\w*)*)\s*(#.*)?$' | sed 's/   //;s/\(#.*\)/\\033[31m\1\\033[0m/')"
+    exit 0
+  fi
+done
 
-  baidu|bd
-    realtime|rt
-    novel|nv
-    movie|mv
-    teleplay|tv
-    car
-    game
-
-  zhihu|zh
-    hot|ht
-      hour
-      day
-      week
-    hotsearch|hs|billboard|bb
-
-  toutiao|tt
-    hot|ht
-    hotsearch|hs
-
-  bilibili|bb
-    hot|ht
-    week|wk
-
-  sogou|sg
-    hotsearch|hs
-
-  sina
-    rank [category [date [type [count]]]]
-    '
-    ;;
-  *) json_res ${@:1};;
-esac
+json_res ${@:1}

@@ -208,6 +208,16 @@ function save() {
   tee "$folder/$(date '+%Y-%m-%dT%H:%M:%S').json" 1>/dev/null
 }
 
+function index() {
+  local arr=($1)
+  local el=$2
+  for i in ${!arr[@]}; do
+    if [[ ${arr[@]:$i:1} == $el ]]; then
+      echo $i
+    fi
+  done
+}
+
 function print_json() {
   local -a fieldNames
   local -a fieldAliases
