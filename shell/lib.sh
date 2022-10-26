@@ -242,7 +242,7 @@ function print_json() {
 
   local cmd="curl -s "$url" "${curlparams[@]}""
 
-  echo "$cmd" 1>&2
+  echo "$cmd" >> resou.log
 
   if [[ -n "$jsonFormat" && `declare -f jsonparser` ]]; then
 

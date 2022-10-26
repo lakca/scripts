@@ -362,7 +362,7 @@ function json_res() {
           fi
           case $type in
             video)
-              jsonFormat='data.result:(标题)title|red|bold|index,(UP主)author,(空间)mid$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description|white|dim,(类型)typename,(链接)arcurl|dim,(图片)pic|image|dim'
+              jsonFormat='data.result:(标题)title|red|bold|index,(播放量)play|number,(点赞数)favorites|number,(收藏量)video_review|number,(弹幕数)danmaku|number,(UP主)author,(空间)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description|white|dim,(类型)typename,(链接)arcurl|dim,(图片)pic|image|dim'
             ;;
             media_ft|media_bangumi)
               jsonFormat='data.result:(标题)title|red|bold|index,(类型)styles,(地区)areas,(简介)desc|white|dim,(演职人员)staff,(媒体类型)season_type_name|magenta,(链接)url|dim,(图片)cover|image|dim'
@@ -380,6 +380,29 @@ function json_res() {
               jsonFormat='data.result:(UP主)uname|red|bold|index,(官方认证)official_verify.desc,(简介)usign,(视频数)videos,(链接)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(头像)upic,(作品)res:(标题)title,(链接)arcurl,(发布时间)pubdate|date'
             ;;
           esac
+        ;;
+        space)
+          url="https://api.bilibili.com/x/space/arc/search?mid={upid}&pn={PAGE}&ps={SIZE}&index=1&order={order}&order_avoided=true&jsonp=jsonp"
+          curlparams='-H User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'
+          # 482324117, 在美国的福建人, https://space.bilibili.com/482324117
+          local upid=$(question '请输入用户ID、名称或主页链接：' $3)
+          if [[ "$upid" = https://space.bilibili.com* ]]; then
+            upid=$(sed -n 's/.*\/\([0-9]\+\)\(?\|\/\).*/\1/p' <<<$upid)
+          elif [[ ! $upid =~ ^[0-9]+$ ]]; then
+            upid=$(RAW=1 json_res bilibili search "$upid" 0 用户 | grep -oE '"mid":\d+' | cut -d: -f2 | head -1)
+          fi
+
+          url=${url//\{upid\}/$upid}
+
+          debug $upid
+
+          _ASK_MSG='如果不需要排序，直接回车；请输入排序：' ask "最新发布 最多播放 最多收藏" $4
+          local orders=(pubdate click stow)
+          local order=${orders[@]:$_ASK_INDEX:1}
+          url=${url//\{order\}/$order}
+          url=${url//\{PAGE\}/${PAGE:-1}}
+          url=${url//\{SIZE\}/${SIZE:-25}}
+          jsonFormat='data.list.vlist:(标题)title|red|bold|index,(简介)description|white|dim,(播放量)play|number,(收藏量)video_review,(评论数)comment|number,(发布时间)created|date(format=md)|magenta,(链接)bvid|$https://www.bilibili.com/video/{data.list:bvid}$|white|dim,(图片)pic|image|white|dim'
         ;;
       esac
     ;;
@@ -468,9 +491,10 @@ function json_res() {
           jsonFormat='data:(标题)title|red|bold|index,(媒体)media|cyan,(链接)url,(时间)time|date'
         ;;
         roll)
-          url="https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=50&page=1&r=$(date +%s)&callback=jQuery111205718232756906676_1666270898448&_=$(date +%s)"
-          # text=$(curl -s "$url" | grep -o '({.*})' | sed -n 's/^.//p;s/.$//p' | tr -d '\n')
-          text=`cat sina.roll.json | grep -o '({.*})' | sed -n 's/^.//;s/.$//p' | tr -d '\n'`
+          # https://news.sina.com.cn/roll
+          url="https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=50&page=1&r=$(date +%s)&callback=jQuery111205718232756906676_$(date +%s)&_=$(date +%s)"
+          text=$(curl -s "$url" | grep -o '({.*})' | sed -n 's/^.//;s/.$//;p' | tr -d '\n')
+          # text=`cat sina.roll.json | grep -o '({.*})' | sed -n 's/^.//;s/.$//p' | tr -d '\n'`
           aliases=(标题 简介 媒体 链接)
           fields=(title intro media_name url)
           patterns=(_ _ _ _)
