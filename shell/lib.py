@@ -6,7 +6,6 @@ import sys
 import re
 import os
 import time
-from tkinter.tix import IMAGE
 from urllib import request
 
 IMGCAT = False
@@ -338,7 +337,14 @@ class Pipe:
                 v = time.strptime(v, "%a, %d %b %Y %H:%M:%S %z")
             except:
                 return v
-        return time.strftime("%Y-%m-%d %H:%M:%S", v)
+        fmts = {
+            'date': '%Y-%m-%d',
+            'time': '%H:%M:%S',
+            'year': '%Y',
+            'md': '%m-%d',
+            'hm': '%H:%M',
+        }
+        return time.strftime(fmts.get(kwargs.get('format', ''), "%Y-%m-%d %H:%M:%S"), v)
 
     @classmethod
     def number(cls, v, type=",", *args, **kwargs):
@@ -586,7 +592,7 @@ class Parser:
         flatted = cls.flatTokens(tokens)
 
         with open(
-            "/Users/dgrocsky/Documents/github/scripts/shell/records.json", "w"
+            "records.json", "w"
         ) as f:
             f.write(json.dumps(records))
 
