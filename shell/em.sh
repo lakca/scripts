@@ -63,4 +63,4 @@ function quote() {
   PRICES="${prices[*]}" quote $*
 }
 
-# QUOTE_ALERT_LOW_PRICES=",17.22" quote sh000001,sz300556,sh600352,sh600678
+QUOTE_ALERT_LOW_PRICES=",17.22" quote sh000001,sz300556,sh600352,sh600678
