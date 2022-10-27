@@ -305,6 +305,13 @@ class Pipe:
 
     @classmethod
     def apply(cls, v, pipes, data={}):
+        def replacer(m):
+            key = m.group(1)
+            if key.startswith('.'):
+                return str(retrieve(data['__'], key.split('.')[1:]))
+            else:
+                return str(data.get(key))
+
         for pipe in pipes:
             args = []
             kwargs = {}
@@ -319,9 +326,7 @@ class Pipe:
             v = (
                 attr(v, *args, data=data, **kwargs)
                 if attr
-                else re.sub(
-                    r"\{([^\}]+)\}", lambda m: str(data.get(m.group(1), "")), pipe
-                )
+                else re.sub(r"\{([^\}]+)\}", replacer, pipe)
             )
         return v
 
@@ -473,8 +478,6 @@ class Pipe:
                 useKwargs["key"] = getVal
         v.sort(**useKwargs)
         return v
-        # if isinstance(v, list):
-
 
 class Parser:
     @classmethod
@@ -501,7 +504,7 @@ class Parser:
             if data:
                 data = data.values() if isinstance(data, dict) else data
                 for item in data:
-                    result = {}
+                    result = { "__": item }
                     results.append(result)
                     for child in node["children"]:
                         value = (
@@ -542,10 +545,16 @@ class Parser:
             if key.startswith("__"):
                 continue
 
+            pipes = meta[key]["pipes"] or []
+
+            hide = 'hide' in pipes
+
             label = meta[key].get("label", key)
 
-            if SIMPLE and index != 1 and label not in ["链接"]:
+            if hide or (SIMPLE and index != 1 and label not in ["链接"]):
                 continue
+
+            hide and pipes.remove('hide')
 
             scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
 
@@ -559,14 +568,14 @@ class Parser:
                     if isinstance(item, dict):
                         cls.printRecord(item, meta, indent + INDENT)
                         scopedStdout(
-                            cls.applyPipes(" " * INDENT, meta[key]["pipes"], record)
+                            cls.applyPipes(" " * INDENT, pipes, record)
                         )
                     else:
                         scopedStdout(
                             "  {}\n".format(
                                 Pipe.green(
                                     cls.applyPipes(
-                                        item or "", meta[key]["pipes"], record
+                                        item or "", pipes, record
                                     )
                                 )
                             )
@@ -575,13 +584,13 @@ class Parser:
                 sys.stdout.write(
                     "{}\n".format(
                         Pipe.green(
-                            cls.applyPipes(val or "", meta[key]["pipes"], record)
+                            cls.applyPipes(val or "", pipes, record)
                         )
                     )
                 )
 
     @classmethod
-    def output(cls, fmt, data):
+    def output(cls, fmt, data, file):
         # print(data)
         if fmt.startswith(":") and not isinstance(data, list):
             data = [data]
@@ -591,10 +600,9 @@ class Parser:
         # print(json.dumps(records, indent=2))
         flatted = cls.flatTokens(tokens)
 
-        with open(
-            "records.json", "w"
-        ) as f:
-            f.write(json.dumps(records))
+        if file:
+            with open(file, "w") as f:
+                f.write(json.dumps(records))
 
         if not records:
             return print("没有数据")
@@ -611,6 +619,7 @@ if __name__ == "__main__":
     import sys
 
     fmt = sys.argv[1]
+    file = sys.argv[2]
     # fmt = "statuses:(内容)text_raw|red|bold|newline(-1)|index,(来源)source,(博主)user.screen_name,(空间)user.idstr,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image"
     data = ""
     for line in sys.stdin:
@@ -620,4 +629,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(data)
         print(e)
-    Parser.output(fmt, data)
+    Parser.output(fmt, data, file)

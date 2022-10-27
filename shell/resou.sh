@@ -42,9 +42,11 @@ function json_res() {
   local -a types
   local jsonFormat
   local curlparams
+  local outputfile="$1"
   case $1 in
     # 微博
     weibo|wb) # 微博
+      outputfile="$outputfile.$2"
       case $2 in
         groups|gps) # 分组
           url='https://weibo.com/ajax/feed/allGroups?is_new_segment=1&fetch_hot=1'
@@ -80,7 +82,7 @@ function json_res() {
           exit 0
         ;;
         hotpost|hp) # 热门微博
-          local group=($(json_res wb groups $3))
+          local group=($(json_res weibo groups $3))
           local gid=${group[@]:1:1}
           local containerid=${group[@]:2:1}
           local count=${4:-10}
@@ -164,6 +166,7 @@ function json_res() {
     ;;
     # 知乎
     zhihu|zh) # 知乎
+      outputfile="$outputfile.$2"
       case ${2:-hs} in
         hot|ht) # 热榜 https://www.zhihu.com/knowledge-plan/hot-question/hot/0/hour
           url='https://www.zhihu.com/api/v4/creators/rank/hot?domain={domain}&period={period}&limit=50'
@@ -172,7 +175,8 @@ function json_res() {
           patterns=('"title":"[^"]*"' '"url":"[^"]*"')
           indexes=(4 4)
           jsonFormat='data:(标题)question.title|red|bold|index,(链接)question.url,(时间)question.created|date,(标签)question.topics*.name'
-          case $3 in
+          outputfile="$outputfile.$3"
+          case ${3:-hour} in
             day) # 日榜
               url=${url//\{period\}/day}
               ask "${ZHIHU_DOMAINS[*]}" "$4"
@@ -191,12 +195,6 @@ function json_res() {
               domain=$_ASK_RESULT
               url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
             ;;
-            *)
-              url=${url//\{period\}/hour}
-              ask "${ZHIHU_DOMAINS[*]}" "$3"
-              domain=$_ASK_RESULT
-              url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
-            ;;
           esac
         ;;
         hotsearch|hs|billboard|bb) # 热搜
@@ -212,9 +210,11 @@ function json_res() {
     ;;
     # 百度
     baidu|bd) # 百度
+      outputfile="$outputfile.$2"
       case ${2:-hotsearch} in
         hotsearch|hs) # 热搜
           url="https://top.baidu.com/board"
+          outputfile="$outputfile.$3"
           case ${3:-realtime} in
             realtime|rt) # 实时热搜
               url="$url?tab=realtime"
@@ -285,40 +285,9 @@ function json_res() {
     ;;
     # bilibili
     bilibili|bb) # bilibili
-      aliases=(标题 作者 分类 浏览 点赞 链接 描述 图片)
-      fields=(title name tname view like short_link desc pic)
-      patterns=(_ _ _ '"view":[^,]*,' '"like":[^,]*,' _ _ _)
-      indexes=(4 4 4 3 3 4 4 4)
-      transformers=(_ _ _ _ _ _ _ '${values[@]:7:1}@412w_232h_1c.jpg')
-      types=(_ _ _ _ _ _ _ img)
-      jsonFormat='data.list:(标题)title|red|bold|index,(描述)desc|white|dim,(作者)owner.name,(分类)tname|magenta,(浏览)stat.view|number,(点赞)stat.like|number,(链接)short_link|dim,(图片)pic|image|dim,(发布时间)pubdate|date'
+      outputfile="$outputfile.$2"
       case $2 in
-        hot|ht) # 热榜
-          url='https://api.bilibili.com/x/web-interface/popular?ps=20&pn=1'
-        ;;
-        week|wk) # 周榜
-          local week=$3
-          if [[ $week = 0 ]]; then
-            week=`curl -s https://api.bilibili.com/x/web-interface/popular/series/list | grep -oE '"number":[^,]*,' | head -1 | grep -oE '\d+'`
-          elif [[ -z $week ]]; then
-            json_res bb wkl
-            read -p '输入周编号:' week
-            echo -e "第\033[32m$week\033[0m周"
-          fi
-          url="https://api.bilibili.com/x/web-interface/popular/series/one?number=$week"
-        ;;
-        weeklist|wkl) # 历史周榜
-          url='https://api.bilibili.com/x/web-interface/popular/series/list'
-          aliases=(主题 编号 名称)
-          fields=(subject number name)
-          patterns=(_ '"number":[^,]*,' _)
-          indexes=(4 3 4)
-          transformers=(_ '\\033[0m第\\033[31m${values[@]:1:1}\\033[0m周' _)
-          types=(_ _ _)
-          jsonFormat=''
-        ;;
-        hotsearch|hs) # 热搜
-          # https://www.bilibili.com/blackboard/activity-trending-topic.html?navhide=1
+        热搜|hotsearch|hs) # 热搜 https://www.bilibili.com/blackboard/activity-trending-topic.html
           url='https://app.bilibili.com/x/v2/search/trending/ranking?limit=30'
           text=$(cat bilibili.hotsearch.json)
           url=${url//\{query\}/$query}
@@ -327,7 +296,7 @@ function json_res() {
           indexes=(4)
           jsonFormat='data.list:(关键词)show_name'
         ;;
-        searchsuggest|suggest) # 搜索建议
+        搜索建议|searchsuggest|suggest) # 搜索建议
           url="https://s.search.bilibili.com/main/suggest?func=suggest&suggest_type=accurate&sub_type=tag&main_ver=v1&highlight=&userid=18358716&bangumi_acc_num=1&special_acc_num=1&topic_acc_num=1&upuser_acc_num=3&tag_num=10&special_num=10&bangumi_num=10&upuser_num=3&rnd=$(date +%s)"
           curlparams="-G --data-urlencode term={term}"
           local term=$(question '输入搜索词：' $3)
@@ -336,55 +305,66 @@ function json_res() {
           fields=(term)
           indexes=(4)
           jsonFormat='result.tag:(建议词)term'
-          # text=$(cat bilibili.searchsuggest.json)
         ;;
-        search|s) # 搜索
+        搜索|search|s) # 搜索
+          local args=($@)
           url="https://api.bilibili.com/x/web-interface/search/all/v2?__refresh__=true&page=1&page_size=42&platform=pc"
           curlparams=("-b buvid3=oc; -G")
           local keyword=$(question '输入搜索词：' $3)
           curlparams+=("--data-urlencode keyword=$keyword")
-          # text=$(cat bilibili.search.json)
           jsonFormat='data.result|sort(key=data.result:result_type,sorts=[video,user]):(搜索结果类型)result_type,(结果列表)data|hr:(标题)title,(UP主)author,(标签)tag,(类型)typename,(项目类型)type,(链接)arcurl,(图片)upic'
 
           local orders=(click pubdate dm stow)
-          _ASK_MSG='如果不需要排序，直接回车；请输入排序：' ask "最多点击 最新发布 最多弹幕 最多收藏" $4
+          _ASK_MSG='请输入排序（如果不需要排序，直接回车即可）：' ask "最多点击 最新发布 最多弹幕 最多收藏" $4
           local order=${orders[@]:$_ASK_INDEX:1}
           [[ $order ]] && curlparams+=("--data-urlencode order=$order")
+          args[4]=$order
 
-          local type=$(index "video anime film live article topic user" $5)
-          local types=(video media_bangumi media_ft live article topic bili_user)
-          _ASK_MSG='如果不需要排序，直接回车；请输入排序：' ask "视频 番剧 影视 直播 专栏 话题 用户" $type
-          type=${types[@]:$_ASK_INDEX:1}
+          local type=''
+          case $5 in
+            视频|video)
+              type='video'
+              jsonFormat='data.result:(标题)title|red|bold|index,(简介)description|white|dim,(分类)typename|magenta,(播放量)play|number,(点赞数)favorites|number,(收藏量)video_review|number,(弹幕数)danmaku|number,(UP主)author,(空间)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(发布时间)pubdate|date,(链接)arcurl|dim,(图片)pic|image|dim'
+            ;;
+            影视|media_ft|film)
+              type='media_ft'
+              jsonFormat='data.result:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)styles|magenta,(地区)areas,(演职人员)staff,(媒体类型)season_type_name|magenta,(发布时间)pubdate|date,(链接)url|dim,(图片)cover|image|dim'
+            ;;
+            番剧|media_bangumi|anime)
+              type='media_bangumi'
+              jsonFormat='data.result:(标题)title|red|bold|index,(分类)styles|magenta,(地区)areas,(简介)desc|white|dim,(演职人员)staff,(媒体类型)season_type_name|magenta,(发布时间)pubdate|date,(链接)url|dim,(图片)cover|image|dim'
+            ;;
+            直播|live)
+              type='live'
+              jsonFormat='data.result:live_room:(标题)title|red|bold|index,(分类)cate_name|magenta,(标签)tag,(链接)url|dim,(图片)cover|image|dim;live_user:(UP主)uname,(分类)cate_name,(图片)cover|image|dim,(直播时间)live_time,(关注人数)attentions,(直播间)roomid|$https://live.bilibili.com/{data.result:live_user:roomid}$'
+            ;;
+            专栏|article)
+              type='article'
+              jsonFormat='data.result:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)category_name,(浏览量)view|number,(链接)id|$https://www.bilibili.com/read/cv{data.result:id}$|dim,(发布时间)pubdate|date,(图片)image_urls|image|dim'
+            ;;
+            话题|topic)
+              type='topic'
+              jsonFormat='data.result:(标题)title|red|bold|index,(UP主)author,(空间)mid$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description,(描述)description,(发布时间)pubdate|date,(链接)arcurl|dim,(图片)cover|image|dim'
+            ;;
+            用户|bili_user|user|up)
+              type='bili_user'
+              jsonFormat='data.result:(UP主)uname|red|bold|index,(官方认证)official_verify.desc,(简介)usign,(视频数)videos,(链接)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(头像)upic,(作品)res:(标题)title,(链接)arcurl,(发布时间)pubdate|date'
+            ;;
+            *)
+              _ASK_MSG='请输入分类（如果不需要分类，直接回车即可）：' ask "视频 番剧 影视 直播 专栏 话题 用户"
+              if [[ $_ASK_RESULT ]]; then
+                args[5]=$_ASK_RESULT
+                json_res "${args[@]}"
+                return
+              fi
+            ;;
+          esac
           [[ $type ]] && curlparams+=("--data-urlencode search_type=$type")
-
           if [[ $order || $type ]]; then
             url="https://api.bilibili.com/x/web-interface/search/type?__refresh__=true&page=1&page_size=42&platform=pc"
           fi
-          case $type in
-            video)
-              jsonFormat='data.result:(标题)title|red|bold|index,(播放量)play|number,(点赞数)favorites|number,(收藏量)video_review|number,(弹幕数)danmaku|number,(UP主)author,(空间)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description|white|dim,(类型)typename,(链接)arcurl|dim,(图片)pic|image|dim'
-            ;;
-            media_ft|film)
-              jsonFormat='data.result:(标题)title|red|bold|index,(类型)styles,(地区)areas,(简介)desc|white|dim,(演职人员)staff,(媒体类型)season_type_name|magenta,(链接)url|dim,(图片)cover|image|dim'
-            ;;
-            media_bangumi|anime)
-              jsonFormat='data.result:(标题)title|red|bold|index,(类型)styles,(地区)areas,(简介)desc|white|dim,(演职人员)staff,(媒体类型)season_type_name|magenta,(链接)url|dim,(图片)cover|image|dim'
-            ;;
-            live)
-              jsonFormat='data.result:live_room:(标题)title|red|bold|index,(分类)cate_name,(标签)tag,(链接)url|dim,(图片)cover|image|dim;live_user:(UP主)uname,(分类)cate_name,(图片)cover|image|dim,(直播时间)live_time,(关注人数)attentions,(直播间)roomid|$https://live.bilibili.com/{data.result:live_user:roomid}$'
-            ;;
-            article)
-              jsonFormat='data.result:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)category_name,(浏览量)view|number,(链接)id|$https://www.bilibili.com/read/cv{data.result:id}$|dim,(图片)image_urls|image|dim'
-            ;;
-            topic)
-              jsonFormat='data.result:(标题)title|red|bold|index,(UP主)author,(空间)mid$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description,(描述)description,(发布时间)pubdate,(链接)arcurl|dim,(图片)cover|image|dim'
-            ;;
-            bili_user|user|up)
-              jsonFormat='data.result:(UP主)uname|red|bold|index,(官方认证)official_verify.desc,(简介)usign,(视频数)videos,(链接)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(头像)upic,(作品)res:(标题)title,(链接)arcurl,(发布时间)pubdate|date'
-            ;;
-          esac
         ;;
-        space|up) # 用户投稿
+        用户投稿|space|up) # 用户投稿
           url="https://api.bilibili.com/x/space/arc/search?mid={upid}&pn={PAGE}&ps={SIZE}&index=1&order={order}&order_avoided=true&jsonp=jsonp"
           curlparams='-H User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'
           # 482324117, 在美国的福建人, https://space.bilibili.com/482324117
@@ -407,16 +387,182 @@ function json_res() {
           url=${url//\{SIZE\}/${SIZE:-25}}
           jsonFormat='data.list.vlist:(标题)title|red|bold|index,(简介)description|white|dim,(播放量)play|number,(弹幕数)video_review,(评论数)comment|number,(发布时间)created|date(format=md)|magenta,(链接)bvid|$https://www.bilibili.com/video/{data.list.vlist:bvid}$|white|dim,(图片)pic|image|white|dim'
         ;;
+        综合热门) # 综合热门 https://www.bilibili.com/v/popular/all
+          url="https://api.bilibili.com/x/web-interface/popular?ps=${SIZE:-20}&pn=${PAGE:-1}"
+          jsonFormat='data.list:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)tname|magenta,(UP主)owner.name|${.owner.name} https://space.bilibili.com/{.owner.mid}$,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(点赞数)stat.like|number,(评论数)stat.reply|number,(链接)short_link|dim,(图片)pic|image|dim'
+        ;;
+        排行榜|rank) # 排行榜 https://www.bilibili.com/v/popular/rank
+          local args=($@)
+          outputfile="$outputfile.$3"
+          local tabs=(全站 番剧 国产动画 国创相关 纪录片 动画 音乐 舞蹈 游戏 知识 科技 运动 汽车 生活 美食 动物圈 鬼畜 时尚 娱乐 影视 电影 电视剧 综艺 原创 新人)
+          # 类似 https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=all'
+          local jsonFormatTypeOne='data.list:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)tname|magenta,(UP主)owner.name|${.owner.name} https://space.bilibili.com/{.owner.mid}$,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(点赞数)stat.like|number,(评论数)stat.reply|number,(链接)short_link|dim,(图片)pic|image|dim'
+          # 类似 https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=1
+          local jsonFormatTypeTwo='result.list:(标题)title|red|bold|index,(徽标)badge|magenta,(更新状态)new_ep.index_show,(评分)rating|magenta,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(追番数)stat.follow|number,(总追番数)stat.series_follow|number,(链接)url,(图片)cover|image|dim'
+          case $3 in
+            全站) # https://www.bilibili.com/v/popular/rank/all
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            番剧) # https://www.bilibili.com/v/popular/rank/bangumi
+              url='https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=1'
+              jsonFormat=$jsonFormatTypeTwo
+            ;;
+            国产动画) # https://www.bilibili.com/v/popular/rank/guochan
+              url='https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=4'
+              jsonFormat=$jsonFormatTypeTwo
+            ;;
+            纪录片) # https://www.bilibili.com/v/popular/rank/documentary
+              url='https://api.bilibili.com/pgc/season/rank/web/list?day=3&season_type=3'
+              jsonFormat=$jsonFormatTypeTwo
+            ;;
+            电影) # https://www.bilibili.com/v/popular/rank/movie
+              url='https://api.bilibili.com/pgc/season/rank/web/list?day=3&season_type=2'
+              jsonFormat=$jsonFormatTypeTwo
+            ;;
+            电视剧) # https://www.bilibili.com/v/popular/rank/tv
+              url='https://api.bilibili.com/pgc/season/rank/web/list?day=3&season_type=5'
+              jsonFormat=$jsonFormatTypeTwo
+            ;;
+            综艺) # https://www.bilibili.com/v/popular/rank/variety
+              url='https://api.bilibili.com/pgc/season/rank/web/list?day=3&season_type=7'
+              jsonFormat=$jsonFormatTypeTwo
+            ;;
+            国产相关) # https://www.bilibili.com/v/popular/rank/guochuang
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=168&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            动画) # https://www.bilibili.com/v/popular/rank/douga
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=1&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            音乐) # https://www.bilibili.com/v/popular/rank/music
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=3&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            舞蹈) # https://www.bilibili.com/v/popular/rank/dance
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=129&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            游戏) # https://www.bilibili.com/v/popular/rank/game
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=4&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            知识) # https://www.bilibili.com/v/popular/rank/knowledge
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=36&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            科技) # https://www.bilibili.com/v/popular/rank/tech
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=188&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            运动) # https://www.bilibili.com/v/popular/rank/sports
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=234&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            汽车) # https://www.bilibili.com/v/popular/rank/car
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=223&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            生活) # https://www.bilibili.com/v/popular/rank/life
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=160&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            美食) # https://www.bilibili.com/v/popular/rank/food
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=160&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            动物圈) # https://www.bilibili.com/v/popular/rank/animal
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=217&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            鬼畜) # https://www.bilibili.com/v/popular/rank/kichiku
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=119&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            时尚) # https://www.bilibili.com/v/popular/rank/fashion
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=155&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            娱乐) # https://www.bilibili.com/v/popular/rank/ent
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=5&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            影视) # https://www.bilibili.com/v/popular/rank/cinephile
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=181&type=all'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            原创) # https://www.bilibili.com/v/popular/rank/origin
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=origin'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            新人) # https://www.bilibili.com/v/popular/rank/rookie
+              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=rookie'
+              jsonFormat=$jsonFormatTypeOne
+            ;;
+            *)
+              ask "${tabs[*]}"
+              args[2]=${tabs[@]:$_ASK_INDEX:1}
+              json_res "${args[@]}"
+              return
+            ;;
+          esac
+        ;;
+        每周必看|week) # 每周必看 https://www.bilibili.com/v/popular/weekly
+          local week=$3
+          if [[ $week = 0 ]]; then
+            week=`RAW=1 json_res bilibili weeklist | grep -oE '"number":[^,]*,' | head -1 | grep -oE '\d+'`
+          elif [[ -z $week ]]; then
+            json_res bilibili weeklist
+            read -p '输入周编号:' week
+            echo -e "第\033[32m$week\033[0m周"
+          fi
+          url="https://api.bilibili.com/x/web-interface/popular/series/one?number=$week"
+        ;;
+        周列表|weeklist) # 周列表
+          url='https://api.bilibili.com/x/web-interface/popular/series/list'
+          aliases=(主题 编号 名称)
+          fields=(subject number name)
+          patterns=(_ '"number":[^,]*,' _)
+          indexes=(4 3 4)
+          transformers=(_ '\\033[0m第\\033[31m${values[@]:1:1}\\033[0m周' _)
+          types=(_ _ _)
+          jsonFormat=''
+        ;;
+        入站必刷|precious) # 入站必刷 https://www.bilibili.com/v/popular/history
+          url="https://api.bilibili.com/x/web-interface/popular/precious?page_size=${SIZE:-100}&page=${PAGE:-1}"
+          jsonFormat='data.list:(标题)title|red|bold|index,(简介)desc|white|dim,(成就)achievement|magenta,(分类)tname|magenta,(UP主)owner.name|${.owner.name} https://space.bilibili.com/{.owner.mid}$,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(点赞数)stat.like|number,(评论数)stat.reply|number,(链接)short_link|dim,(图片)pic|image|dim'
+        ;;
+        全站音乐榜) # https://www.bilibili.com/v/popular/music
+          local week=$3
+          if [[ $week = 0 ]]; then
+            week=`RAW=1 json_res bilibili musicweeklist | grep -oE '"number":[^,]*,' | head -1 | grep -oE '\d+'`
+          elif [[ -z $week ]]; then
+            json_res bilibili wkl
+            read -p '输入周编号:' week
+            echo -e "第\033[32m$week\033[0m周"
+          fi
+          url="https://api.bilibili.com/x/copyright-music-publicity/toplist/music_list?list_id=$week"
+        ;;
+        音乐周列表|musicweeklist)
+          url='https://api.bilibili.com/x/copyright-music-publicity/toplist/all_period?list_type=1'
+          aliases=(编号 发布时间)
+          fields=(period publish_time)
+          patterns=('"period":[^,]*,' '"publish_time":[^,]*,')
+          indexes=(3 3)
+          transformers=('\\033[0m第\\033[31m${values[@]:1:1}\\033[0m期' _)
+          types=(_ date)
+          jsonFormat=''
+        ;;
       esac
     ;;
     # sogou
     sogou|sg) # 搜狗
+      outputfile="$outputfile.$2"
       case ${2:-hotsearch} in
-        hotsearch|hs) # 热搜
-          # https://ie.sogou.com/top/
+        hotsearch|hs) # 热搜 https://ie.sogou.com/top/
           url="https://go.ie.sogou.com/hot_ranks?callback=jQuery112403809296729897269_1666168486497&h=0&r=0&v=0&_=$(date +%s)"
           text=$(curl -s "$url" | grep -oE '{.*}')
-          # text=$(cat sogou.hot.json)
           aliases=(标题 热度 链接)
           fields=(title num id)
           patterns=(_ '"num":[^,]*,' _)
@@ -428,6 +574,7 @@ function json_res() {
     ;;
     # sina
     sina) # 新浪
+      outputfile="$outputfile.$2"
       case ${2:-rank} in
         rank) # 排行榜 https://sinanews.sina.cn/h5/top_news_list.d.html
           # （历史）首页 http://news.sina.com.cn/head/news20221020am.shtml
@@ -476,16 +623,21 @@ function json_res() {
           local category=$3
           ask "$(selectColumns "${categories[*]}" 1)" $category
           category=${categories[@]:$((_ASK_INDEX * 2 + 1)):1}
-          debug $category
           url=${url//\{category\}/$category}
-          local date=$(question "输入排行榜时间：" "${4:-$(date '+%Y%m%d')}")
-          url=${url//\{date\}/$date}
+          outputfile="$outputfile.$category"
+          debug $category
+
           local type=$(question "输入排行榜类型（可选值：day/week，分别代表日/周排行榜）：" "${5:-day}")
           url=${url//\{type\}/$type}
+          outputfile="$outputfile.$type"
+
+          local date=$(question "输入排行榜时间：" "${4:-$(date '+%Y%m%d')}")
+          url=${url//\{date\}/$date}
+
           local count=$(question "输入排行榜新闻数量：" "${6:-20}")
           url=${url//\{count\}/$count}
+
           text=$(curl -s "$url" | grep -o '{.*}')
-          # text=`cat sina.rank.json | grep -o '{.*}'`
           debug $text
           aliases=(标题 媒体 链接)
           fields=(title media url)
@@ -496,7 +648,6 @@ function json_res() {
         roll) # 滚动新闻 https://news.sina.com.cn/roll
           url="https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=50&page=1&r=$(date +%s)&callback=jQuery111205718232756906676_$(date +%s)&_=$(date +%s)"
           text=$(curl -s "$url" | grep -o '({.*})' | sed -n 's/^.//;s/.$//;p' | tr -d '\n')
-          # text=`cat sina.roll.json | grep -o '({.*})' | sed -n 's/^.//;s/.$//p' | tr -d '\n'`
           aliases=(标题 简介 媒体 链接)
           fields=(title intro media_name url)
           patterns=(_ _ _ _)
@@ -508,7 +659,7 @@ function json_res() {
           local category=$(index "${categories[*]}" "$3")
           ask "新浪热榜 潮流热榜 娱乐热榜 视频热榜 汽车热榜 育儿热榜 时尚热榜 旅游热榜" $category
           category=${categories[@]:$((_ASK_INDEX)):1}
-
+          outputfile="$outputfile.$category"
           case ${category:-top} in
             top) # 新浪热榜
               url='https://sinanews.sina.cn/h5/top_news_list.d.html'
@@ -551,12 +702,12 @@ function json_res() {
   if [[ -z "$text" && -z "$url" ]]; then
     echo "没有地址" 1>&2; exit 1;
   fi
-  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}"
+  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}" -o "$outputfile"
 }
 
 for i in $@; do
   if [[ $i == '-h' ]]; then
-    echo -e "$(cat $0 | grep -oE '^\s*\w+(\|\w*)*)\s*(#.*)?$' | sed 's/   //;s/\(#.*\)/\\033[31m\1\\033[0m/')"
+    echo -e "$(cat $0 | grep -oE '^\s*[^|)( ]+(\|[^|)( ]*)*\)\s*(#.*)?$' | sed 's/    //;s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;s/\([^ |)]\+\)\(|\|)\)/\\033[32m\1\\033[0m\2/g;/^\S/i\ ')"
     exit 0
   fi
 done

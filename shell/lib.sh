@@ -9,13 +9,14 @@ if [[ $pythonInstalled -eq 1 && -z $PURE ]]; then
     local OPTIND
     local data
     local format
-    while getopts 'd:f:' opt; do
+    while getopts 'd:f:o:' opt; do
       case $opt in
         d) data="$OPTARG";;
         f) format="$OPTARG";;
+        o) file="$OPTARG";;
       esac
     done
-    printf %s "$data" | python3 $_dirname/lib.py "$format"
+    printf %s "$data" | python3 $_dirname/lib.py "$format" "$file"
   }
 fi
 
@@ -160,11 +161,13 @@ function resolveLink() {
 }
 
 function ask() {
+  unset _ASK_INDEX
+  unset _ASK_RESULT
   local values=($1)
   local value="$2"
   for i in "${!values[@]}"; do
     if [[ $value = $i || $value = ${values[@]:$i:1} ]]; then
-      printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
+      printf "${_ASK_MSG:-输入值：}%b\n" "\033[31m${values[@]:$i:1}\033[0m" 1>&2
       _ASK_RESULT=${values[@]:$i:1}
       _ASK_INDEX=$i
       debug $_ASK_RESULT, $_ASK_INDEX
@@ -175,18 +178,20 @@ function ask() {
     printf '%b %b	' "\033[31m$i\033[0m" "\033[32m${values[@]:$i:1}\033[0m" 1>&2
   done
   read -p $'\n'${_ASK_MSG:-输入值：}''
-  local revoke=$(shopt -p nocasematch)
-  shopt -s nocasematch
-  for i in "${!values[@]}"; do
-    if [[ "$REPLY" = $i  || "$REPLY" = "${values[@]:$i:1}" ]]; then
-      printf '值: %b\n' "\033[31m${values[@]:$i:1}\033[0m" 1>&2
-      _ASK_RESULT="${values[@]:$i:1}"
-      _ASK_INDEX=$i
-      debug $_ASK_RESULT, $_ASK_INDEX
-      break
-    fi
-  done
-  eval $revoke
+  if [[ -n $REPLY ]]; then
+    local revoke=$(shopt -p nocasematch)
+    shopt -s nocasematch
+    for i in "${!values[@]}"; do
+      if [[ "$REPLY" = $i  || "$REPLY" = "${values[@]:$i:1}" ]]; then
+        printf "${_ASK_MSG:-输入值：}%b\n" "\033[31m${values[@]:$i:1}\033[0m" 1>&2
+        _ASK_RESULT="${values[@]:$i:1}"
+        _ASK_INDEX=$i
+        debug $_ASK_RESULT, $_ASK_INDEX
+        break
+      fi
+    done
+    eval $revoke
+  fi
 }
 
 function question() {
@@ -201,11 +206,14 @@ function question() {
   fi
 }
 
-function save() {
-  local folder=$_dirname/xy/"$(echo ${1//\//-} | sed 's/\(=\)[0-9]\{10\}/\1/g')"
+function datafile() {
+  local folder=$_dirname/data
+  for i in $@; do
+    [[ -n $i ]] && folder=$folder/$i
+  done
   debug folder: $folder
   ensureFolder "$folder"
-  tee "$folder/$(date '+%Y-%m-%dT%H:%M:%S').json" 1>/dev/null
+  echo "$folder/$(date '+%Y-%m-%d.%H:%M:%S').json"
 }
 
 function index() {
@@ -232,7 +240,7 @@ function print_json() {
   local raw=$RAW
   local jsonFormat=''
   local OPTIND
-  while getopts 'a:f:p:i:t:u:s:r:y:j:q:' opt; do
+  while getopts 'a:f:p:i:t:u:s:r:y:j:q:o:' opt; do
     case "$opt" in
       a) fieldAliases+=($OPTARG);;
       k) fieldKeys+=($OPTARG);;
@@ -246,6 +254,7 @@ function print_json() {
       s) text="$OPTARG";;
       r) raw=$OPTARG;;
       j) jsonFormat=$OPTARG;;
+      o) file=$OPTARG;;
       *) echo '未知选项 $opt' 1>&2; exit 1;;
     esac
   done
@@ -254,24 +263,20 @@ function print_json() {
 
   echo "$cmd" >> resou.log
 
+  [[ -z "$text" ]] && text="$($cmd)"
+
+  [[ -n $file ]] && printf %s "$text" > "$(datafile $file)"
+
   if [[ -n "$jsonFormat" && `declare -f jsonparser` ]]; then
-
-    [[ -z "$text" ]] && text="$($cmd)"
-
-    printf %s "$text" | save $url
 
     if [[ -n $raw ]]; then
       printf '%s' "$text"
     else
       debug "$text"
-      jsonparser -f "$jsonFormat" -d "$text"
+      jsonparser -f "$jsonFormat" -d "$text" -o "$(datafile records $file)"
     fi
 
   else
-
-    [[ -z "$text" ]] && text="$($cmd)"
-
-    printf %s "$text" | save $url
 
     text=$(escapeSpace "$text")
 
