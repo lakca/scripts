@@ -99,20 +99,20 @@ function escapeUnicode2() {
 }
 
 function escapeSpace() {
-  printf '%s' "$*" | sed 's/ /\\x20/g;s/\n/\\xa/g;s/\t/\\x9/g;s/\v/\\xb/g;s/\f/\\xc/g;s/\r/\\xd/g;s/\\"/\\x22/gI'
+  ( [[ -p /dev/stdin ]] && tee || printf '%s' "$*" ) | sed 's/ /\\x20/g;s/\n/\\xa/g;s/\t/\\x9/g;s/\v/\\xb/g;s/\f/\\xc/g;s/\r/\\xd/g;s/\\"/\\x22/gI'
 }
 
 function print_record() {
   local -a fields=()
   local -a values=()
-  local -a types=()
+  local -a filters=()
   local id=''
   local OPTIND
-  while getopts ':a:v:n:t:' opt; do
+  while getopts ':a:v:n:y:' opt; do
     case "$opt" in
       a) fields+=($OPTARG);;
       v) values+=($OPTARG);;
-      t) types+=($OPTARG);;
+      y) filters+=($OPTARG);;
       n) id=$OPTARG;;
     esac
   done
@@ -125,7 +125,7 @@ function print_record() {
       echo -e "\033[33m${fields[@]:$index:1}\033[0m: 【"$id"】\033[1;31m$value\033[0m"
     else
       echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[32m$value\033[0m"
-      if [[ -n $ITERM_SESSION_ID && $IMGCAT && "${types[@]:$index:1}" = 'img' ]]; then
+      if [[ -n $ITERM_SESSION_ID && $IMGCAT && "${filters[@]:$index:1}" = *:image:* ]]; then
         curl -s "${values[@]:$index:1}" | imgcat --height=5
       fi
     fi
@@ -233,7 +233,7 @@ function print_json() {
   local -a fieldIndexes
   local -a transformers
   local -a fieldKeys
-  local -a types
+  local -a filters
   local -a curlparams
   local url=''
   local text=''
@@ -248,7 +248,7 @@ function print_json() {
       p) fieldPatterns+=($OPTARG);;
       i) fieldIndexes+=($OPTARG);;
       t) transformers+=($OPTARG);;
-      y) types+=($OPTARG);;
+      y) filters+=($OPTARG);;
       u) url="$OPTARG";;
       q) curlparams+=($OPTARG);;
       s) text="$OPTARG";;
@@ -290,7 +290,11 @@ function print_json() {
         local field="${fieldNames[@]:$index:1}";
         local pattern="${fieldPatterns[@]:$index:1}"
         if [[ "$pattern" = '_' ]]; then
-          pattern='"'$field'":"[^"]*"'
+          if [[ ${filters[@]:$index:1} = *:number:* ]]; then
+            pattern='"'$field'":[^,]*,'
+          else
+            pattern='"'$field'":"[^"]*"'
+          fi
         fi
         declare -a "arr_$field"
         while read -r line; do
@@ -305,12 +309,17 @@ function print_json() {
       # iterate records
       for index in "${!primaryFields[@]}"; do
         local -a values=()
-        for field in "${fieldNames[@]}"; do
-          local _fieldValuesIndirection="arr_${field}[@]"
+        for idx in "${!fieldNames[@]}"; do
+          local _fieldValuesIndirection="arr_${fieldNames[@]:$idx:1}[@]"
           local _fieldValues=("${!_fieldValuesIndirection}")
           local value="${_fieldValues[@]:$index:1}"
           if [[ "$value" =~ ^:[0-9]+,$ ]]; then # 数字类型
             value=$(echo "$value" | grep -oE '\d+')
+            if [[ ${filters[@]:$idx:1} = *:timestamp:* ]]; then
+              value="$(date -r $value '+%Y-%m-%d %H:%M:%S' | escapeSpace)"
+            else
+              value=$(printf "%'.f" $value)
+            fi
           fi
           values+=("$value")
         done
@@ -328,7 +337,7 @@ function print_json() {
           values[$idx]="${_values[@]:$idx:1}"
         done
 
-        print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index` -t "${types[*]}"
+        print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index` -y "${filters[*]}"
         echo
       done
     fi

@@ -10,13 +10,27 @@ function indicate() {
 }
 
 function quote() {
-  IFS=',' read -r -a alertHighPrices <<< "$QUOTE_ALERT_HIGH_PRICES"
+  local codes=''
+  local idx=1
+  while [[ $idx -le $# ]]; do
+    local arg="${!idx}"
+    case "$arg" in
+      --low-price|-v) key=QUOTE_ALERT_LOW_PRICES;;
+      --high-price|+v) key=QUOTE_ALERT_HIGH_PRICES;;
+      --low-percent|-p) key=QUOTE_ALERT_LOW_PERCENTS;;
+      --high-percent|+p) key=QUOTE_ALERT_HIGH_PERCENTS;;
+      *) [[ -n $key ]] && declare $key="$arg" || codes="$arg";;
+    esac
+    idx=$((1 + idx))
+  done
+
   IFS=',' read -r -a alertLowPrices <<< "$QUOTE_ALERT_LOW_PRICES"
-  IFS=',' read -r -a alertHighPercents <<< "$QUOTE_ALERT_HIGH_PERCENTS"
+  IFS=',' read -r -a alertHighPrices <<< "$QUOTE_ALERT_HIGH_PRICES"
   IFS=',' read -r -a alertLowPercents <<< "$QUOTE_ALERT_LOW_PERCENTS"
+  IFS=',' read -r -a alertHighPercents <<< "$QUOTE_ALERT_HIGH_PERCENTS"
   local prices=($PRICES)
 
-  local url="https://hq.sinajs.cn/list=$1"
+  local url="https://hq.sinajs.cn/list=$codes"
   local list=($(curl -s "$url" -H 'Referer:http://finance.sina.com.cn/' | iconv -f gb18030 -t utf8 | cut -d '"' -f2))
   # https://www.jianshu.com/p/fabe3811a01d
   local keys=(name open close price high low buy sell volume amount bv1 bp1 bv2 bp2 bv3 bp3 bv4 bp4 bv5 bp5 sv1 sp1 sv2 sp2 sv3 sp3 sv4 sp4 sv5 sp5 date time)
@@ -63,4 +77,9 @@ function quote() {
   PRICES="${prices[*]}" quote $*
 }
 
-QUOTE_ALERT_LOW_PRICES=",17.22" quote sh000001,sz300556,sh600352,sh600678
+# QUOTE_ALERT_LOW_PRICES=",17.22,8.90,5.11" quote sh000001,sz300556,sh600352,sh600678
+# em.sh quote sh000001,sz300556,sh600352,sh600678 -v ",17.22,8.90,5.11" +v '3000'
+
+case $1 in
+  quote) quote "${@:2}";;
+esac

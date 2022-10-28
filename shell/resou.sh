@@ -39,10 +39,11 @@ function json_res() {
   local -a patterns
   local -a indexes
   local -a transformers
-  local -a types
+  local -a filters
   local jsonFormat
   local curlparams
   local outputfile="$1"
+  local tailer=''
   case $1 in
     # 微博
     weibo|wb) # 微博
@@ -205,6 +206,23 @@ function json_res() {
           patterns=('"titleArea":{"text":"[^"]*"' '"excerptArea":{"text":"[^"]*"' '"metricsArea":{"text":"[^"]*"' '"link":{"url":"[^"]*"' '"imageArea":{"url":"[^"]*"')
           indexes=(6 6 6 6 6)
           jsonFormat="initialState.topstory.hotList:(标题)target.titleArea.text|red|bold|index,(描述)target.excerptArea.text|white|dim,(热度)target.metricsArea.text|magenta,(链接)target.link.url,(图片)target.imageArea.url|image"
+        ;;
+        question) # 问题回答
+          local id=$3
+          [[ $id = http* ]] && id=$(grep -o '/\d\+' <<< $id); id=${id#/}
+          [[ $id ]] && url="https://www.zhihu.com/api/v4/questions/$id/feeds"
+          [[ $3 = *cursor=*session_id=* ]] && url=$3
+          echo -e "url: $url\narg: $3" >&2
+          # text=$(curl -s "$url")
+          text=$(cat zhihu.json)
+          fields=('excerpt' 'title' 'voteup_count' 'created_time' 'url')
+          patterns=(_ '"title":"[^"]*","type":"question"' _ _ '"url":"[^"]*","visible_only_to_author":')
+          indexes=(4 4 3 3 4)
+          filters=(_ _ :number: :number:timestamp: _)
+          jsonFormat='data:(问题)target.question.title|red|index,(内容)target.excerpt|white|dim,(作者)target.author.name,(点赞数)target.voteup_count|number|magenta,(评论数)target.comment_count|number|magenta,(发布时间)target.created_time|date,(链接)target.url|dim'
+
+          next=$(echo -e $(escapeUnicode $(grep -oE '"next":"[^"]*"' <<< $text | cut -d'"' -f4)))
+          [[ $next && ${SIZE:-10} > 0 ]] && tailer="SIZE=$((${SIZE:-10} - 5)) json_res zhihu question $next"
         ;;
       esac
     ;;
@@ -526,7 +544,7 @@ function json_res() {
           patterns=(_ '"number":[^,]*,' _)
           indexes=(4 3 4)
           transformers=(_ '\\033[0m第\\033[31m${values[@]:1:1}\\033[0m周' _)
-          types=(_ _ _)
+          filters=(_ :number: _)
           jsonFormat=''
         ;;
         入站必刷|precious) # 入站必刷 https://www.bilibili.com/v/popular/history
@@ -548,10 +566,10 @@ function json_res() {
           url='https://api.bilibili.com/x/copyright-music-publicity/toplist/all_period?list_type=1'
           aliases=(编号 发布时间)
           fields=(period publish_time)
-          patterns=('"period":[^,]*,' '"publish_time":[^,]*,')
+          patterns=(_ _)
+          filters=(:number: :number:timestamp:)
           indexes=(3 3)
           transformers=('\\033[0m第\\033[31m${values[@]:1:1}\\033[0m期' _)
-          types=(_ date)
           jsonFormat=''
         ;;
       esac
@@ -702,7 +720,12 @@ function json_res() {
   if [[ -z "$text" && -z "$url" ]]; then
     echo "没有地址" 1>&2; exit 1;
   fi
-  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}" -o "$outputfile"
+  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}" -o "$outputfile" -y "${filters[*]}"
+
+  # printf %s "tailer: $tailer" 1>&2
+  if [[ $tailer ]]; then
+    "$tailer"
+  fi
 }
 
 for i in $@; do
