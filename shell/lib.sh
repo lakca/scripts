@@ -102,6 +102,18 @@ function escapeSpace() {
   ( [[ -p /dev/stdin ]] && tee || printf '%s' "$*" ) | sed 's/ /\\x20/g;s/\n/\\xa/g;s/\t/\\x9/g;s/\v/\\xb/g;s/\f/\\xc/g;s/\r/\\xd/g;s/\\"/\\x22/gI'
 }
 
+function random() {
+  local r=$RANDOM
+  if [[ $1 ]]; then
+    while [[ $1 -gt ${#r} ]]; do
+      r=$r$RANDOM
+    done
+    echo ${r:0:$1}
+  else
+    echo $r
+  fi
+}
+
 function print_record() {
   local -a fields=()
   local -a values=()
@@ -239,8 +251,9 @@ function print_json() {
   local text=''
   local raw=$RAW
   local jsonFormat=''
+  local headers=()
   local OPTIND
-  while getopts 'a:f:p:i:t:u:s:r:y:j:q:o:' opt; do
+  while getopts 'a:f:p:i:t:u:s:r:y:j:q:o:H:' opt; do
     case "$opt" in
       a) fieldAliases+=($OPTARG);;
       k) fieldKeys+=($OPTARG);;
@@ -255,11 +268,12 @@ function print_json() {
       r) raw=$OPTARG;;
       j) jsonFormat=$OPTARG;;
       o) file=$OPTARG;;
+      H) headers+=($OPTARG);;
       *) echo '未知选项 $opt' 1>&2; exit 1;;
     esac
   done
 
-  local cmd="curl -s "$url" "${curlparams[@]}""
+  local cmd="curl -s "$url" "${curlparams[@]}" "${headers[@]}""
 
   echo "$cmd" >> resou.log
 
