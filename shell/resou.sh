@@ -45,11 +45,10 @@ function json_res() {
   local outputfile="$1"
   local tailer=''
   case $1 in
-    # 微博
-    weibo|wb) # 微博
+    微博|weibo|wb)
       outputfile="$outputfile.$2"
       case $2 in
-        groups|gps) # 分组
+        分组|groups|gps)
           url='https://weibo.com/ajax/feed/allGroups?is_new_segment=1&fetch_hot=1'
           text=$(curl -s "$url")
           debug $text
@@ -82,7 +81,7 @@ function json_res() {
           echo "$group ${gids[@]:$_ASK_INDEX:1} ${containerids[@]:$_ASK_INDEX:1}"
           exit 0
         ;;
-        hotpost|hp) # 热门微博
+        热门微博|hotpost|hp)
           local group=($(json_res weibo groups $3))
           local gid=${group[@]:1:1}
           local containerid=${group[@]:2:1}
@@ -98,7 +97,7 @@ function json_res() {
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
           jsonFormat='statuses:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{statuses:user.idstr}$,(链接)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
         ;;
-        userpost|up) # 用户微博
+        用户微博|userpost|up)
           uid="$3"
           page=${4:-1}
           url="$WEIBO_USER_POSTS_URL"
@@ -112,7 +111,7 @@ function json_res() {
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
           jsonFormat='data.list:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{data.list:user.idstr}$,(链接)mblogid|$https://weibo.com/{data.list:user.idstr}/{data.list:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
         ;;
-        hottopic|ht) # 话题榜
+        话题榜|hottopic|ht)
           url="$WEIBO_TOPIC_URL"
           aliases=('标签' '内容' '分类' '阅读量' '讨论' '链接')
           fields=('topic' 'summary' 'category' 'read' 'mention' 'mid')
@@ -121,7 +120,7 @@ function json_res() {
           transformers=('_' '_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
           jsonFormat='data.statuses:(标签)topic|red|bold|index,(内容)summary|white|dim,(分类)category,(阅读量)read|number,(讨论数)mention|number,(链接)mid|$https://s.weibo.com/weibo?q=%23{data.statuses:mid}%23$,(图片)images_url|image'
         ;;
-        hotsearch|hs) # 热搜榜
+        热搜榜|hotsearch|hs)
           url="$WEIBO_HOT_SEARCH_URL";
           aliases=('标题' '分类' '热度' '原始热度' '链接')
           fields=('word' 'category' 'num' 'raw_hot' 'note')
@@ -130,7 +129,7 @@ function json_res() {
           transformers=('_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
           jsonFormat='data.band_list:(标题)word|red|bold|index,(分类)category,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word}%23$'
         ;;
-        post|ps) # 微博
+        微博|post|ps)
           local postid="$3" # M7OL9bpQP
           if [[ $postid =~ ^http ]]; then
             local parts=(`resolveLink $3`)
@@ -145,7 +144,7 @@ function json_res() {
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
           jsonFormat=':(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{:user.idstr}$,(链接)mblogid|$https://weibo.com/{:user.idstr}/{:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
         ;;
-        comment|cm) # 微博评论
+        微博评论|comment|cm)
           local count=${4:-10}
           local post=`RAW=1 json_res weibo post $3`
           # 4816863043518870
@@ -165,11 +164,10 @@ function json_res() {
         *) return;;
       esac
     ;;
-    # 知乎
-    zhihu|zh) # 知乎
+    知乎|zhihu|zh)
       outputfile="$outputfile.$2"
       case ${2:-hs} in
-        hot|ht) # 热榜 https://www.zhihu.com/knowledge-plan/hot-question/hot/0/hour
+        热榜|hot|ht) # https://www.zhihu.com/knowledge-plan/hot-question/hot/0/hour
           url='https://www.zhihu.com/api/v4/creators/rank/hot?domain={domain}&period={period}&limit=50'
           fields=(title link)
           aliases=(标题 链接)
@@ -178,19 +176,19 @@ function json_res() {
           jsonFormat='data:(标题)question.title|red|bold|index,(链接)question.url,(时间)question.created|date,(标签)question.topics*.name'
           outputfile="$outputfile.$3"
           case ${3:-hour} in
-            day) # 日榜
+            日榜|day)
               url=${url//\{period\}/day}
               ask "${ZHIHU_DOMAINS[*]}" "$4"
               domain=$_ASK_RESULT
               url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
             ;;
-            week) # 周榜
+            周榜|week)
               url=${url//\{period\}/week}
               ask "${ZHIHU_DOMAINS[*]}" "$4"
               domain=$_ASK_RESULT
               url=${url//\{domain\}/${ZHIHU_DOMAINS_NUM[@]:$_ASK_INDEX:1}}
             ;;
-            hot|ht|hour) # 小时榜
+            小时榜|hot|ht|hour)
               url=${url//\{period\}/hour}
               ask "${ZHIHU_DOMAINS[*]}" "$4"
               domain=$_ASK_RESULT
@@ -198,7 +196,7 @@ function json_res() {
             ;;
           esac
         ;;
-        hotsearch|hs|billboard|bb) # 热搜
+        热搜|hotsearch|hs|billboard|bb)
           url='https://www.zhihu.com/billboard'
           text=$(curl -s "$url" | grep -oE '<script id="js-initialData" type="text/json">.*<\/script>' | sed -nE 's/<script[^>]*>//;s/<\/script>.*//p')
           aliases=(标题 描述 热度 链接 图片)
@@ -207,43 +205,69 @@ function json_res() {
           indexes=(6 6 6 6 6)
           jsonFormat="initialState.topstory.hotList:(标题)target.titleArea.text|red|bold|index,(描述)target.excerptArea.text|white|dim,(热度)target.metricsArea.text|magenta,(链接)target.link.url,(图片)target.imageArea.url|image"
         ;;
-        question) # 问题回答
+        搜索建议|searchsuggest|ss)
+          local query="$3"
+          url="https://www.zhihu.com/api/v4/search/suggest?q=$query"
+          jsonFormat='suggest:(关键词)query|red|bold,(链接)id|$https://www.zhihu.com/search?type=content&q={suggest:query}$'
+        ;;
+        搜索|search)
+          _ASK_MSG='请输入搜索类别（默认为综合）：' ask '综合 用户 话题 视频 学术 专栏 盐选内容 电子书' $4
+          local categories=(general user topic zvideo scholar column km_general publication)
+          local category=${categories[@]:${_ASK_INDEX:-0}:1}
+          url="https://www.zhihu.com/api/v4/search_v3?gk_version=gz-gaokao&t=$category"
+          curlparams=(-G)
+          curlparams+=(--data-urlencode "q=$3")
+          curlparams+=(--data-urlencode 'correction=1')
+          curlparams+=(--data-urlencode 'offset=0')
+          curlparams+=(--data-urlencode 'limit=20')
+          curlparams+=(--data-urlencode 'filter_fields=')
+          curlparams+=(--data-urlencode 'lc_idx=0')
+          curlparams+=(--data-urlencode 'show_all_topics=0')
+          curlparams+=(--data-urlencode 'search_source=Normal')
+          curlparams+=(-H 'cookie:_zap=56bdfcc3-c246-4680-8e57-a5473b751fb9;_xsrf=ffba990f-3a49-4e9b-b232-cab6496b2d4c;d_c0="AGDdL78gPxSPTkmCNGZifvEjgMhuR-HaOIc=|1640613826";_9755xjdesxxd_=32;YD00517437729195%3AWM_TID=hNCooIXAVRtAFQERAEZ%2BqRSZ6KxiyxVn;Hm_lvt_98beee57fd2ef70ccdd5ca52b9740c49=1666186862;SESSIONID=lIINZ3KHfbMwt2tjxmX2mMVDzbhcX2g9CmQQ0joNtGh;JOID=VlsdAkOQjG6Q5X5pEpcnM1QlW10K-84u17NKKVP66SjumEAac04FNPbucmsSbq2QOHOLDN6v4CTG6o7tfhZ0QkE=;osd=W1gXBEqdj2SW7HNqGJEuPlcvXVQH-MQo3r5JI1Xz5CvknkkXcEQDPfvteG0bY66aPnqGD9Sp6SnF4IjkcxV-REg=;__snaker__id=uv8MRYIw7Fv5KCpg;captcha_session_v2=2|1:0|10:1666878835|18:captcha_session_v2|88:d2taY0xjcU85TG50d1dBaVRVTkR6bU1zb1FkR1MyT0k4UUpTTUpxODlYTnNhWWREaWxjNml0U01qRk92TWp6Lw==|471ef29025ebe894da84eea7f4b7b93962ec65def721c79fc40b29d18cbbba15;YD00517437729195%3AWM_NI=NoF33ptg%2Bgy7L4j7DWexQa0Mu1ETlqe6gpjVWSI%2BoOl7mL%2BNlVHfssWKUEYrQx6fg5Hbk%2BqIlEP3UYSjDgtlk%2Fhg2d1%2F73wgd3M7thIQGBlGn0WOe18Je%2Fyr%2FLxao5%2FfRFU%3D;YD00517437729195%3AWM_NIKE=9ca17ae2e6ffcda170e2e6ee83b633edad9cd1c825b49e8aa6c55f878a8a87d86986a9aeb1d74f8aadff86ea2af0fea7c3b92a8eb18ad4b27cb8b9e588fc3d90eca6d8c75da7a89f82b347b7ef8bb5ef7ba7eaa991e95e958d87ccee45b0e9a3adaa46b08a8887f27995959ba6dc7a93a8fa87e63f8cbea5ccf443b09ba0d4d85391b68c88f768a9f1a888b170f3f1f9d4f66da8ed83d8f7648b8f89a3ef4daef099b0e83bfc96abd0fc7aed94b882ee3fedba9ea7d837e2a3;gdxidpyhxdE=8zWmSlJQ0Cfxz7fvITX0kTJt%2BLKgkc4Nlc1nkRJ9SdOTUI31NnbwoClGmggG%2FIVm%5Cdu9g0qavDl83BJ0u%2FYrEg%5CL%2FBEz%2Fc24EeueRuen59tNL%5C8gSeMGRQHRG1MCs4WolvT8atJEwmOlpP%2BOKI%2FelPD5UMk5HfHznbSDQT1LxZRu74%2BX%3A1667051401315;Hm_lpvt_98beee57fd2ef70ccdd5ca52b9740c49=1667050836;KLBRSID=d017ffedd50a8c265f0e648afe355952|1667050836|1667050636')
+          curlparams+=(-H 'x-ab-pb:CsQBCAAbAD8ARwC0AGkBagF0ATsCzALXAtgCTwNQA6ADoQOiA7cD8wP0AzMEjASNBKYE1gQRBVEFiwWMBZ4FMAYxBusGJwd3B3gH2AfcB90HZwh0CHYIeQjaCD8JQglgCY0JwwnECcUJxgnHCcgJyQnKCcsJzAnRCfEJ9AkECkkKZQprCpgKpQqpCr4KxArUCt0K7Qr9Cv4KOws8C0MLRgtxC3YLhQuHC40LwAvXC+AL5QvmCywMOAxxDI8MrAy5DMMMyQz4DBJiAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAAA=')
+          curlparams+=(-H 'x-api-version:3.0.91')
+          curlparams+=(-H 'x-app-za:OS=Web')
+          curlparams+=(-H 'x-zse-93:101_3_3.0')
+          curlparams+=(-H 'x-zse-96:2.0_GvwwUMkek8=4IKMpxb4X6Vrgz1NcrMLbce=W7rcoQC+TxG0p5vlhR8ariWgX8JxX')
+          curlparams+=(-H 'x-zst-81:3_2.0aR_sn77yn6O92wOB8hPZnQr0EMYxc4f18wNBUgpTQ6nxERFZsRY0-4Lm-h3_tufIwJS8gcxTgJS_AuPZNcXCTwxI78YxEM20s4PGDwN8gGcYAupMWufIoLVqr4gxrRPOI0cY7HL8qun9g93mFukyigcmebS_FwOYPRP0E4rZUrN9DDom3hnynAUMnAVPF_PhaueTF03CcUeB0BgBf9LMwq3BggpKe8pmYUOLSbUfEUgKn9HLUrNMCvHLjwCOYcSTVMO9fG7C6qO_agXqAbSLSicLb_LmrbxLZBFqBUX0pCNVSBxLEwC9Fho1WbO_SqLq_UC0huOqkqY99cLZnwgC8rc8AucVwDe9mbXfoeoLkiNYrCH_kGO0Vg_z3bOVxwe_PcLZ3h9KfgYYSwYqQgeYUwS_cwLpcgXyfceMb0Vm9gSKrekV0UXY20c9gcOYeQH9Y7p1cqXqouCpuh3mZrLYzuN9sqV1o4XC8gNmwJxBorSs')
+          jsonFormat='data:(标题)object.title|red|bold|index,(摘录)object.excerpt|red|bold,(结果类型)object.type,(内容)object.content|white|dim,(作者)object.author.name|${data:object.author.name} https://www.zhihu.com/people/{.object.author.url_token}$,(时间)object.created_at|date,(链接)url|dim,(视频)object.video_url|dim,(图片)object.cover_url|image|dim'
+        ;;
+        问题回答|answer)
           local id=$3
           [[ $id = http* ]] && id=$(grep -o '/\d\+' <<< $id); id=${id#/}
           [[ $id ]] && url="https://www.zhihu.com/api/v4/questions/$id/feeds"
-          [[ $3 = *cursor=*session_id=* ]] && url=$3
-          echo -e "url: $url\narg: $3" >&2
-          # text=$(curl -s "$url")
-          text=$(cat zhihu.json)
+          [[ $3 = *cursor=* ]] && url=$3
+          text=$(curl -s "$url")
+          # text=$(cat zhihu.json)
           fields=('excerpt' 'title' 'voteup_count' 'created_time' 'url')
           patterns=(_ '"title":"[^"]*","type":"question"' _ _ '"url":"[^"]*","visible_only_to_author":')
           indexes=(4 4 3 3 4)
           filters=(_ _ :number: :number:timestamp: _)
-          jsonFormat='data:(问题)target.question.title|red|index,(内容)target.excerpt|white|dim,(作者)target.author.name,(点赞数)target.voteup_count|number|magenta,(评论数)target.comment_count|number|magenta,(发布时间)target.created_time|date,(链接)target.url|dim'
+          jsonFormat="data:(内容)target.excerpt|red|index(${INDEX_OFFSET:-0}),(问题)target.question.title|white|dim,(作者)target.author.name,(点赞数)target.voteup_count|number|magenta,(评论数)target.comment_count|number|magenta,(发布时间)target.created_time|date,(链接)target.url|dim"
 
           next=$(echo -e $(escapeUnicode $(grep -oE '"next":"[^"]*"' <<< $text | cut -d'"' -f4)))
-          [[ $next && ${SIZE:-10} > 0 ]] && tailer="SIZE=$((${SIZE:-10} - 5)) json_res zhihu question $next"
+          [[ $next && ${SIZE:-10} > 0 ]] && tailer="INDEX_OFFSET=$((5 + ${INDEX_OFFSET:-0})) SIZE=$((${SIZE:-10} - 5)) json_res zhihu question '$next'"
         ;;
       esac
     ;;
-    # 百度
-    baidu|bd) # 百度
+    百度|baidu|bd) #
       outputfile="$outputfile.$2"
       case ${2:-hotsearch} in
-        hotsearch|hs) # 热搜
+        热搜|hotsearch|hs)
           url="https://top.baidu.com/board"
           outputfile="$outputfile.$3"
           case ${3:-realtime} in
-            realtime|rt) # 实时热搜
+            实时热搜|realtime|rt)
               url="$url?tab=realtime"
             ;;
-            novel|nv) # 小说
+            小说|novel|nv)
               url="$url?tab=novel"
               ask "全部类型 都市 玄幻 奇幻 历史 科幻 军事 游戏 武侠 现代言情 古代言情 幻想言情 青春" "$4"
               local category=$_ASK_RESULT
               url="$url&tag={\"category\":\"$category\"}"
             ;;
-            movie|mv) # 电影
+            电影|movie|mv)
               url="$url?tab=movie"
               ask "全部类型 爱情 喜剧 动作 剧情 科幻 恐怖 动画 惊悚 犯罪" "$4"
               local category=$_ASK_RESULT
@@ -251,7 +275,7 @@ function json_res() {
               local country=$_ASK_RESULT
               url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
             ;;
-            teleplay|tv) # 电视剧
+            电视剧|teleplay|tv)
               url="$url?tab=teleplay"
               ask "全部类型 爱情 搞笑 悬疑 古装 犯罪 动作 恐怖 科幻 剧情 都市" "$4"
               local category=$_ASK_RESULT
@@ -259,13 +283,13 @@ function json_res() {
               local country=$_ASK_RESULT
               url="$url&tag={\"category\":\"$category\",\"country\":\"$country\"}"
             ;;
-            car) # 汽车
+            汽车|car)
               url="$url?tab=car"
               ask "全部 轿车 SUV 新能源 跑车 MPV" "$4"
               local category=$_ASK_RESULT
               url="$url&tag={\"category\":\"$category\"}"
             ;;
-            game) # 游戏
+            游戏|game)
               url="$url?tab=game"
               ask "全部类型 手机游戏 网络游戏 单机游戏" "$4"
               local category=$_ASK_RESULT
@@ -281,18 +305,17 @@ function json_res() {
         ;;
       esac
     ;;
-    # 头条
-    toutiao|tt) # 今日头条
+    今日头条|toutiao|tt)
       fields=(title link)
       aliases=(标题 链接)
       case ${2:-hot} in
-        hot|ht) # 热榜
+        热榜|hot|ht)
           url='https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc';
           patterns=('"Title":"[^"]*"' '"Url":"[^"]*"');
           indexes=(4 4)
           jsonFormat='data:(标题)Title|red|bold|index,(链接)Url,(图片)Image.url_list*.url|image'
         ;;
-        hotsearch|hs) # 热搜
+        热搜|hotsearch|hs)
           url='https://tsearch.snssdk.com/search/suggest/hot_words/';
           patterns=('"query":"[^"]*"' '"query":"[^"]*"');
           indexes=(4 4);
@@ -301,8 +324,7 @@ function json_res() {
         ;;
       esac
     ;;
-    # bilibili
-    bilibili|bb) # bilibili
+    哔哩哔哩|bilibili|bb)
       outputfile="$outputfile.$2"
       case $2 in
         热搜|hotsearch|hs) # 热搜 https://www.bilibili.com/blackboard/activity-trending-topic.html
@@ -575,10 +597,10 @@ function json_res() {
       esac
     ;;
     # sogou
-    sogou|sg) # 搜狗
+    搜狗|sogou|sg)
       outputfile="$outputfile.$2"
       case ${2:-hotsearch} in
-        hotsearch|hs) # 热搜 https://ie.sogou.com/top/
+        热搜|hotsearch|hs) # https://ie.sogou.com/top/
           url="https://go.ie.sogou.com/hot_ranks?callback=jQuery112403809296729897269_1666168486497&h=0&r=0&v=0&_=$(date +%s)"
           text=$(curl -s "$url" | grep -oE '{.*}')
           aliases=(标题 热度 链接)
@@ -591,10 +613,10 @@ function json_res() {
       esac
     ;;
     # sina
-    sina) # 新浪
+    新浪|sina)
       outputfile="$outputfile.$2"
       case ${2:-rank} in
-        rank) # 排行榜 https://sinanews.sina.cn/h5/top_news_list.d.html
+        排行榜|rank) # https://sinanews.sina.cn/h5/top_news_list.d.html
           # （历史）首页 http://news.sina.com.cn/head/news20221020am.shtml
           # （历史）排行榜 https://news.sina.com.cn/hotnews/
           url='https://top.news.sina.com.cn/ws/GetTopDataList.php?top_type={type}&top_cat={category}&top_time={date}&top_show_num={count}&top_order=DESC&js_var=channel_'
@@ -663,7 +685,7 @@ function json_res() {
           indexes=(4 4 4)
           jsonFormat='data:(标题)title|red|bold|index,(媒体)media|cyan,(链接)url,(时间)time|date'
         ;;
-        roll) # 滚动新闻 https://news.sina.com.cn/roll
+        滚动新闻|roll) # https://news.sina.com.cn/roll
           url="https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=50&page=1&r=$(date +%s)&callback=jQuery111205718232756906676_$(date +%s)&_=$(date +%s)"
           text=$(curl -s "$url" | grep -o '({.*})' | sed -n 's/^.//;s/.$//;p' | tr -d '\n')
           aliases=(标题 简介 媒体 链接)
@@ -672,45 +694,169 @@ function json_res() {
           indexes=(4 4 4 4)
           jsonFormat='result.data:(标题)title|red|bold|index,(简介)intro|white|dim,(媒体)media_name|cyan,(链接)url,(时间)ctime|date,(图片)images*.u'
         ;;
-        hot) # 热榜 https://sinanews.sina.cn/h5/top_news_list.d.html
+        热榜|hot) # https://sinanews.sina.cn/h5/top_news_list.d.html
           local categories=(top trend ent video baby car fashion trip)
           local category=$(index "${categories[*]}" "$3")
           ask "新浪热榜 潮流热榜 娱乐热榜 视频热榜 汽车热榜 育儿热榜 时尚热榜 旅游热榜" $category
           category=${categories[@]:$((_ASK_INDEX)):1}
           outputfile="$outputfile.$category"
           case ${category:-top} in
-            top) # 新浪热榜
+            新浪热榜|top)
               url='https://sinanews.sina.cn/h5/top_news_list.d.html'
               text=$(curl -s $url | grep -oE '<script>SM = {.*};</script>' | sed 's/<script>SM = //;s/;<\/script>//;')
               jsonFormat='data.data.result:(标题)text|red|bold|index,(分类)queryClass|magenta,(热度)hotValue,(链接)link|dim,(图片)imgUrl|image|dim'
             ;;
-            trend) # 潮流热榜
+            潮流热榜|trend)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-trend&localCityCode=&wm='
               jsonFormat='data.hotList:(标题)info.title|red|bold|index,(热度)info.hotValue,(图片)info.pic*.url|image|dim,(链接)base.base.url'
             ;;
-            ent) # 娱乐热榜
+            娱乐热榜|ent)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-ent&localCityCode=&wm='
               jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(图片)info.pic*.url|image|dim,(链接)base.base.url'
             ;;
-            video) # 视频热榜
+            视频热榜|video)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-minivideo&localCityCode=&wm='
               jsonFormat='data.hotList:(标题)info.title|red|bold|index,(热度)info.intro,(媒体)media_info.name,(视频)stream:(链接)playUrl,(清晰度)definitionType'
             ;;
-            car) # 汽车热榜
+            汽车热榜|car)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-auto&localCityCode=&wm='
               jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
             ;;
-            baby) # 育儿热榜
+            育儿热榜|baby)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-mother&localCityCode=&wm='
               jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
             ;;
-            fashion) # 时尚热榜
+            时尚热榜|fashion)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-fashion&localCityCode=&wm='
               jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
             ;;
-            trip) # 旅游热榜
+            旅游热榜|trip)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-travel&localCityCode=&wm='
               jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
+            ;;
+          esac
+        ;;
+      esac
+    ;;
+    # eastmoney
+    东方财富|eastmoney|em)
+      outputfile=$outputfile$2
+      case $2 in
+        最新播报|zxbb)
+          url="https://emres.dfcfw.com/60/zxbb2018.js?callback=zxbb2018&_=$(date +%s)"
+          text=$(curl -s $url | grep -o '{.*}')
+          aliases=(标题 时间 链接)
+          fields=(Art_Title Art_Showtime Art_UniqueUrl)
+          jsonFormat='Result:(标题)Art_Title|red|bold|index,(时间)Art_Showtime,(链接)Art_UniqueUrl|white|dim'
+        ;;
+        国内股指|gngz)
+          url="https://push2.eastmoney.com/api/qt/clist/get?pi=0&pz=10&po=1&np=1&fields=f1,f2,f3,f4,f6,f12,f13,f14&fltt=2&invt=2&ut=433fd2d0e98eaf36ad3d5001f088614d&fs=i:1.000001,i:0.399001,i:0.399006,i:1.000300,i:0.300059&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
+          text=$(curl -s $url | grep -o '{.*}')
+          jsonFormat='data.diff:(指数)f14|red|bold|index,(点数)f2|magenta,(涨跌幅)f3|append(%)|red,(成交额)f6|number(cn)|magenta,(代码)f12'
+        ;;
+        国外股指|gwgz)
+          url="https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f1,f2,f12,f13,f14,f3,f4,f6,f104,f152&secids=100.ATX,100.FCHI,100.GDAXI,100.HSI,100.N225,100.FTSE,100.NDX,100.DJIA&ut=13697a1cc677c8bfa9a496437bfef419&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
+          text=$(curl -s $url | grep -o '{.*}')
+          jsonFormat='data.diff:(指数)f14|red|bold|index,(点数)f2|magenta,(涨跌幅)f3|append(%)|red,(成交额)f6|number(cn)|magenta,(代码)f12'
+        ;;
+        搜索|search|s) # https://data.eastmoney.com/xg/xg/calendar.html
+          outputfile=$outputfile$3
+          case $3 in
+            文章|article) # 新股日历解读 https://data.eastmoney.com/xg/xg/calendar.html
+              url="https://data.eastmoney.com/dataapi/search/article?page=${PAGE:-1}&pagesize=${SIZE:-50}&keywordPhase=true&excludeChannels%5B%5D=1"
+              curlparams=(-G --data-urlencode keyword=$4)
+              jsonFormat='result.cmsArticleWeb:(标题)title|red|bold|index,(内容)content|white|dim,(媒体)mediaName,(时间)date,(链接)url|dim'
+            ;;
+          esac
+        ;;
+        周末消息|zmxx) # https://data.eastmoney.com/xg/xg/calendar.html
+          json_res eastmoney search article '周末这些重要消息或将影响股市'
+        ;;
+        每日数据挖掘机|mrwj) # https://data.eastmoney.com/xg/xg/calendar.html
+          json_res eastmoney search article '每日数据挖掘机'
+        ;;
+        今日热搜|hotkeyword|hk)
+          url="https://searchapi.eastmoney.com/api/hotkeyword/get?count=${PAGE:-20}&token=32A8A21716361A5A387B0D85259A0037&cb=jQuery35108491390379066641_$(date +%s)&_=$(date +%s)"
+          text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
+          jsonFormat='Data:(关键词)KeyPhrase|red|bold|index,(链接)JumpAddress'
+        ;;
+        新股数据|xg) # https://data.eastmoney.com/xg/
+          url="https://datacenter-web.eastmoney.com/api/data/v1/get"
+          curlparams=(-G)
+          curlparams+=(--data-urlencode callback=jQuery112305747392010999344_$(date +%s))
+          curlparams+=(--data-urlencode pageSize=${SIZE:-50})
+          curlparams+=(--data-urlencode pageNumber=${PAGE:-1})
+          curlparams+=(--data-urlencode source=WEB)
+          curlparams+=(--data-urlencode client=WEB)
+          outputfile=$outputfile$3
+          case $3 in
+            新股申购|xg) # https://data.eastmoney.com/xg/xg/default.html
+              local apply_date=${4:-$(date +%Y-%m-%d)}
+              curlparams+=(--data-urlencode sortColumns=APPLY_DATE,SECURITY_CODE)
+              curlparams+=(--data-urlencode sortTypes=1,-1)
+              curlparams+=(--data-urlencode reportName=RPTA_APP_IPOAPPLY)
+              curlparams+=(--data-urlencode columns=SECURITY_CODE,SECURITY_NAME,TRADE_MARKET_CODE,APPLY_CODE,TRADE_MARKET,MARKET_TYPE,ORG_TYPE,ISSUE_NUM,ONLINE_ISSUE_NUM,OFFLINE_PLACING_NUM,TOP_APPLY_MARKETCAP,PREDICT_ONFUND_UPPER,ONLINE_APPLY_UPPER,PREDICT_ONAPPLY_UPPER,ISSUE_PRICE,LATELY_PRICE,CLOSE_PRICE,APPLY_DATE,BALLOT_NUM_DATE,BALLOT_PAY_DATE,LISTING_DATE,AFTER_ISSUE_PE,ONLINE_ISSUE_LWR,INITIAL_MULTIPLE,INDUSTRY_PE_NEW,OFFLINE_EP_OBJECT,CONTINUOUS_1WORD_NUM,TOTAL_CHANGE,PROFIT,LIMIT_UP_PRICE,INFO_CODE,OPEN_PRICE,LD_OPEN_PREMIUM,LD_CLOSE_CHANGE,TURNOVERRATE,LD_HIGH_CHANG,LD_AVERAGE_PRICE,OPEN_DATE,OPEN_AVERAGE_PRICE,PREDICT_PE,PREDICT_ISSUE_PRICE2,PREDICT_ISSUE_PRICE,PREDICT_ISSUE_PRICE1,PREDICT_ISSUE_PE,PREDICT_PE_THREE,ONLINE_APPLY_PRICE,MAIN_BUSINESS,PAGE_PREDICT_PRICE1,PAGE_PREDICT_PRICE2,PAGE_PREDICT_PRICE3,PAGE_PREDICT_PE1,PAGE_PREDICT_PE2,PAGE_PREDICT_PE3,SELECT_LISTING_DATE,IS_BEIJING,INDUSTRY_PE_RATIO)
+              curlparams+=(--data-urlencode quoteColumns=f2~01~SECURITY_CODE~NEWEST_PRICE)
+              curlparams+=(-d quoteType=0)
+              curlparams+=(--data-urlencode filter="(APPLY_DATE>'$apply_date')")
+
+              jsonFormat='result.data:(证券名称)SECURITY_NAME|${.SECURITY_NAME} {.SECURITY_CODE}$|red|bold|index,(主营业务)MAIN_BUSINESS|white|dim,(申购日期)APPLY_DATE,(上市日期)LISTING_DATE,(连续一字板数量)CONTINUOUS_1WORD_NUM|cyan,(涨幅)TOTAL_CHANGE,(中签获利)PROFIT|number,(发行价)ISSUE_PRICE|magenta,(预测发行价)PREDICT_ISSUE_PRICE|${.PREDICT_ISSUE_PRICE}/{.PREDICT_ISSUE_PRICE1}/{.PREDICT_ISSUE_PRICE2}$,(市盈率)AFTER_ISSUE_PE,(发行市盈率)AFTER_ISSUE_PE,(行业市盈率)INDUSTRY_PE_NEW,(预测发行市盈率)PREDICT_ISSUE_PE,(预测市盈率)PREDICT_PE,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
+            ;;
+            IPO审核|ipo) # https://data.eastmoney.com/xg/ipo
+              curlparams+=(--data-urlencode sortColumns=UPDATE_DATE,ORG_CODE)
+              curlparams+=(--data-urlencode sortTypes=-1,-1)
+              curlparams+=(--data-urlencode reportName=RPT_IPO_INFOALLNEW)
+              curlparams+=(--data-urlencode columns=SECURITY_CODE,STATE,REG_ADDRESS,INFO_CODE,CSRC_INDUSTRY,ACCEPT_DATE,DECLARE_ORG,PREDICT_LISTING_MARKET,LAW_FIRM,ACCOUNT_FIRM,ORG_CODE,UPDATE_DATE,RECOMMEND_ORG)
+              local markets=(科创板 创业板 上海主板 深圳主板 北交所)
+              _ASK_MSG='请输入板块（不指定板块回车即可）：' ask "${markets[*]}" $4
+              local market=$_ASK_RESULT
+              [[ $market ]] && curlparams+=(--data-urlencode filter="(PREDICT_LISTING_MARKET=\"$market\")")
+
+              jsonFormat='result.data:(企业名称)DECLARE_ORG|red|bold|index,(行业)CSRC_INDUSTRY|white|dim,(拟上市板块)PREDICT_LISTING_MARKET|cyan,(状态)STATE|magenta,(更新日期)UPDATE_DATE,(受理日期)ACCEPT_DATE,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
+            ;;
+            打新收益|dxsy) # https://data.eastmoney.com/xg/xg/dxsyl.html
+              curlparams+=(--data-urlencode sortColumns=LISTING_DATE,SECURITY_CODE)
+              curlparams+=(--data-urlencode sortTypes=-1,-1)
+              curlparams+=(--data-urlencode reportName=RPTA_APP_IPOAPPLY)
+              curlparams+=(--data-urlencode quoteColumns=f2~01~SECURITY_CODE,f14~01~SECURITY_CODE)
+              curlparams+=(--data-urlencode quoteType=0)
+              curlparams+=(--data-urlencode columns=ALL)
+              curlparams+=(--data-urlencode filter="((APPLY_DATE>'2010-01-01')(|@APPLY_DATE=\"NULL\"))((LISTING_DATE>'2010-01-01')(|@LISTING_DATE=\"NULL\"))(TRADE_MARKET_CODE!=\"069001017\")")
+
+              jsonFormat='result.data:(证券名称)SECURITY_NAME|${.SECURITY_NAME} {.SECURITY_CODE}$|red|bold|index,(主营业务)MAIN_BUSINESS|white|dim,(行业)INDUSTRY_NAME|white|dim,(上市日期)LISTING_DATE,(开盘溢价)LD_OPEN_PREMIUM|number(+)|append(%)|indicator,(首日最高)LD_HIGH_CHANG|number(+)|append(%)|indicator,(首日收盘)LD_CLOSE_CHANGE|number(+)|append(%)|indicator,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
+            ;;
+            增发|qbzf) #
+              curlparams+=(--data-urlencode sortColumns=ISSUE_DATE)
+              curlparams+=(--data-urlencode sortTypes=-1)
+              curlparams+=(--data-urlencode reportName=RPT_SEO_DETAIL)
+              curlparams+=(--data-urlencode columns=ALL)
+              curlparams+=(--data-urlencode quoteColumns=f2~01~SECURITY_CODE~NEW_PRICE)
+              curlparams+=(--data-urlencode quoteType=0)
+
+              jsonFormat='result.data:(证券名称)SECURITY_NAME_ABBR|${.SECURITY_NAME_ABBR} {.SECURITY_CODE}$|red|bold|index,(主营业务)MAIN_BUSINESS|white|dim,(增发方式)ISSUE_WAY|magenta,(增发用途)FUND_FOR|magenta|dim,(增发数量)ISSUE_NUM|number(cn),(增发价格)ISSUE_PRICE,(增发上市日期)ISSUE_ON_DATE,(链接)SECURITY_CODE|$https://data.eastmoney.com/stockdata/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
+            ;;
+          esac
+          text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
+        ;;
+        财经日历|cjrl) # https://data.eastmoney.com/cjrl/default.html
+          local today=$(date +%Y-%m-%d)
+          local end_date=$(date -v+1m +%Y-%m-%d)
+          outputfile=$outputfile$3
+          case $3 in
+            财经会议|cjhy) # https://data.eastmoney.com/cjrl/default.html
+              url="https://datacenter-web.eastmoney.com/api/data/v1/get?callback=datatable$(random 7)&reportName=RPT_CPH_FECALENDAR&pageNumber=${PAGE:-1}&pageSize=${SIZE:-50}&sortColumns=START_DATE&sortTypes=1&filter=(END_DATE%3E%3D%27$today%27)(START_DATE%3C%27$end_date%27)(STD_TYPE_CODE%3D%221%22)&source=WEB&client=WEB&columns=START_DATE%2CEND_DATE%2CFE_CODE%2CFE_NAME%2CFE_TYPE%2CCONTENT%2CSTD_TYPE_CODE%2CSPONSOR_NAME%2CCITY&_=$(date +%s)"
+              text=$(curl -s $url | grep -o '{.*}')
+              jsonFormat='result.data:(会议名称)FE_NAME|red|bold|index,(会议类型)FE_TYPE|magenta,(主办单位)SPONSOR_NAME,(开始时间)START_DATE,(结束时间)END_DATE,(会议地点)CITY,(会议内容)CONTENT|white|dim'
+            ;;
+            经济数据|jjsj) # https://data.eastmoney.com/cjrl/default.html
+              url="https://datacenter-web.eastmoney.com/api/data/v1/get?callback=datatable$(random 7)&reportName=RPT_CPH_FECALENDAR&pageNumber=${PAGE:-1}&pageSize=${SIZE:-50}&sortColumns=START_DATE&sortTypes=1&filter=(END_DATE%3E%3D%27$today%27)(START_DATE%3C%27$end_date%27)(STD_TYPE_CODE%3D%222%22)&source=WEB&client=WEB&columns=START_DATE%2CEND_DATE%2CFE_CODE%2CFE_NAME%2CFE_TYPE%2CCONTENT%2CSTD_TYPE_CODE%2CSPONSOR_NAME%2CCITY&_=$(date +%s)"
+              text=$(curl -s $url | grep -o '{.*}')
+              jsonFormat='result.data:(数据名称)FE_NAME|red|bold|index,(数据类型)FE_TYPE|magenta,(公布时间)START_DATE,(地区)CITY'
+            ;;
+            其他日程|qtrc) # https://data.eastmoney.com/cjrl/default.html
+              url="https://datacenter-web.eastmoney.com/api/data/v1/get?callback=datatable$(random 7)&reportName=RPT_CPH_FECALENDAR&pageNumber=${PAGE:-1}&pageSize=${SIZE:-50}&sortColumns=START_DATE&sortTypes=1&filter=(END_DATE%3E%3D%27$today%27)(START_DATE%3C%27$end_date%27)(STD_TYPE_CODE%3D%223%22)&source=WEB&client=WEB&columns=START_DATE%2CEND_DATE%2CFE_CODE%2CFE_NAME%2CFE_TYPE%2CCONTENT%2CSTD_TYPE_CODE%2CSPONSOR_NAME%2CCITY&_=$(date +%s)"
+              text=$(curl -s $url | grep -o '{.*}')
+              jsonFormat='result.data:(名称)FE_NAME|red|bold|index,(时间)START_DATE'
             ;;
           esac
         ;;
@@ -724,7 +870,7 @@ function json_res() {
 
   # printf %s "tailer: $tailer" 1>&2
   if [[ $tailer ]]; then
-    "$tailer"
+    eval $tailer
   fi
 }
 
@@ -736,3 +882,5 @@ for i in $@; do
 done
 
 json_res ${@:1}
+
+# console.log([...new URL().searchParams.entries()].map(e => `curlparams+=(--data-urlencode ${e[0]}=${e[1]})`).join('\n'))

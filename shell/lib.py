@@ -307,8 +307,8 @@ class Pipe:
     def apply(cls, v, pipes, data={}):
         def replacer(m):
             key = m.group(1)
-            if key.startswith('.'):
-                return str(retrieve(data['__'], key.split('.')[1:]))
+            if key.startswith("."):
+                return str(retrieve(data["__"], key.split(".")[1:]))
             else:
                 return str(data.get(key))
 
@@ -343,13 +343,13 @@ class Pipe:
             except:
                 return v
         fmts = {
-            'date': '%Y-%m-%d',
-            'time': '%H:%M:%S',
-            'year': '%Y',
-            'md': '%m-%d',
-            'hm': '%H:%M',
+            "date": "%Y-%m-%d",
+            "time": "%H:%M:%S",
+            "year": "%Y",
+            "md": "%m-%d",
+            "hm": "%H:%M",
         }
-        return time.strftime(fmts.get(kwargs.get('format', ''), "%Y-%m-%d %H:%M:%S"), v)
+        return time.strftime(fmts.get(kwargs.get("format", ""), "%Y-%m-%d %H:%M:%S"), v)
 
     @classmethod
     def number(cls, v, type=",", *args, **kwargs):
@@ -361,8 +361,23 @@ class Pipe:
             return "{:.2%}".format(v)
         elif type == "+%":
             return "{:+.2%}".format(v)
+        elif type == "+":
+            return "{:+.2f}".format(v)
+        elif type == "cn":
+            for e in ["", "万", "亿", "兆"]:
+                if v > 10000:
+                    v = v / 10000
+                else:
+                    return "{:.4f}".format(v) + e
         else:
             return type.format(v)
+
+    @classmethod
+    def indicator(cls, v, *args, **kwargs):
+        return Pipe.apply(
+            Pipe.green(v) if str(v).startswith("-") else Pipe.red(v),
+            ["bold", "underline"],
+        )
 
     @classmethod
     def style(cls, v, styles=[], *args, **kwargs):
@@ -434,15 +449,17 @@ class Pipe:
 
     @classmethod
     def prepend(cls, v, text="", *args, **kwargs):
-        return text + v
+        return text + str(v)
 
     @classmethod
     def append(cls, v, text="", *args, **kwargs):
-        return v + text
+        return str(v) + text
 
     @classmethod
     def index(cls, v, *args, **kwargs):
-        index = kwargs.get("data", {}).get("__index", "")
+        index = kwargs.get("data", {}).get("__index", "") + (
+            (int(args[0]) if len(args) else 0)
+        )
         return cls.white(f"【{index}】") + v
 
     @classmethod
@@ -479,6 +496,7 @@ class Pipe:
         v.sort(**useKwargs)
         return v
 
+
 class Parser:
     @classmethod
     def getTokens(cls, fmt):
@@ -504,7 +522,7 @@ class Parser:
             if data:
                 data = data.values() if isinstance(data, dict) else data
                 for item in data:
-                    result = { "__": item }
+                    result = {"__": item}
                     results.append(result)
                     for child in node["children"]:
                         value = (
@@ -547,14 +565,14 @@ class Parser:
 
             pipes = meta[key]["pipes"] or []
 
-            hide = 'hide' in pipes
+            hide = "hide" in pipes
 
             label = meta[key].get("label", key)
 
             if hide or (SIMPLE and index != 1 and label not in ["链接"]):
                 continue
 
-            hide and pipes.remove('hide')
+            hide and pipes.remove("hide")
 
             scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
 
@@ -567,26 +585,16 @@ class Parser:
                 for item in val:
                     if isinstance(item, dict):
                         cls.printRecord(item, meta, indent + INDENT)
-                        scopedStdout(
-                            cls.applyPipes(" " * INDENT, pipes, record)
-                        )
+                        scopedStdout(cls.applyPipes(" " * INDENT, pipes, record))
                     else:
                         scopedStdout(
                             "  {}\n".format(
-                                Pipe.green(
-                                    cls.applyPipes(
-                                        item or "", pipes, record
-                                    )
-                                )
+                                Pipe.white(cls.applyPipes(item or "", pipes, record))
                             )
                         )
             else:
                 sys.stdout.write(
-                    "{}\n".format(
-                        Pipe.green(
-                            cls.applyPipes(val or "", pipes, record)
-                        )
-                    )
+                    "{}\n".format(Pipe.white(cls.applyPipes(val or "", pipes, record)))
                 )
 
     @classmethod
