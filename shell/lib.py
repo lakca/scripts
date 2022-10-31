@@ -238,6 +238,10 @@ def tokenize(fmt):
             if not node.usingArgs:
                 node.keys()
                 node.pipe()
+                if fmt[index + 1] == "$":
+                    index += 1
+                    node.token('$')
+                    raw = True
         # 分割同级（属性、参数...）
         elif token == ",":
             node.keys()
@@ -269,7 +273,7 @@ def tokenize(fmt):
 def retrieve(obj, keys, default=None):
     for key in keys:
         if obj:
-            if str(key).isdigit() and isinstance(obj, list, int):
+            if str(key).isdigit() and isinstance(obj, (list, int)):
                 index = int(key)
                 if len(obj) > index:
                     obj = obj[index]
@@ -284,6 +288,70 @@ def retrieve(obj, keys, default=None):
             return default
     return obj
 
+class Unicode:
+    # https://blog.oasisfeng.com/2006/10/19/full-cjk-unicode-range/
+    cjk = [
+        (0x3400, 0x4DB5), # 1）标准CJK文字
+        (0x4E00, 0x9FA5),
+        (0x9FA6, 0x9FBB),
+        (0xF900, 0xFA2D),
+        (0xFA30, 0xFA6A),
+        (0xFA70, 0xFAD9),
+        (0x20000, 0x2A6D6),
+        (0x2F800, 0x2FA1D),
+        (0xFF00, 0xFFEF), # 2）全角ASCII、全角中英文标点、半宽片假名、半宽平假名、半宽韩文字母
+        (0x2E80, 0x2EFF), # 3）CJK部首补充
+        (0x3000, 0x303F), # 4）CJK标点符号
+        (0x31C0, 0x31EF), # 5）CJK笔划
+        (0x2F00, 0x2FDF), # 6）康熙部首
+        (0x2FF0, 0x2FFF), # 7）汉字结构描述字符
+        (0x3100, 0x312F), # 8）注音符号
+        (0x31A0, 0x31BF), # 9）注音符号（闽南语、客家语扩展）
+        (0x3040, 0x309F), # 10）日文平假名
+        (0x30A0, 0x30FF), # 11）日文片假名
+        (0x31F0, 0x31FF), # 12）日文片假名拼音扩展
+        (0xAC00, 0xD7AF), # 13）韩文拼音
+        (0x1100, 0x11FF), # 14）韩文字母
+        (0x3130, 0x318F), # 15）韩文兼容字母
+        (0xD300, 0x1D35F), # 16）太玄经符号：
+        (0x4DC0, 0x4DFF), # 17）易经六十四卦象
+        (0xA000, 0xA48F), # 18）彝文音节
+        (0xA490, 0xA4CF), # 19）彝文部首
+        (0x2800, 0x28FF), # 20）盲文符号
+        (0x3200, 0x32FF), # 21）CJK字母及月份
+        (0x3300, 0x33FF), # 22）CJK特殊符号（日期合并）
+        (0x2700, 0x27BF), # 23）装饰符号（非CJK专用）
+        (0x2600, 0x26FF), # 24）杂项符号（非CJK专用）
+        (0xFE10, 0xFE1F), # 25）中文竖排标点
+        (0xFE30, 0xFE4F), # 26）CJK兼容符号（竖排变体、下划线、顿号）
+    ]
+
+    # https://unicode.org/emoji/charts/full-emoji-list.html
+    emoji = [
+        (0x1F600, 0x1F3F3),
+    ]
+
+    ascii = [
+        (0x20, 0x7e),
+    ]
+
+    zero = [
+        (0x0, 0x0),
+    ]
+
+    @classmethod
+    def isrange(cls, v, range):
+        for range in getattr(cls, range):
+            if range[1] >= ord(v) >= range[0]:
+                return True
+        return False
+
+    @classmethod
+    def simpleWidth(cls, text):
+        w = 0
+        for char in text:
+            w += 1 if cls.isrange(char, 'ascii') else 2 if cls.isrange(char, 'cjk') else 1
+        return w
 
 class Pipe:
     STYLES = {
@@ -322,12 +390,12 @@ class Pipe:
                     else:
                         args.append(e)
                 pipe = pipe[0]
-            attr = getattr(cls, pipe, None)
-            v = (
-                attr(v, *args, data=data, **kwargs)
-                if attr
-                else re.sub(r"\{([^\}]+)\}", replacer, pipe)
-            )
+
+            if pipe.startswith('$'):
+                v = re.sub(r"\{([^\}]+)\}", replacer, pipe[1:])
+            else:
+                attr = getattr(cls, pipe, None)
+                if attr: v = attr(v, *args, data=data, **kwargs)
         return v
 
     @classmethod
@@ -374,10 +442,7 @@ class Pipe:
 
     @classmethod
     def indicator(cls, v, *args, **kwargs):
-        return Pipe.apply(
-            Pipe.green(v) if str(v).startswith("-") else Pipe.red(v),
-            ["bold", "underline"],
-        )
+        return Pipe.green(v) + ' 📉' if str(v).startswith("-") else Pipe.red(v) + ' 📈'
 
     @classmethod
     def style(cls, v, styles=[], *args, **kwargs):
@@ -496,6 +561,21 @@ class Pipe:
         v.sort(**useKwargs)
         return v
 
+    @classmethod
+    def reverse(cls, v, *args, **kwargs):
+        if isinstance(v, list):
+            v.reverse()
+        return v
+
+def trim_ansi(a):
+    ESC = r'\x1b'
+    CSI = ESC + r'\['
+    OSC = ESC + r'\]'
+    CMD = '[@-~]'
+    ST = ESC + r'\\'
+    BEL = r'\x07'
+    pattern = '(' + CSI + '.*?' + CMD + '|' + OSC + '.*?' + '(' + ST + '|' + BEL + ')' + ')'
+    return re.sub(pattern, '', a)
 
 class Parser:
     @classmethod
@@ -565,14 +645,10 @@ class Parser:
 
             pipes = meta[key]["pipes"] or []
 
-            hide = "hide" in pipes
-
             label = meta[key].get("label", key)
 
-            if hide or (SIMPLE and index != 1 and label not in ["链接"]):
+            if "HIDE" in pipes or (SIMPLE and index != 1 and label not in ["链接"]):
                 continue
-
-            hide and pipes.remove("hide")
 
             scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
 
@@ -617,10 +693,30 @@ class Parser:
 
         records = Pipe.apply(records, tokens["pipes"])
 
-        for i, record in enumerate(records):
-            record["__index"] = i + 1
-            cls.printRecord(record, flatted)
-            sys.stdout.write("-" * 50 + "\n")
+        if 'SIMPLE' in tokens['pipes']:
+
+            bodies=[list(map(lambda child: str(Pipe.apply(child.get("label", child['key']), ["yellow", "italic"])), tokens['children']))]
+            widths = [list(map(lambda e: Unicode.simpleWidth(trim_ansi(e)), bodies[0]))]
+            maxWidths = widths[0].copy()
+
+            for i, record in enumerate(records):
+                record["__index"] = i + 1
+                bodies.append([])
+                widths.append([])
+                for j, child in enumerate(tokens['children']):
+                    text=str(Pipe.apply(record.get(child['key'], '-'), child['pipes'], record))
+                    bodies[-1].append(text)
+                    widths[-1].append(Unicode.simpleWidth(trim_ansi(text)))
+                    maxWidths[j] = max(widths[-1][-1], maxWidths[j])
+            for i, body in enumerate(bodies):
+                for j, text in enumerate(body):
+                    sys.stdout.write(text + ' ' * (maxWidths[j] - widths[i][j] + 4))
+                sys.stdout.write('\n')
+
+        else:
+            for i, record in enumerate(records):
+                cls.printRecord(record, flatted)
+                sys.stdout.write("-" * 50 + "\n")
 
 
 if __name__ == "__main__":

@@ -12,6 +12,7 @@ function indicate() {
 function quote() {
   local codes=''
   local idx=1
+  local key=''
   while [[ $idx -le $# ]]; do
     local arg="${!idx}"
     case "$arg" in
@@ -19,7 +20,14 @@ function quote() {
       --high-price|+v) key=QUOTE_ALERT_HIGH_PRICES;;
       --low-percent|-p) key=QUOTE_ALERT_LOW_PERCENTS;;
       --high-percent|+p) key=QUOTE_ALERT_HIGH_PERCENTS;;
-      *) [[ -n $key ]] && declare $key="$arg" || codes="$arg";;
+      *)
+        if [[ -n $key ]]; then
+          declare $key="$arg"
+          key=''
+        else
+          codes="$arg"
+        fi
+      ;;
     esac
     idx=$((1 + idx))
   done
