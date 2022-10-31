@@ -118,7 +118,7 @@ function json_res() {
           patterns=('"topic":"[^"]*"' '"summary":"[^"]*"'  '"category":"[^"]*"' '"read":[^,]*,' '"mention":[^,]*,' '"mid":"[^"]"*')
           indexes=(4 4 4 3 3 4)
           transformers=('_' '_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-          jsonFormat='data.statuses:(标签)topic|red|bold|index,(内容)summary|white|dim,(分类)category,(阅读量)read|number,(讨论数)mention|number,(链接)mid|$https://s.weibo.com/weibo?q=%23{data.statuses:mid}%23$,(图片)images_url|image'
+          jsonFormat='data.statuses:(标签)topic|red|bold|index,(内容)summary|white|dim,(分类)category|magenta,(阅读量)read|number,(讨论数)mention|number,(链接)mid|$https://s.weibo.com/weibo?q=%23{data.statuses:mid}%23$,(图片)images_url|image'
         ;;
         热搜榜|hotsearch|hs)
           url="$WEIBO_HOT_SEARCH_URL";
@@ -127,7 +127,7 @@ function json_res() {
           patterns=('_' '"(category|ad_type)":"[^"]*"' '"num":[^,]*,' '"raw_hot":[^,]*,' '_')
           indexes=(4 4 3 3 4)
           transformers=('_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-          jsonFormat='data.band_list:(标题)word|red|bold|index,(分类)category,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word}%23$'
+          jsonFormat='data.band_list:(标题)word|red|bold|index,(分类)category|magenta,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word}%23$'
         ;;
         微博|post|ps)
           local postid="$3" # M7OL9bpQP
@@ -740,9 +740,14 @@ function json_res() {
     ;;
     # eastmoney
     东方财富|eastmoney|em)
-      outputfile=$outputfile$2
+      outputfile=$outputfile.$2
       case $2 in
-        最新播报|zxbb)
+        滚动新闻|roll) # 7x24直播 http://kuaixun.eastmoney.com/
+          url="https://newsapi.eastmoney.com/kuaixun/v2/api/list?callback=ajaxResult_102&column=102&limit=20&p=1&callback=kxall_ajaxResult102&_=$(date +%s)"
+          text=$(curl -s $url | grep -o '{.*}')
+          jsonFormat='news|reverse:(标题)title|red|bold|index,(内容)digest|white|dim,(时间)showtime,(链接)url_unique|dim'
+        ;;
+        最新播报|zxbb) # http://roll.eastmoney.com/
           url="https://emres.dfcfw.com/60/zxbb2018.js?callback=zxbb2018&_=$(date +%s)"
           text=$(curl -s $url | grep -o '{.*}')
           aliases=(标题 时间 链接)
@@ -752,15 +757,15 @@ function json_res() {
         国内股指|gngz)
           url="https://push2.eastmoney.com/api/qt/clist/get?pi=0&pz=10&po=1&np=1&fields=f1,f2,f3,f4,f6,f12,f13,f14&fltt=2&invt=2&ut=433fd2d0e98eaf36ad3d5001f088614d&fs=i:1.000001,i:0.399001,i:0.399006,i:1.000300,i:0.300059&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
           text=$(curl -s $url | grep -o '{.*}')
-          jsonFormat='data.diff:(指数)f14|red|bold|index,(点数)f2|magenta,(涨跌幅)f3|append(%)|red,(成交额)f6|number(cn)|magenta,(代码)f12'
+          jsonFormat='data.diff|SIMPLE:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|append(%)|indicator,(成交额)f6|number(cn),(代码)f12'
         ;;
         国外股指|gwgz)
           url="https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f1,f2,f12,f13,f14,f3,f4,f6,f104,f152&secids=100.ATX,100.FCHI,100.GDAXI,100.HSI,100.N225,100.FTSE,100.NDX,100.DJIA&ut=13697a1cc677c8bfa9a496437bfef419&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
           text=$(curl -s $url | grep -o '{.*}')
-          jsonFormat='data.diff:(指数)f14|red|bold|index,(点数)f2|magenta,(涨跌幅)f3|append(%)|red,(成交额)f6|number(cn)|magenta,(代码)f12'
+          jsonFormat='data.diff:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|append(%)|indicator,(成交额)f6|number(cn),(代码)f12'
         ;;
         搜索|search|s) # https://data.eastmoney.com/xg/xg/calendar.html
-          outputfile=$outputfile$3
+          outputfile=$outputfile.$3
           case $3 in
             文章|article) # 新股日历解读 https://data.eastmoney.com/xg/xg/calendar.html
               url="https://data.eastmoney.com/dataapi/search/article?page=${PAGE:-1}&pagesize=${SIZE:-50}&keywordPhase=true&excludeChannels%5B%5D=1"
@@ -788,7 +793,7 @@ function json_res() {
           curlparams+=(--data-urlencode pageNumber=${PAGE:-1})
           curlparams+=(--data-urlencode source=WEB)
           curlparams+=(--data-urlencode client=WEB)
-          outputfile=$outputfile$3
+          outputfile=$outputfile.$3
           case $3 in
             新股申购|xg) # https://data.eastmoney.com/xg/xg/default.html
               local apply_date=${4:-$(date +%Y-%m-%d)}
@@ -841,7 +846,7 @@ function json_res() {
         财经日历|cjrl) # https://data.eastmoney.com/cjrl/default.html
           local today=$(date +%Y-%m-%d)
           local end_date=$(date -v+1m +%Y-%m-%d)
-          outputfile=$outputfile$3
+          outputfile=$outputfile.$3
           case $3 in
             财经会议|cjhy) # https://data.eastmoney.com/cjrl/default.html
               url="https://datacenter-web.eastmoney.com/api/data/v1/get?callback=datatable$(random 7)&reportName=RPT_CPH_FECALENDAR&pageNumber=${PAGE:-1}&pageSize=${SIZE:-50}&sortColumns=START_DATE&sortTypes=1&filter=(END_DATE%3E%3D%27$today%27)(START_DATE%3C%27$end_date%27)(STD_TYPE_CODE%3D%221%22)&source=WEB&client=WEB&columns=START_DATE%2CEND_DATE%2CFE_CODE%2CFE_NAME%2CFE_TYPE%2CCONTENT%2CSTD_TYPE_CODE%2CSPONSOR_NAME%2CCITY&_=$(date +%s)"
