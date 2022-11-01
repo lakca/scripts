@@ -114,6 +114,10 @@ function random() {
   fi
 }
 
+function timestamp() {
+  echo $(date +%s)$(random 3)
+}
+
 function print_record() {
   local -a fields=()
   local -a values=()
@@ -148,15 +152,26 @@ function print_record() {
 function selectColumns() {
   local array=($1)
   local skip=${2:-1}
+  local offset=${3:-0}
   local length=${#array[@]}
   local -a left=()
   debug $1
   debug $2
-  for i in $(seq 0 $((skip+1)) $((length-1))); do
+  for i in $(seq $offset $((skip+1)) $((length-1))); do
     left+=(${array[@]:$i:1})
   done
   debug ${left[@]}
   echo ${left[@]}
+}
+
+function selectColumn() {
+  local array=($1)
+  local offset=${3:-0}
+  local index=$(($2 + $offset))
+  debug $1
+  debug $2
+  debug $3
+  echo ${array[@]:$index:1}
 }
 
 function ensureFolder() {

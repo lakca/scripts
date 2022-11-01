@@ -17,6 +17,8 @@ if os.environ.get("IMGCAT", None):
 if os.environ.get("SIMPLE", None):
     SIMPLE = True
 
+TABLE = os.environ.get("TABLE")
+
 try:
     from imgcat import imgcat
 except:
@@ -522,7 +524,7 @@ class Pipe:
 
     @classmethod
     def index(cls, v, *args, **kwargs):
-        index = kwargs.get("data", {}).get("__index", "") + (
+        index = (kwargs.get("data", {}).get("__index", 0)) + (
             (int(args[0]) if len(args) else 0)
         )
         return cls.white(f"【{index}】") + v
@@ -601,8 +603,11 @@ class Parser:
             results = []
             if data:
                 data = data.values() if isinstance(data, dict) else data
-                for item in data:
-                    result = {"__": item}
+                for i, item in enumerate(data):
+                    if not isinstance(item, dict):
+                        item = { "value": item }
+
+                    result = { "__": item, "__index": i + 1 }
                     results.append(result)
                     for child in node["children"]:
                         value = (
@@ -626,28 +631,29 @@ class Parser:
     def applyPipes(cls, value, pipes, data):
         return Pipe.apply(value, pipes, data)
 
-    def applyListPipes(cls, value, pipes, data):
-        return Pipe.apply(value, pipes, data)
+    @classmethod
+    def shouldHidden(cls, token, index):
+        key = token.get("key", "")
+        pipes = token.get("pipes", [])
+        label = token.get("label", key)
+        global SIMPLE
+        return "HIDE" in pipes or (SIMPLE and index != 0 and label not in ["链接"] and 'SIMPLE' not in pipes)
 
     @classmethod
     def printRecord(cls, record, meta, indent=0):
-        global SIMPLE
         INDENT = 2
         scopedStdout = lambda *args: sys.stdout.write(
             " " * indent + "".join(list(*args))
         )
         index = 0
         for (key, val) in record.items():
-            index += 1
-
             if key.startswith("__"):
                 continue
 
-            pipes = meta[key]["pipes"] or []
-
+            pipes = meta[key].get("pipes", [])
             label = meta[key].get("label", key)
 
-            if "HIDE" in pipes or (SIMPLE and index != 1 and label not in ["链接"]):
+            if cls.shouldHidden(meta[key], index):
                 continue
 
             scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
@@ -658,20 +664,52 @@ class Parser:
             elif isinstance(val, list):
                 scopedStdout("\n")
 
-                for item in val:
-                    if isinstance(item, dict):
-                        cls.printRecord(item, meta, indent + INDENT)
-                        scopedStdout(cls.applyPipes(" " * INDENT, pipes, record))
-                    else:
-                        scopedStdout(
-                            "  {}\n".format(
-                                Pipe.white(cls.applyPipes(item or "", pipes, record))
+                if 'TABLE' in pipes and TABLE != '0':
+                    cls.printTable(val, meta[key], indent + INDENT)
+                else:
+                    for i, item in enumerate(val):
+                        if isinstance(item, dict):
+                            cls.printRecord(item, meta, indent + INDENT)
+                            i + 1 < len(val) and scopedStdout(cls.applyPipes((indent + INDENT) * ' ' + "-" * 50 + '\n', pipes, record))
+                        else:
+                            scopedStdout(
+                                "  {}\n".format(
+                                    Pipe.white(cls.applyPipes(item or "", pipes, record))
+                                )
                             )
-                        )
             else:
                 sys.stdout.write(
                     "{}\n".format(Pipe.white(cls.applyPipes(val or "", pipes, record)))
                 )
+
+    @classmethod
+    def printTable(cls, records, tokens, indent=0):
+
+        children = []
+
+        for index, token in enumerate(tokens['children']):
+            if not cls.shouldHidden(token, index):
+                children.append(token)
+
+        scopedStdout = lambda *args: sys.stdout.write(
+            " " * indent + "".join(list(*args))
+        )
+        bodies=[[Pipe.apply('序号', ['yellow'])] + list(map(lambda child: str(Pipe.apply(child.get("label", child['key']), ["yellow", "italic"])), children))]
+        widths = [list(map(lambda e: Unicode.simpleWidth(trim_ansi(e)), bodies[0]))]
+        maxWidths = widths[0].copy()
+
+        for i, record in enumerate(records):
+            bodies.append([Pipe.apply(str(i + 1), ['dim', 'italic'])])
+            widths.append([len(str(i + 1))])
+            for j, child in enumerate(children):
+                text=str(Pipe.apply(record.get(child['key'], '-'), child['pipes'], record))
+                bodies[-1].append(text)
+                widths[-1].append(Unicode.simpleWidth(trim_ansi(text)))
+                maxWidths[j + 1] = max(widths[-1][-1], maxWidths[j + 1])
+        for i, body in enumerate(bodies):
+            for j, text in enumerate(body):
+                scopedStdout(text + ' ' * (maxWidths[j] - widths[i][j] + 4))
+            sys.stdout.write('\n')
 
     @classmethod
     def output(cls, fmt, data, file):
@@ -693,26 +731,10 @@ class Parser:
 
         records = Pipe.apply(records, tokens["pipes"])
 
-        if 'SIMPLE' in tokens['pipes']:
+        global TABLE
 
-            bodies=[list(map(lambda child: str(Pipe.apply(child.get("label", child['key']), ["yellow", "italic"])), tokens['children']))]
-            widths = [list(map(lambda e: Unicode.simpleWidth(trim_ansi(e)), bodies[0]))]
-            maxWidths = widths[0].copy()
-
-            for i, record in enumerate(records):
-                record["__index"] = i + 1
-                bodies.append([])
-                widths.append([])
-                for j, child in enumerate(tokens['children']):
-                    text=str(Pipe.apply(record.get(child['key'], '-'), child['pipes'], record))
-                    bodies[-1].append(text)
-                    widths[-1].append(Unicode.simpleWidth(trim_ansi(text)))
-                    maxWidths[j] = max(widths[-1][-1], maxWidths[j])
-            for i, body in enumerate(bodies):
-                for j, text in enumerate(body):
-                    sys.stdout.write(text + ' ' * (maxWidths[j] - widths[i][j] + 4))
-                sys.stdout.write('\n')
-
+        if ('TABLE' in tokens['pipes'] and TABLE != '0') or TABLE == '1':
+            cls.printTable(records, tokens)
         else:
             for i, record in enumerate(records):
                 cls.printRecord(record, flatted)
@@ -724,7 +746,6 @@ if __name__ == "__main__":
 
     fmt = sys.argv[1]
     file = sys.argv[2]
-    # fmt = "statuses:(内容)text_raw|red|bold|newline(-1)|index,(来源)source,(博主)user.screen_name,(空间)user.idstr,(地址)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image"
     data = ""
     for line in sys.stdin:
         data += line
