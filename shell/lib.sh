@@ -21,10 +21,15 @@ if [[ $pythonInstalled -eq 1 && -z $PURE ]]; then
 fi
 
 function debug() {
+  # for i in ${!FUNCNAME[@]}; do
+  #   printf ${BASH_SOURCE[@]:$i:1} >&2
+  #   printf :${BASH_LINENO[@]:$i:1} >&2
+  #   printf :${FUNCNAME[@]:$i:1} >&2
+  #   printf '\n'
+  # done
   if [[ -n "$DEBUG" ]]; then
     echo "$*" | while IFS=$'\n' read line ; do
-      # echo ${FUNCNAME[@]} ${BASH_SOURCE[@]}, ${BASH_LINENO[@]} 1>&2
-      printf "\033[0;31m[DEBUG:`realpath ${BASH_SOURCE[@]:1:1}`:${BASH_LINENO[@]:0:1}]\033[0m \033[0;37m%s\033[0m\n" "$line" 1>&2
+      printf "\033[2;31m[DEBUG:`realpath ${BASH_SOURCE[@]:1:1}`:${BASH_LINENO[@]:0:1} \033[3;32m${FUNCNAME[@]:1:1}\033[0m]\033[0m \033[0;37m%s\033[0m\n" "$line" 1>&2
     done
   fi
 }
@@ -221,6 +226,76 @@ function ask() {
   fi
 }
 
+function ask2() {
+  unset _ASK_INDEX
+  unset _ASK_RESULT
+  unset _ASK_RESULTS
+  local question=${_ASK_MSG:-'请输入上述序号或值：'}
+  local values=()
+  local data=''
+  local index
+
+  while getopts 'q:v:d:' opt; do
+    case $opt in
+      q) question=$OPTARG ;;
+      v) values+=("$OPTARG") ;;
+      d) data=$OPTARG ;;
+    esac
+  done
+
+  local first=(${values[@]:0:1})
+  local indexes=${!first[@]}
+
+  values+=("${indexes[*]}")
+
+  debug 问题：$question, 输入值：$data, 选项：${values[@]}
+
+  for value in "${values[@]}"; do
+    index=$(indexof "$value" $data)
+    [[ $index ]] && break
+  done
+
+  debug 索引：$index
+
+  local reply
+
+  if [[ -z $index ]]; then
+    printf '\n' >&2
+    for i in "${!first[@]}"; do
+      printf '%b' "\033[37m$i\033[0m" >&2
+      for value in "${values[@]}"; do
+        value=($value)
+        printf ',' >&2
+        printf '%b' "\033[32m${value[@]:$i:1}\033[0m" >&2
+      done
+      printf '  \033[2;37m|\033[0m  ' >&2
+    done
+    printf '\n' >&2
+
+    read -p $'\n'${question}'' reply
+  fi
+
+  if [[ -n $reply ]]; then
+    for value in "${values[@]}"; do
+      debug 回复：$reply, 数组：$value
+      index=$(_INDEXOF_IGNORE_CASE=1 indexof "$value" $reply)
+      [[ $index ]] && break
+    done
+  fi
+
+  if [[ $index ]]; then
+    _ASK_INDEX=$index
+    _ASK_RESULTS=()
+    for value in "${values[@]}"; do
+      value=($value)
+      [[ ! $_ASK_RESULT ]] && _ASK_RESULT="${value[@]:$index:1}"
+      _ASK_RESULTS+=("${value[@]:$index:1}")
+    done
+    printf '您输入的有效值为：' >&2
+    printf '%b\n' "\033[31m${_ASK_RESULTS[*]}\033[0m" >&2
+  fi
+}
+
 function question() {
   local msg="$1"
   local default="$2"
@@ -243,14 +318,18 @@ function datafile() {
   echo "$folder/$(date '+%Y-%m-%d.%H:%M:%S').json"
 }
 
-function index() {
-  local arr=($1)
-  local el=$2
-  for i in ${!arr[@]}; do
-    if [[ ${arr[@]:$i:1} == $el ]]; then
+function indexof() {
+  local values=($1)
+  local value="$2"
+  local revoke=$(shopt -p nocasematch)
+  debug 索引值：$value, 数组长度：${#values[@]}, 数组：${values[@]}
+  [[ $_INDEXOF_IGNORE_CASE ]] && shopt -s nocasematch
+  for i in ${!values[@]}; do
+    if [[ ${values[@]:$i:1} == $value ]]; then
       echo $i
     fi
   done
+  eval "$revoke"
 }
 
 function print_json() {
