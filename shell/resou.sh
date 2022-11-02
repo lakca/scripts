@@ -403,7 +403,7 @@ function json_res() {
       case $2 in
         热搜|hotsearch|hs) # 热搜 https://www.bilibili.com/blackboard/activity-trending-topic.html
           url='https://app.bilibili.com/x/v2/search/trending/ranking?limit=30'
-          text=$(cat bilibili.hotsearch.json)
+          # text=$(cat bilibili.hotsearch.json)
           url=${url//\{query\}/$query}
           aliases=(关键词)
           fields=(show_name)
@@ -770,7 +770,7 @@ function json_res() {
         ;;
         热榜|hot) # https://sinanews.sina.cn/h5/top_news_list.d.html
           local categories=(top trend ent video baby car fashion trip)
-          local category=$(index "${categories[*]}" "$3")
+          local category=$(indexof "${categories[*]}" "$3")
           ask "新浪热榜 潮流热榜 娱乐热榜 视频热榜 汽车热榜 育儿热榜 时尚热榜 旅游热榜" $category
           category=${categories[@]:$((_ASK_INDEX)):1}
           outputfile="$outputfile.$category"
@@ -848,7 +848,7 @@ function json_res() {
           outputfile=$outputfile.$3
           local keyword="$4"
           case $3 in
-            文章|article) # 新股日历 https://data.eastmoney.com/xg/xg/calendar.html
+            article) # 新股日历 https://data.eastmoney.com/xg/xg/calendar.html
               url='https://data.eastmoney.com/dataapi/search/article'
               curlparams+=(--data-urlencode page=${PAGE:-1})
               curlparams+=(--data-urlencode pagesize=${SIZE:-50})
@@ -889,7 +889,7 @@ function json_res() {
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["noticeWeb"],"client":"web","clientVersion":"curr","clientType":"web","param":{"noticeWeb":{"preTag":"<em class=\"red\">","postTag":"</em>","pageSize":'${SIZE:-10}',"pageIndex":'${PAGE:-1}'}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
-              jsonFormat='result.noticeWeb:(标题)title|red|bold,(证券)securityFullName|magenta,(内容)content|tag,(时间)date,(链接)url|dim'
+              jsonFormat='result.noticeWeb:(标题)title|red|bold,(证券)securityFullName|magenta,(内容)content|dim|tag,(时间)date,(链接)url|dim'
             ;;
             研报|report) # https://so.eastmoney.com/yanbao/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
@@ -897,15 +897,19 @@ function json_res() {
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["researchReport"],"client":"web","clientVersion":"curr","clientType":"web","param":{"researchReport":{"client":"web","pageSize":'${SIZE:-10}',"pageIndex":'${PAGE:-1}'}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
-              jsonFormat='result.researchReport:(标题)title|tag|red|bold,(来源)source|dim,(证券)stockName|magenta,(内容)content|dim,(时间)date,(链接)url|$http://data.eastmoney.com/report/zw_stock.jshtml?infocode={.code}$|dim'
+              jsonFormat='result.researchReport:(标题)title|red|bold|tag,(来源)source|dim,(证券)stockName|magenta,(内容)content|dim,(时间)date,(链接)url|$http://data.eastmoney.com/report/zw_stock.jshtml?infocode={.code}$|dim'
             ;;
-            文章|article) # https://so.eastmoney.com/carticle/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
+            文章|article2) # https://so.eastmoney.com/carticle/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
+              _ASK_MSG='请输入搜索范围（默认全部）：' ask2 -v '标题 正文' -v 'TITLE CONTENT' -d "$5"
+              local searchScope='ALL'
+              [[ $_ASK_INDEX ]] && searchScope=${_ASK_RESULTS[@]:1:1}
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
-              curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["article"],"client":"web","clientType":"web","clientVersion":"curr","param":{"article":{"searchScope":"ALL","sort":"DEFAULT","pageIndex":'${PAGE:-1}',"pageSize":'${SIZE:-10}',"preTag":"","postTag":""}}}')
+              curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["article"],"client":"web","clientType":"web","clientVersion":"curr","param":{"article":{"searchScope":"'$searchScope'","sort":"DEFAULT","pageIndex":'${PAGE:-1}',"pageSize":'${SIZE:-10}',"preTag":"","postTag":""}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
-              jsonFormat='result.article:(标题)title|red|bold,(作者)nickname|dim,(作者链接)authorUrl|dim,(内容)content|dim,(时间)date,(链接)url|dim,(图片)listImage|image|dim'
+              # text=$(cat data/eastmoney.search.article2/2022-11-02.17:48:45.json)
+              jsonFormat='result.article:(标题)title|red|bold|index|tag,(内容)content|dim|tag,(作者)nickname|dim,(作者链接)authorUrl|dim,(时间)date,(链接)url|dim,(图片)listImage|image|dim'
             ;;
             股吧|guba) # https://so.eastmoney.com/tiezi/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
@@ -1105,8 +1109,6 @@ function json_res() {
           text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
         ;;
         财经日历|cjrl) # https://data.eastmoney.com/cjrl/default.html
-          local today=$(date +%Y-%m-%d)
-          local end_date=$(date -v+1m +%Y-%m-%d)
           outputfile=$outputfile.$3
           url='https://datacenter-web.eastmoney.com/api/data/v1/get'
           curlparams+=(-d callback=datatable$(date +%s))
@@ -1118,7 +1120,11 @@ function json_res() {
           curlparams+=(-d sortColumns=START_DATE)
           curlparams+=(-d sortTypes=1)
           curlparams+=(--data-urlencode columns=ALL)
-          curlparams+=(-d _=$(date +%s))
+          curlparams+=(-d _=$(timestamp))
+          local today=$(question '请输入开始日期（默认为今天）：' $4)
+          today=${today:-$(date +%Y-%m-%d)}
+          local end_date=$(question '请输入结束日期（默认为一个月后）：' $5)
+          end_date=${end_date:-$(date -v+1m +%Y-%m-%d)}
           case $3 in
             财经会议|cjhy) # https://data.eastmoney.com/cjrl/default.html
               curlparams+=(--data-urlencode "filter=(END_DATE>='$today')(START_DATE<'$end_date')(STD_TYPE_CODE=\"1\")")

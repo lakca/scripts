@@ -462,51 +462,54 @@ class Pipe:
         for style in styles:
             if style in cls.STYLES:
                 codes.append(cls.STYLES[style])
-        return "\033[" + ";".join(codes) + "m" + v + "\033[0m"
+        text = "\033[" + ";".join(codes) + "m" + v + "\033[0m"
+        # if kwargs.get('preserve', False):
+        #     regReset = re.compile(r"\033\[0m")
+        return text
 
     @classmethod
     def red(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["red"])
+        return cls.style(v, styles=["red"], *args, **kwargs)
 
     @classmethod
     def green(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["green"])
+        return cls.style(v, styles=["green"], *args, **kwargs)
 
     @classmethod
     def yellow(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["yellow"])
+        return cls.style(v, styles=["yellow"], *args, **kwargs)
 
     @classmethod
     def blue(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["blue"])
+        return cls.style(v, styles=["blue"], *args, **kwargs)
 
     @classmethod
     def magenta(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["magenta"])
+        return cls.style(v, styles=["magenta"], *args, **kwargs)
 
     @classmethod
     def cyan(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["cyan"])
+        return cls.style(v, styles=["cyan"], *args, **kwargs)
 
     @classmethod
     def white(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["white"])
+        return cls.style(v, styles=["white"], *args, **kwargs)
 
     @classmethod
     def bold(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["bold"])
+        return cls.style(v, styles=["bold"], *args, **kwargs)
 
     @classmethod
     def dim(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["dim"])
+        return cls.style(v, styles=["dim"], *args, **kwargs)
 
     @classmethod
     def italic(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["italic"])
+        return cls.style(v, styles=["italic"], *args, **kwargs)
 
     @classmethod
     def underline(cls, v, *args, **kwargs):
-        return cls.style(v, styles=["underline"])
+        return cls.style(v, styles=["underline"], *args, **kwargs)
 
     @classmethod
     def _image(cls, v, *args, **kwargs):
@@ -580,10 +583,51 @@ class Pipe:
         return v
 
     @classmethod
-    def tag(cls, v, *args, **kwargs):
-        return re.sub(
-            r"<(\w+)(\s+[^>]*)*>([\s\S]*?)</\1>", "\033[1;4m\g<3>\033[0m", str(v)
-        )
+    def getLeftStyleANSI(cls, text, *args, **kwargs):
+        text = str(text)
+        start = kwargs.get('start', 0)
+        end = kwargs.get('end', len(text) - 1)
+        regStyle = re.compile(r"\033\[(?:\d;?)+m")
+        regReset = re.compile(r"\033\[0m")
+        resetMatch = None
+        styleStart = start
+        for resetMatch in regReset.finditer(text, start, end): pass
+        if resetMatch: styleStart = resetMatch.end()
+        ansi = regStyle.findall(text, styleStart, end)
+        return ansi
+
+    @classmethod
+    def rebaseNestedStyleANSI(cls, text, *args, **kwargs):
+        reg = re.compile(r"((?P<reset>\033\[0m)|(?P<style>\033\[(?:\d;?)+m))")
+        style = []
+        def replacer(match):
+            nonlocal style
+            # print(match.groupdict(), repr(match.group('reset')), repr(match.group('style')))
+            r = match.group()
+            if match.group('style'):
+                style.append(match.group('style'))
+            elif match.group('reset'):
+                len(style) and style.pop()
+                r += ''.join(style)
+                style = ''
+            # print(repr(r))
+            return r
+        return reg.sub(replacer, text)
+
+    @classmethod
+    def tag(cls, text, *args, **kwargs):
+        regTag = re.compile(r"<(\w+)(\s+[^>]*)*>([\s\S]*?)</\1>")
+        start = 0
+        # print(text)
+        # print(repr(text))
+        def replacer(match):
+            nonlocal start
+            nonlocal text
+            end = match.start()
+            ansi = cls.getLeftStyleANSI(text, start=start, end=end)
+            start = end
+            return '\033[7m' + match.group(3) + '\033[0m' + ''.join(ansi)
+        return regTag.sub(replacer, text)
 
     @classmethod
     def striptags(cls, v, *args, **kwargs):
@@ -706,14 +750,12 @@ class Parser:
                         else:
                             scopedStdout(
                                 "  {}\n".format(
-                                    Pipe.white(
-                                        cls.applyPipes(item or "", pipes, record)
-                                    )
+                                    cls.applyPipes(item or "", pipes, record)
                                 )
                             )
             else:
                 sys.stdout.write(
-                    "{}\n".format(Pipe.white(cls.applyPipes(val or "", pipes, record)))
+                    "{}\n".format(cls.applyPipes(val or "", pipes, record))
                 )
 
     @classmethod
