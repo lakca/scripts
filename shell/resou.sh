@@ -161,6 +161,80 @@ function json_res() {
           indexes=(4 4 4 4 4)
           transformers=('_' '_' '_' '_' 'https://weibo.com${values[@]:4:1}')
         ;;
+        搜索|search)
+          # https://m.weibo.cn/search?containerid=100103type%3D1%26q%3Dhello
+          local keyword="$4"
+          local types=(1 综合 61 实时 3 用户 62 关注 64 视频 63 图片 21 文章 60 热门 38 话题 98 超话 92 地点 97 商品 32 主页)
+          # url="https://weibo.com/ajax/side/search?q=$keyword"
+          # jsonFormat='data.hotquery|TABLE:(词条)suggestion|red|bold,(结果数量)count|number'
+          # text=$(cat data/weibo.search/2022-11-01.22:58:58.json)
+          case $3 in
+            实时|realtime)
+              type=61
+              jsonFormat='data.cards:(内容)mblog.text|striptags|red|bold|index,(来源)region_name|${.mblog.region_name} {.mblog.source}$,(用户昵称)mblog.user.screen_name,(粉丝数)mblog.user.followers_count_str,(简介)mblog.user.description,(用户主页)space|$https://weibo.com/u/{.mblog.user.id}$|dim,(链接)url|$https://weibo.com/{.mblog.user.id}/{.mblog.id}$|dim,(页面标题)mblog.page_info.page_title,(页面链接)mblog.page_info.page_url,(图片)mblog.pics*.url|image|dim'
+            ;;
+            用户|user)
+              type=3
+              jsonFormat='data.cards.1.card_group:(昵称)user.screen_name|red|bold|index,(粉丝数)user.followers_count_str,(认证信息)user.verified_reason|magenta,(链接)user.profile_url|dim,(头像)user.profile_image_url|image|dim'
+            ;;
+            关注|follow)
+              type=62
+              jsonFormat='data.cards:(内容)mblog.text|striptags|red|bold|index,(来源)region_name|${.mblog.region_name} {.mblog.source}$,(用户昵称)mblog.user.screen_name,(粉丝数)mblog.user.followers_count_str,(简介)mblog.user.description,(用户主页)space|$https://weibo.com/u/{.mblog.user.id}$|dim,(链接)url|$https://weibo.com/{.mblog.user.id}/{.mblog.id}$|dim,(页面标题)mblog.page_info.page_title,(页面链接)mblog.page_info.page_url,(图片)mblog.pics*.url|image|dim'
+            ;;
+            视频|video)
+              type=64
+              jsonFormat='data.cards:card_group:(标题)title,(用户昵称)user.screen_name,(粉丝数)user.followers_count_str,(简介)user.description,(用户主页)space|$https://weibo.com/u/{.user.id}$|dim,(链接)scheme|dim'
+            ;;
+            图片|image)
+              type=63
+              jsonFormat='data.cards:card_group:(内容)left_element.desc1|red|bold,(来源)left_element.mblog.source|${.mblog.source} {.mblog.city}$,(链接)left_element.url|$https://weibo.com/{.mblog.user.id}/{.mblog.id}$|dim,(图片)left_element.mblog.original_pic|image|dim,(内容)right_element.desc1|red|bold|index,(来源)right_element.mblog.source|${.mblog.source} {.mblog.city}$,(链接)right_element.url|$https://weibo.com/{.mblog.user.id}/{.mblog.id}$|dim,(图片)right_element.mblog.original_pic|image|dim'
+            ;;
+            文章|article)
+              type=21
+              jsonFormat='data.cards:card_group:(标题)title_sub|red|bold,(描述)desc1|dim,(描述2)desc2|dim,(链接)openurl|dim,(图片)pic|image|dim'
+            ;;
+            热门|hot)
+              type=60
+              jsonFormat='data.cards:(内容)mblog.text|striptags|red|bold|index,(来源)region_name|${.mblog.region_name} {.mblog.source}$,(用户昵称)mblog.user.screen_name,(粉丝数)mblog.user.followers_count_str,(简介)mblog.user.description,(用户主页)space|$https://weibo.com/u/{.mblog.user.id}$|dim,(链接)url|$https://weibo.com/{.mblog.user.id}/{.mblog.id}$|dim,(页面标题)mblog.page_info.page_title,(页面链接)mblog.page_info.page_url,(图片)mblog.pics*.url|image|dim'
+            ;;
+            话题|topic)
+              type=38
+              jsonFormat='data.cards:card_group:(标题)title_sub|red|bold,(描述)desc1|dim,(描述2)desc2|dim,(链接)openurl|dim,(图片)pic|image|dim'
+            ;;
+            超话|super)
+              type=98
+              jsonFormat='data.cards:card_group:(标题)title_sub|red|bold,(描述)desc1|dim,(描述2)desc2|dim,(链接)openurl|dim,(图片)pic|image|dim'
+            ;;
+            地点|position)
+              type=92
+              jsonFormat='data.cards:card_group:(标题)title_sub|red|bold,(描述)desc1|dim,(描述2)desc2|dim,(链接)openurl|dim,(图片)pic|image|dim'
+            ;;
+            地点|position)
+              type=92
+              jsonFormat='data.cards:card_group:(标题)title_sub|red|bold,(描述)desc1|dim,(描述2)desc2|dim,(链接)openurl|dim,(图片)pic|image|dim'
+            ;;
+            商品|good)
+              type=97
+              jsonFormat='data.cards.1.card_group:items:(标题)title|red|bold,(价格)price2,(描述)desc1|dim,(描述2)desc2|dim,(链接)scheme|dim,(图片)pic|image|dim'
+            ;;
+            主页|mainpage)
+              type=32
+              jsonFormat='data.cards:card_group:(标题)title_sub|red|bold,(描述)desc|dim,(描述1)desc1|dim,(描述2)desc2|dim,(链接)scheme|dim,(图片)pic|image|dim'
+            ;;
+          esac
+          url='https://m.weibo.cn/api/container/getIndex'
+          curlparams+=(--data-urlencode "containerid=100103type=$type&q=$keyword&t=")
+          curlparams+=(--data-urlencode page_type=searchall)
+        ;;
+        建议|suggest)
+          url='https://s.weibo.com/Ajax_Search/suggest'
+          curlparams+=(--data-urlencode where=weibo)
+          curlparams+=(--data-urlencode type=hot)
+          curlparams+=(--data-urlencode key=)
+          curlparams+=(--data-urlencode __rnd=$(timestamp))
+          jsonFormat=''
+        ;;
+
         *) return;;
       esac
     ;;
@@ -772,6 +846,7 @@ function json_res() {
         ;;
         搜索|search|s) # https://data.eastmoney.com/xg/xg/calendar.html
           outputfile=$outputfile.$3
+          local keyword="$4"
           case $3 in
             文章|article) # 新股日历 https://data.eastmoney.com/xg/xg/calendar.html
               url='https://data.eastmoney.com/dataapi/search/article'
@@ -779,11 +854,10 @@ function json_res() {
               curlparams+=(--data-urlencode pagesize=${SIZE:-50})
               curlparams+=(--data-urlencode keywordPhase=true)
               curlparams+=(--data-urlencode excludeChannels[]=1)
-              curlparams+=(--data-urlencode keyword=$4)
+              curlparams+=(--data-urlencode "keyword=$keyword")
               jsonFormat='result.cmsArticleWeb:(标题)title|red|bold|index,(内容)content|white|dim,(媒体)mediaName,(时间)date,(链接)url|dim'
             ;;
             行情|quote) # https://so.eastmoney.com/quotation/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
-              local keyword="$4"
               local type="$5"
               local types=(AB_STOCK AB股 INDEX 指数 BK 板块 HK 港股 UN 美股 UK 英股 TB 三板 FUND 基金 DEBT 债券 FU_OR_OP 期货期权 FE 外汇)
               _ASK_MSG='如果仅返回特定类型，请输入（否则回车即可）:' ask "$(selectColumns "${types[*]}" 1 1)" $type
@@ -798,7 +872,6 @@ function json_res() {
               jsonFormat=':(分类)name|red|bold|SIMPLE,(分类)type,(列表)quoteList|TABLE|SIMPLE:(证券名称)shortName|green|italic|SIMPLE,(行情)url|SIMPLE|$http://quote.eastmoney.com/unify/r/{.unifiedId}$|dim,(股吧)guba|$http://guba.eastmoney.com/interface/GetList.aspx?code={.unifiedId}$|dim'
             ;;
             资讯|CMS) # https://so.eastmoney.com/news/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
-              local keyword="$4"
               url='https://searchapi.eastmoney.com/bussiness/Web/GetCMSSearchList'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
               curlparams+=(--data-urlencode "keyword=$keyword")
@@ -816,17 +889,17 @@ function json_res() {
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["noticeWeb"],"client":"web","clientVersion":"curr","clientType":"web","param":{"noticeWeb":{"preTag":"<em class=\"red\">","postTag":"</em>","pageSize":'${SIZE:-10}',"pageIndex":'${PAGE:-1}'}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
-              jsonFormat='result.noticeWeb:(标题)title|red|bold,(证券)securityFullName|magenta,(内容)content|dim,(时间)date,(链接)url|dim'
+              jsonFormat='result.noticeWeb:(标题)title|red|bold,(证券)securityFullName|magenta,(内容)content|tag,(时间)date,(链接)url|dim'
             ;;
-            研报|report)
+            研报|report) # https://so.eastmoney.com/yanbao/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["researchReport"],"client":"web","clientVersion":"curr","clientType":"web","param":{"researchReport":{"client":"web","pageSize":'${SIZE:-10}',"pageIndex":'${PAGE:-1}'}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
-              jsonFormat='result.researchReport:(标题)title|red|bold,(来源)source|dim,(证券)stockName|magenta,(内容)content|dim,(时间)date,(链接)url|$http://data.eastmoney.com/report/zw_stock.jshtml?infocode={.code}$|dim'
+              jsonFormat='result.researchReport:(标题)title|tag|red|bold,(来源)source|dim,(证券)stockName|magenta,(内容)content|dim,(时间)date,(链接)url|$http://data.eastmoney.com/report/zw_stock.jshtml?infocode={.code}$|dim'
             ;;
-            文章|article)
+            文章|article) # https://so.eastmoney.com/carticle/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["article"],"client":"web","clientType":"web","clientVersion":"curr","param":{"article":{"searchScope":"ALL","sort":"DEFAULT","pageIndex":'${PAGE:-1}',"pageSize":'${SIZE:-10}',"preTag":"","postTag":""}}}')
@@ -834,55 +907,55 @@ function json_res() {
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='result.article:(标题)title|red|bold,(作者)nickname|dim,(作者链接)authorUrl|dim,(内容)content|dim,(时间)date,(链接)url|dim,(图片)listImage|image|dim'
             ;;
-            股吧|guba)
+            股吧|guba) # https://so.eastmoney.com/tiezi/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
-              curlparams+=(--data-urlencode param={"uid":"","keyword":"新能源","type":["gubaArticleWeb"],"client":"web","clientVersion":"curr","clientType":"web","param":{"gubaArticleWeb":{"pageSize":10,"pageIndex":1,"postTag":"","preTag":"","sortOrder":""}}})
+              curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["gubaArticleWeb"],"client":"web","clientVersion":"curr","clientType":"web","param":{"gubaArticleWeb":{"pageSize":'${SIZE:-10}',"pageIndex":'${PAGE:-1}',"postTag":"","preTag":"","sortOrder":""}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='result.gubaArticleWeb:(标题)title|red|bold,(短标题)shortName|dim,(内容)content|dim,(时间)createTime,(链接)url|dim'
             ;;
-            问董秘|wen)
+            问董秘|wen) # https://so.eastmoney.com/qa/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
-              curlparams+=(--data-urlencode param={"uid":"","keyword":"新能源","type":["wenDongMiWeb"],"client":"web","clientVersion":"9.8","clientType":"web","param":{"wenDongMiWeb":{"webSearchScope":4,"pageindex":1,"pagesize":10,"gubaId":"","startTime":"","endTime":"","preTag":"","postTag":""}}})
+              curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["wenDongMiWeb"],"client":"web","clientVersion":"9.8","clientType":"web","param":{"wenDongMiWeb":{"webSearchScope":4,"pageindex":1,"pagesize":10,"gubaId":"","startTime":"","endTime":"","preTag":"","postTag":""}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='result.wenDongMiWeb:(标题)title|red|bold,(证券)stockName|${.stockName} {.gubaId}$|magenta,(内容)content|dim,(创建时间)createTime,(回复时间)responseTime,(链接)url|dim'
             ;;
-            博客|blog)
+            博客|blog) # https://so.eastmoney.com/blog/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://searchapi.eastmoney.com/bussiness/Web/GetSearchList'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
               curlparams+=(--data-urlencode "keyword=$keyword")
               curlparams+=(--data-urlencode type=202)
-              curlparams+=(--data-urlencode pageindex=1)
-              curlparams+=(--data-urlencode pagesize=10)
+              curlparams+=(--data-urlencode pageindex=${PAGE:-1})
+              curlparams+=(--data-urlencode pagesize=${SIZE:-10})
               curlparams+=(--data-urlencode name=normal)
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='Data:(标题)Title|red|bold,(时间)CreateTime,(内容)Content|dim,(作者)UserNickName,(作者链接)AuthorUrl|dim,(头像)Portrait|image|dim,(链接)Url|dim'
             ;;
-            组合|portfolio)
+            组合|portfolio) # https://so.eastmoney.com/zuhe/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
-              curlparams+=(--data-urlencode param={"uid":"","keyword":"新能源","type":["portfolio"],"client":"web","clientVersion":"curr","clientType":"web","param":{"portfolio":{"pageSize":20,"pageIndex":1,"postTag":"","preTag":"","type":0}}})
+              curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["portfolio"],"client":"web","clientVersion":"curr","clientType":"web","param":{"portfolio":{"pageSize":'${SIZE:-20}',"pageIndex":'${PAGE:-1}',"postTag":"","preTag":"","type":0}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='result.portfolio:(名称)zuheName|red|bold,(管理人)userName,(链接)url|$http://group.eastmoney.com/other,{.zhbs}.html$|dim'
               # https://spoapi.eastmoney.com/app_moni_zuhe?type=app_reqs&func=search_get_zuhe_infos&plat=2&ver=web20&zuhelist=2810391,12459908,9849886,9346254,7625830,2479770,12760540,12652559,11754189,10406085,9661714,9406269,9297793,7950448,3285676,2614025,1701403,10337217,9228239,9149992&utToken=&ctToken=&cb=jQuery35109401671042551594_1667293154748&_=1667293154792
             ;;
-            用户|user)
+            用户|user) # https://so.eastmoney.com/caccount/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
-              curlparams+=(--data-urlencode param={"uid":"","keyword":"新能源","type":["passportWeb"],"client":"web","clientType":"web","clientVersion":"curr","param":{"passportWeb":{"openBigV":false,"sort":"DEFAULT","pageIndex":1,"pageSize":20,"preTag":"","postTag":""}}})
+              curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["passportWeb"],"client":"web","clientType":"web","clientVersion":"curr","param":{"passportWeb":{"openBigV":false,"sort":"DEFAULT","pageIndex":'${PAGE:-1}',"pageSize":'${SIZE:-20}',"preTag":"","postTag":""}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='result.passportWeb:(名称)alias|red|bold,(介绍)introduction|dim,(自选数量)userSelectStockCount|number,(自选股被关注数)stockFollowerCount|number,(关注人数)userFollowingCount|number,(粉丝人数)fansCount|number,(发帖数量)postCount|number,(链接)url|dim,(头像)portrait|image|dim'
             ;;
-            百科|wiki)
+            百科|wiki) # https://so.eastmoney.com/baike/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
-              curlparams+=(--data-urlencode param={"uid":"","keyword":"新能源","type":["baikeWeb"],"client":"web","clientVersion":"curr","clientType":"web","param":{"baikeWeb":{"pageSize":10,"pageIndex":1,"postTag":"","preTag":""}}})
+              curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["baikeWeb"],"client":"web","clientVersion":"curr","clientType":"web","param":{"baikeWeb":{"pageSize":'${SIZE:-10}',"pageIndex":'${PAGE:-1}',"postTag":"","preTag":""}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='result.baikeWeb:(名称)encyclopediaName|red|bold,(证券)stockName|${.stockName} {.stockCode}$|magenta,(描述)description|dim,(链接)url|$https://baike.eastmoney.com/item/{.encyclopediaName}$|dim'
@@ -892,15 +965,14 @@ function json_res() {
               curlparams+=(--data-urlencode count=${SIZE:-10})
               curlparams+=(--data-urlencode cb=jQuery351042763412117835364_$(timestamp))
               curlparams+=(--data-urlencode _=$(timestamp))
-              curlparams+=(--data-urlencode input="$4")
+              curlparams+=(--data-urlencode "input=$keyword")
               text=$(curl -s $url "${curlparams[@]}" | grep -o '\[.*\]')
               jsonFormat='|TABLE:(关键词)value|red|bold,(链接)url|$https://so.eastmoney.com/web/s?keyword={.value}$|dim'
             ;;
             *)
-              local query=$4
               url='https://searchapi.eastmoney.com/api/suggest/get'
               curlparams+=(--data-urlencode cb=jQuery1124007392431488856332_$(timestamp))
-              curlparams+=(--data-urlencode input=$query)
+              curlparams+=(--data-urlencode input=$keyword)
               curlparams+=(--data-urlencode token=D43BF722C8E33BDC906FB84D85E326E8)
               curlparams+=(--data-urlencode markettype=)
               curlparams+=(--data-urlencode mktnum=)
@@ -985,6 +1057,7 @@ function json_res() {
           curlparams+=(--data-urlencode pageNumber=${PAGE:-1})
           curlparams+=(--data-urlencode source=WEB)
           curlparams+=(--data-urlencode client=WEB)
+          curlparams+=(--data-urlencode columns=ALL)
           outputfile=$outputfile.$3
           case $3 in
             新股申购|xg) # https://data.eastmoney.com/xg/xg/default.html
@@ -992,7 +1065,6 @@ function json_res() {
               curlparams+=(--data-urlencode sortColumns=APPLY_DATE,SECURITY_CODE)
               curlparams+=(--data-urlencode sortTypes=1,-1)
               curlparams+=(--data-urlencode reportName=RPTA_APP_IPOAPPLY)
-              curlparams+=(--data-urlencode columns=SECURITY_CODE,SECURITY_NAME,TRADE_MARKET_CODE,APPLY_CODE,TRADE_MARKET,MARKET_TYPE,ORG_TYPE,ISSUE_NUM,ONLINE_ISSUE_NUM,OFFLINE_PLACING_NUM,TOP_APPLY_MARKETCAP,PREDICT_ONFUND_UPPER,ONLINE_APPLY_UPPER,PREDICT_ONAPPLY_UPPER,ISSUE_PRICE,LATELY_PRICE,CLOSE_PRICE,APPLY_DATE,BALLOT_NUM_DATE,BALLOT_PAY_DATE,LISTING_DATE,AFTER_ISSUE_PE,ONLINE_ISSUE_LWR,INITIAL_MULTIPLE,INDUSTRY_PE_NEW,OFFLINE_EP_OBJECT,CONTINUOUS_1WORD_NUM,TOTAL_CHANGE,PROFIT,LIMIT_UP_PRICE,INFO_CODE,OPEN_PRICE,LD_OPEN_PREMIUM,LD_CLOSE_CHANGE,TURNOVERRATE,LD_HIGH_CHANG,LD_AVERAGE_PRICE,OPEN_DATE,OPEN_AVERAGE_PRICE,PREDICT_PE,PREDICT_ISSUE_PRICE2,PREDICT_ISSUE_PRICE,PREDICT_ISSUE_PRICE1,PREDICT_ISSUE_PE,PREDICT_PE_THREE,ONLINE_APPLY_PRICE,MAIN_BUSINESS,PAGE_PREDICT_PRICE1,PAGE_PREDICT_PRICE2,PAGE_PREDICT_PRICE3,PAGE_PREDICT_PE1,PAGE_PREDICT_PE2,PAGE_PREDICT_PE3,SELECT_LISTING_DATE,IS_BEIJING,INDUSTRY_PE_RATIO)
               curlparams+=(--data-urlencode quoteColumns=f2~01~SECURITY_CODE~NEWEST_PRICE)
               curlparams+=(-d quoteType=0)
               curlparams+=(--data-urlencode filter="(APPLY_DATE>'$apply_date')")
@@ -1003,7 +1075,6 @@ function json_res() {
               curlparams+=(--data-urlencode sortColumns=UPDATE_DATE,ORG_CODE)
               curlparams+=(--data-urlencode sortTypes=-1,-1)
               curlparams+=(--data-urlencode reportName=RPT_IPO_INFOALLNEW)
-              curlparams+=(--data-urlencode columns=SECURITY_CODE,STATE,REG_ADDRESS,INFO_CODE,CSRC_INDUSTRY,ACCEPT_DATE,DECLARE_ORG,PREDICT_LISTING_MARKET,LAW_FIRM,ACCOUNT_FIRM,ORG_CODE,UPDATE_DATE,RECOMMEND_ORG)
               local markets=(科创板 创业板 上海主板 深圳主板 北交所)
               _ASK_MSG='请输入板块（不指定板块回车即可）：' ask "${markets[*]}" $4
               local market=$_ASK_RESULT
@@ -1017,7 +1088,6 @@ function json_res() {
               curlparams+=(--data-urlencode reportName=RPTA_APP_IPOAPPLY)
               curlparams+=(--data-urlencode quoteColumns=f2~01~SECURITY_CODE,f14~01~SECURITY_CODE)
               curlparams+=(--data-urlencode quoteType=0)
-              curlparams+=(--data-urlencode columns=ALL)
               curlparams+=(--data-urlencode filter="((APPLY_DATE>'2010-01-01')(|@APPLY_DATE=\"NULL\"))((LISTING_DATE>'2010-01-01')(|@LISTING_DATE=\"NULL\"))(TRADE_MARKET_CODE!=\"069001017\")")
 
               jsonFormat='result.data:(证券名称)SECURITY_NAME|${.SECURITY_NAME} {.SECURITY_CODE}$|red|bold|index,(主营业务)MAIN_BUSINESS|white|dim,(行业)INDUSTRY_NAME|white|dim,(上市日期)LISTING_DATE,(开盘溢价)LD_OPEN_PREMIUM|number(+)|append(%)|indicator,(首日最高)LD_HIGH_CHANG|number(+)|append(%)|indicator,(首日收盘)LD_CLOSE_CHANGE|number(+)|append(%)|indicator,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
@@ -1026,7 +1096,6 @@ function json_res() {
               curlparams+=(--data-urlencode sortColumns=ISSUE_DATE)
               curlparams+=(--data-urlencode sortTypes=-1)
               curlparams+=(--data-urlencode reportName=RPT_SEO_DETAIL)
-              curlparams+=(--data-urlencode columns=ALL)
               curlparams+=(--data-urlencode quoteColumns=f2~01~SECURITY_CODE~NEW_PRICE)
               curlparams+=(--data-urlencode quoteType=0)
 
@@ -1039,23 +1108,58 @@ function json_res() {
           local today=$(date +%Y-%m-%d)
           local end_date=$(date -v+1m +%Y-%m-%d)
           outputfile=$outputfile.$3
+          url='https://datacenter-web.eastmoney.com/api/data/v1/get'
+          curlparams+=(-d callback=datatable$(date +%s))
+          curlparams+=(-d pageSize=${SIZE:-50})
+          curlparams+=(-d pageNumber=${PAGE:-1})
+          curlparams+=(-d source=WEB)
+          curlparams+=(-d client=WEB)
+          curlparams+=(-d reportName=RPT_CPH_FECALENDAR)
+          curlparams+=(-d sortColumns=START_DATE)
+          curlparams+=(-d sortTypes=1)
+          curlparams+=(--data-urlencode columns=ALL)
+          curlparams+=(-d _=$(date +%s))
           case $3 in
             财经会议|cjhy) # https://data.eastmoney.com/cjrl/default.html
-              url="https://datacenter-web.eastmoney.com/api/data/v1/get?callback=datatable$(random 7)&reportName=RPT_CPH_FECALENDAR&pageNumber=${PAGE:-1}&pageSize=${SIZE:-50}&sortColumns=START_DATE&sortTypes=1&filter=(END_DATE%3E%3D%27$today%27)(START_DATE%3C%27$end_date%27)(STD_TYPE_CODE%3D%221%22)&source=WEB&client=WEB&columns=START_DATE%2CEND_DATE%2CFE_CODE%2CFE_NAME%2CFE_TYPE%2CCONTENT%2CSTD_TYPE_CODE%2CSPONSOR_NAME%2CCITY&_=$(date +%s)"
-              text=$(curl -s $url | grep -o '{.*}')
+              curlparams+=(--data-urlencode "filter=(END_DATE>='$today')(START_DATE<'$end_date')(STD_TYPE_CODE=\"1\")")
               jsonFormat='result.data:(会议名称)FE_NAME|red|bold|index,(会议类型)FE_TYPE|magenta,(主办单位)SPONSOR_NAME,(开始时间)START_DATE,(结束时间)END_DATE,(会议地点)CITY,(会议内容)CONTENT|white|dim'
             ;;
             经济数据|jjsj) # https://data.eastmoney.com/cjrl/default.html
-              url="https://datacenter-web.eastmoney.com/api/data/v1/get?callback=datatable$(random 7)&reportName=RPT_CPH_FECALENDAR&pageNumber=${PAGE:-1}&pageSize=${SIZE:-50}&sortColumns=START_DATE&sortTypes=1&filter=(END_DATE%3E%3D%27$today%27)(START_DATE%3C%27$end_date%27)(STD_TYPE_CODE%3D%222%22)&source=WEB&client=WEB&columns=START_DATE%2CEND_DATE%2CFE_CODE%2CFE_NAME%2CFE_TYPE%2CCONTENT%2CSTD_TYPE_CODE%2CSPONSOR_NAME%2CCITY&_=$(date +%s)"
-              text=$(curl -s $url | grep -o '{.*}')
+              curlparams+=(--data-urlencode "filter=(END_DATE>='$today')(START_DATE<'$end_date')(STD_TYPE_CODE=\"2\")")
               jsonFormat='result.data:(数据名称)FE_NAME|red|bold|index,(数据类型)FE_TYPE|magenta,(公布时间)START_DATE,(地区)CITY'
             ;;
             其他日程|qtrc) # https://data.eastmoney.com/cjrl/default.html
-              url="https://datacenter-web.eastmoney.com/api/data/v1/get?callback=datatable$(random 7)&reportName=RPT_CPH_FECALENDAR&pageNumber=${PAGE:-1}&pageSize=${SIZE:-50}&sortColumns=START_DATE&sortTypes=1&filter=(END_DATE%3E%3D%27$today%27)(START_DATE%3C%27$end_date%27)(STD_TYPE_CODE%3D%223%22)&source=WEB&client=WEB&columns=START_DATE%2CEND_DATE%2CFE_CODE%2CFE_NAME%2CFE_TYPE%2CCONTENT%2CSTD_TYPE_CODE%2CSPONSOR_NAME%2CCITY&_=$(date +%s)"
-              text=$(curl -s $url | grep -o '{.*}')
+              curlparams+=(--data-urlencode "filter=(END_DATE>='$today')(START_DATE<'$end_date')(STD_TYPE_CODE=\"3\")")
               jsonFormat='result.data:(名称)FE_NAME|red|bold|index,(时间)START_DATE'
             ;;
           esac
+          text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
+        ;;
+        股市日历|gsrl)
+          outputfile=$outputfile.$3
+          url='https://datacenter-web.eastmoney.com/api/data/v1/get'
+          curlparams+=(-d callback=jQuery1123015335331911826122_$(date +%s))
+          curlparams+=(-d pageSize=${SIZE:-50})
+          curlparams+=(-d pageNumber=${PAGE:-1})
+          curlparams+=(-d source=WEB)
+          curlparams+=(-d client=WEB)
+          curlparams+=(--data-urlencode columns=ALL)
+          curlparams+=(-d _=$(date +%s))
+          local today=$(date +%Y-%m-%d)
+
+          case $3 in
+            公司动态|gsdt)
+              curlparams+=(--data-urlencode sortColumns=SECURITY_CODE)
+              curlparams+=(--data-urlencode sortTypes=1)
+              # curlparams+=(--data-urlencode columns=SECURITY_CODE,SECUCODE,SECURITY_NAME_ABBR,EVENT_TYPE,EVENT_CONTENT,TRADE_DATE)
+              curlparams+=(--data-urlencode reportName=RPT_ORGOP_ALL)
+              local trade_date=$(question "请输入日期(默认今天，即$today)" $4)
+              trade_date=${trade_date:-$today}
+              curlparams+=(--data-urlencode "filter=(TRADE_DATE='$trade_date')")
+              jsonFormat='result.data:(股票)SECURITY_NAME_ABBR${.SECURITY_NAME_ABBR} {.SECURITY_CODE}$,(事件类型)EVENT_TYPE,(内容)EVENT_CONTENT|white|dim,(时间)TRADE_DATE'
+            ;;
+          esac
+          text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
         ;;
       esac
     ;;

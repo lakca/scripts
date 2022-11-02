@@ -225,7 +225,7 @@ function question() {
   local msg="$1"
   local default="$2"
   if [[ $PROGRESS || -z $default ]]; then
-    read -p $'\033[33m'"【默认值："$default"】"$1$'\033[0m\033[31m'
+    read -ep $'\033[33m'${1}$'\033[0m: \033[31m'
     debug $REPLY
     [[ -z $REPLY ]] && echo $default || echo $REPLY
   else
