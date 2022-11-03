@@ -168,7 +168,13 @@ function json_res() {
           # url="https://weibo.com/ajax/side/search?q=$keyword"
           # jsonFormat='data.hotquery|TABLE:(词条)suggestion|red|bold,(结果数量)count|number'
           # text=$(cat data/weibo.search/2022-11-01.22:58:58.json)
+          outputfile="$outputfile.$3"
           case $3 in
+            综合|complex)
+              type=1
+              # text=$(cat data/weibo.search/2022-11-02.20:43:50.json)
+              jsonFormat='data.cards:card_group.0|DOWNGRADE:(内容)mblog.text|striptags|red|bold|index,(来源)region_name|${.mblog.region_name} {.mblog.source}$,(用户昵称)mblog.user.screen_name,(粉丝数)mblog.user.followers_count_str,(简介)mblog.user.description,(用户主页)space|$https://weibo.com/u/{.mblog.user.id}$|dim,(链接)url|$https://weibo.com/{.mblog.user.id}/{.mblog.id}$|dim,(页面标题)mblog.page_info.page_title,(页面链接)mblog.page_info.page_url,(图片)mblog.pics*.url|image|dim'
+            ;;
             实时|realtime)
               type=61
               jsonFormat='data.cards:(内容)mblog.text|striptags|red|bold|index,(来源)region_name|${.mblog.region_name} {.mblog.source}$,(用户昵称)mblog.user.screen_name,(粉丝数)mblog.user.followers_count_str,(简介)mblog.user.description,(用户主页)space|$https://weibo.com/u/{.mblog.user.id}$|dim,(链接)url|$https://weibo.com/{.mblog.user.id}/{.mblog.id}$|dim,(页面标题)mblog.page_info.page_title,(页面链接)mblog.page_info.page_url,(图片)mblog.pics*.url|image|dim'
@@ -225,6 +231,7 @@ function json_res() {
           url='https://m.weibo.cn/api/container/getIndex'
           curlparams+=(--data-urlencode "containerid=100103type=$type&q=$keyword&t=")
           curlparams+=(--data-urlencode page_type=searchall)
+          curlparams+=(--data-urlencode page=${PAGE:-1})
         ;;
         建议|suggest)
           url='https://s.weibo.com/Ajax_Search/suggest'
@@ -234,7 +241,6 @@ function json_res() {
           curlparams+=(--data-urlencode __rnd=$(timestamp))
           jsonFormat=''
         ;;
-
         *) return;;
       esac
     ;;

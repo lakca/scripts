@@ -585,14 +585,16 @@ class Pipe:
     @classmethod
     def getLeftStyleANSI(cls, text, *args, **kwargs):
         text = str(text)
-        start = kwargs.get('start', 0)
-        end = kwargs.get('end', len(text) - 1)
+        start = kwargs.get("start", 0)
+        end = kwargs.get("end", len(text) - 1)
         regStyle = re.compile(r"\033\[(?:\d;?)+m")
         regReset = re.compile(r"\033\[0m")
         resetMatch = None
         styleStart = start
-        for resetMatch in regReset.finditer(text, start, end): pass
-        if resetMatch: styleStart = resetMatch.end()
+        for resetMatch in regReset.finditer(text, start, end):
+            pass
+        if resetMatch:
+            styleStart = resetMatch.end()
         ansi = regStyle.findall(text, styleStart, end)
         return ansi
 
@@ -600,18 +602,20 @@ class Pipe:
     def rebaseNestedStyleANSI(cls, text, *args, **kwargs):
         reg = re.compile(r"((?P<reset>\033\[0m)|(?P<style>\033\[(?:\d;?)+m))")
         style = []
+
         def replacer(match):
             nonlocal style
             # print(match.groupdict(), repr(match.group('reset')), repr(match.group('style')))
             r = match.group()
-            if match.group('style'):
-                style.append(match.group('style'))
-            elif match.group('reset'):
+            if match.group("style"):
+                style.append(match.group("style"))
+            elif match.group("reset"):
                 len(style) and style.pop()
-                r += ''.join(style)
-                style = ''
+                r += "".join(style)
+                style = ""
             # print(repr(r))
             return r
+
         return reg.sub(replacer, text)
 
     @classmethod
@@ -626,7 +630,8 @@ class Pipe:
             end = match.start()
             ansi = cls.getLeftStyleANSI(text, start=start, end=end)
             start = end
-            return '\033[7m' + match.group(3) + '\033[0m' + ''.join(ansi)
+            return "\033[7m" + match.group(3) + "\033[0m" + "".join(ansi)
+
         return regTag.sub(replacer, text)
 
     @classmethod
@@ -645,6 +650,9 @@ def trim_ansi(a):
         "(" + CSI + ".*?" + CMD + "|" + OSC + ".*?" + "(" + ST + "|" + BEL + ")" + ")"
     )
     return re.sub(pattern, "", a)
+
+
+xxx = False
 
 
 class Parser:
@@ -667,23 +675,40 @@ class Parser:
                 return []
 
         data = cls.retrieve(data, node)
-        if "children" in node:
-            results = []
-            if data:
-                data = data.values() if isinstance(data, dict) else data
-                for i, item in enumerate(data):
-                    if not isinstance(item, dict):
-                        item = {"value": item}
 
-                    result = {"__": item, "__index": i + 1}
-                    results.append(result)
+        # global xxx
+        # if "0" in node["key"] and not xxx:
+        #     print(node["keys"], data)
+        #     xxx = True
+
+        results = []
+
+        if "children" in node:
+            if data:
+                if isinstance(data, list):
+                    results = []
+                    for i, item in enumerate(data):
+                        if not isinstance(item, dict):
+                            item = {"value": item}
+                        result = {"__": item, "__index": i + 1}
+                        results.append(result)
+                        for child in node["children"]:
+                            value = (
+                                cls.getValue(item, child)
+                                if "children" in child or "iterKeys" in child
+                                else cls.retrieve(item, child)
+                            )
+                            result[child["key"]] = value
+                elif isinstance(data, dict):
+                    results = {"__": data}
                     for child in node["children"]:
                         value = (
-                            cls.getValue(item, child)
+                            cls.getValue(data, child)
                             if "children" in child or "iterKeys" in child
-                            else cls.retrieve(item, child)
+                            else cls.retrieve(data, child)
                         )
-                        result[child["key"]] = value
+                        results[child["key"]] = value
+
             return results
 
     @classmethod
@@ -712,21 +737,31 @@ class Parser:
     @classmethod
     def printRecord(cls, record, meta, indent=0):
         INDENT = 2
+        _indent = indent
         scopedStdout = lambda *args: sys.stdout.write(
             " " * indent + "".join(list(*args))
         )
         index = 0
         for (key, val) in record.items():
+
+            indent = _indent
+
             if key.startswith("__"):
                 continue
-
-            pipes = meta[key].get("pipes", [])
-            label = meta[key].get("label", key)
 
             if cls.shouldHidden(meta[key], index):
                 continue
 
-            scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
+            pipes = meta[key].get("pipes", [])
+            labeled = len(meta[key].get("labels"))
+            label = meta[key].get("label")
+            downgrade = "DOWNGRADE" in pipes
+
+            if downgrade:
+                indent -= INDENT
+
+            if labeled:
+                scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
 
             if isinstance(val, dict):
                 cls.printRecord(val, meta, indent + INDENT)
