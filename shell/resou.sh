@@ -835,26 +835,64 @@ function json_res() {
           jsonFormat='Result|reverse:(标题)Art_Title|red|bold|index,(时间)Art_Showtime,(链接)Art_UniqueUrl|white|dim'
         ;;
         周末消息|zmxx) # https://data.eastmoney.com/xg/xg/calendar.html
-          json_res eastmoney search article '周末这些重要消息或将影响股市'
+          json_res eastmoney search keyword '周末这些重要消息或将影响股市'
         ;;
         每日数据挖掘机|mrwj) # https://data.eastmoney.com/xg/xg/calendar.html
-          json_res eastmoney search article '每日数据挖掘机'
+          json_res eastmoney search keyword '每日数据挖掘机'
         ;;
-        国内股指|gngz)
-          url="https://push2.eastmoney.com/api/qt/clist/get?pi=0&pz=10&po=1&np=1&fields=f1,f2,f3,f4,f6,f12,f13,f14&fltt=2&invt=2&ut=433fd2d0e98eaf36ad3d5001f088614d&fs=i:1.000001,i:0.399001,i:0.399006,i:1.000300,i:0.300059&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
-          text=$(curl -s $url | grep -o '{.*}')
-          jsonFormat='data.diff|TABLE:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|append(%)|indicator,(成交额)f6|number(cn),(代码)f12'
+        机构调研|jgdy)
+          json_res eastmoney search keyword '机构调研'
         ;;
-        国外股指|gwgz)
-          url="https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f1,f2,f12,f13,f14,f3,f4,f6,f104,f152&secids=100.ATX,100.FCHI,100.GDAXI,100.HSI,100.N225,100.FTSE,100.NDX,100.DJIA&ut=13697a1cc677c8bfa9a496437bfef419&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
-          text=$(curl -s $url | grep -o '{.*}')
-          jsonFormat='data.diff|TABLE:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|append(%)|indicator,(成交额)f6|number(cn),(代码)f12'
+        龙虎榜解读|lhbjd) # https://data.eastmoney.com/stock/lhb.html
+          json_res eastmoney search keyword '龙虎榜'
+        ;;
+        盘后机构策略|phjgcl)
+          json_res eastmoney search keyword '盘后机构策略'
+        ;;
+        早间机构策略|zjjgcl)
+          json_res eastmoney search keyword '早间机构策略'
+        ;;
+        行情|quote)
+          outputfile=$outputfile.$3
+          case $3 in
+            国内股指|gngz)
+              url="https://push2.eastmoney.com/api/qt/clist/get?pi=0&pz=10&po=1&np=1&fields=f1,f2,f3,f4,f6,f12,f13,f14&fltt=2&invt=2&ut=433fd2d0e98eaf36ad3d5001f088614d&fs=i:1.000001,i:0.399001,i:0.399006,i:1.000300,i:0.300059&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
+              text=$(curl -s $url | grep -o '{.*}')
+              jsonFormat='data.diff|TABLE:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|append(%)|indicator,(成交额)f6|number(cn),(代码)f12'
+            ;;
+            国外股指|gwgz)
+              url="https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f1,f2,f12,f13,f14,f3,f4,f6,f104,f152&secids=100.ATX,100.FCHI,100.GDAXI,100.HSI,100.N225,100.FTSE,100.NDX,100.DJIA&ut=13697a1cc677c8bfa9a496437bfef419&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
+              text=$(curl -s $url | grep -o '{.*}')
+              jsonFormat='data.diff|TABLE:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|append(%)|indicator,(成交额)f6|number(cn),(代码)f12'
+            ;;
+          esac
+        ;;
+        数据|data)
+          outputfile=$outputfile.$3
+          case $3 in
+            龙虎榜|lhb)
+              url='https://datacenter-web.eastmoney.com/api/data/v1/get'
+              curlparams+=(--data-urlencode callback=jQuery112307241680021281278_1667469097363)
+              curlparams+=(--data-urlencode sortColumns=SECURITY_CODE,TRADE_DATE)
+              curlparams+=(--data-urlencode sortTypes=1,-1)
+              curlparams+=(--data-urlencode pageSize=50)
+              curlparams+=(--data-urlencode pageNumber=1)
+              curlparams+=(--data-urlencode reportName=RPT_DAILYBILLBOARD_DETAILSNEW)
+              curlparams+=(--data-urlencode columns=SECURITY_CODE,SECUCODE,SECURITY_NAME_ABBR,TRADE_DATE,EXPLAIN,CLOSE_PRICE,CHANGE_RATE,BILLBOARD_NET_AMT,BILLBOARD_BUY_AMT,BILLBOARD_SELL_AMT,BILLBOARD_DEAL_AMT,ACCUM_AMOUNT,DEAL_NET_RATIO,DEAL_AMOUNT_RATIO,TURNOVERRATE,FREE_MARKET_CAP,EXPLANATION,D1_CLOSE_ADJCHRATE,D2_CLOSE_ADJCHRATE,D5_CLOSE_ADJCHRATE,D10_CLOSE_ADJCHRATE,SECURITY_TYPE_CODE)
+              curlparams+=(--data-urlencode source=WEB)
+              curlparams+=(--data-urlencode client=WEB)
+              curlparams+=(--data-urlencode "filter=(TRADE_DATE<='2022-11-03')(TRADE_DATE>='2022-11-01')")
+              text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
+
+              jsonFormat='result.data:(证券名称)SECURITY_NAME_ABBR|red|bold|index,(证券代码)SECURITY_CODE|red,(上榜原因)EXPLANATION|dim,(其他)EXPLAIN|dim,(买入)BILLBOARD_BUY_AMT|number(cn),(卖出)BILLBOARD_SELL_AMT|number(cn),(净买入)BILLBOARD_NET_AMT|number(cn)|indicator,(龙虎榜成交额)BILLBOARD_DEAL_AMT,(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|append(%),(涨跌幅)CHANGE_RATE|number(+)|append(%)|indicator,(交易日)TRADE_DATE|date(date),(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$'
+            ;;
+          esac
         ;;
         搜索|search|s) # https://data.eastmoney.com/xg/xg/calendar.html
           outputfile=$outputfile.$3
           local keyword="$4"
           case $3 in
-            article) # 新股日历 https://data.eastmoney.com/xg/xg/calendar.html
+            关键词|keyword) # 新股日历 https://data.eastmoney.com/xg/xg/calendar.html
               url='https://data.eastmoney.com/dataapi/search/article'
               curlparams+=(--data-urlencode page=${PAGE:-1})
               curlparams+=(--data-urlencode pagesize=${SIZE:-50})
@@ -905,7 +943,7 @@ function json_res() {
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='result.researchReport:(标题)title|red|bold|tag,(来源)source|dim,(证券)stockName|magenta,(内容)content|dim,(时间)date,(链接)url|$http://data.eastmoney.com/report/zw_stock.jshtml?infocode={.code}$|dim'
             ;;
-            文章|article2) # https://so.eastmoney.com/carticle/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
+            文章|article) # https://so.eastmoney.com/carticle/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
               _ASK_MSG='请输入搜索范围（默认全部）：' ask2 -v '标题 正文' -v 'TITLE CONTENT' -d "$5"
               local searchScope='ALL'
@@ -1181,19 +1219,40 @@ function json_res() {
   fi
   print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}" -o "$outputfile" -y "${filters[*]}"
 
-  # printf %s "tailer: $tailer" 1>&2
+  debug "$tailer"
   if [[ $tailer ]]; then
     eval $tailer
   fi
 }
 
-for i in $@; do
-  if [[ $i == '-h' ]]; then
-    echo -e "$(cat $0 | grep -oE '^\s*[^|)( ]+(\|[^|)( ]*)*\)\s*(#.*)?$' | sed 's/    //;s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;s/\([^ |)]\+\)\(|\|)\)/\\033[32m\1\\033[0m\2/g;/^\S/i\ ')"
-    exit 0
+function help() {
+  if [[ "$*" =~ (^|[[:space:]])-h([[:space:]]|$) ]]; then
+    local help_msg="$(cat $0 | grep -oE '^\s*[^|)( ]+(\|[^|)( ]*)*\)\s*(#.*)?$' | sed 's/    / /g;')"
+    local stylish=(-e '/^ \S\+/i\ ' -e 's/^ \( \+\)/\1\1\1\1/;s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;s/\(\s*\)\([^ |)]\+\)\([|)]\)/\1\\033[31m\2\\033[0m\3/;s/\(|\)\([^ |)]\+\)/\1\\033[32m\2\\033[0m/g;/^\S/i\ ')
+    local endLevel=0
+    for i in $#; do [[ ${@:$i:1} == '-h' ]] && endLevel=$i; done
+    [[ $endLevel == 1 ]] && echo -e "$(sed "${stylish[@]}" <<< "$help_msg")" && exit 0
+    echo -e "$(
+      nextLevel=1
+      while IFS= read line; do
+        lineLevel=$(grep -o '^\s*' <<< "$line")
+        lineLevel=${#lineLevel}
+        # nextLevel至少为1
+        [[ $nextLevel < 1 ]] && nextLevel=1
+        # echo "$nextLevel,$lineLevel,$line"
+        # 回溯
+        [[ $lineLevel < $nextLevel ]] && { [[ $line =~ ${@:$lineLevel:1} ]] &&  { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
+        # 打印全部子命令
+        [[ $lineLevel -ge $endLevel && $nextLevel -ge $endLevel ]] &&  echo -e "$line" && continue
+        # 匹配上nextLevel，打印
+        [[ $lineLevel = $nextLevel && $line =~ ${@:$lineLevel:1} ]] && { echo -e "$line" && nextLevel=$((nextLevel + 1)) && continue; }
+      done <<< "$help_msg" | sed "${stylish[@]}"
+    )"
+  else
+    return 1
   fi
-done
+}
 
-json_res ${@:1}
+help "$@" || json_res ${@:1}
 
 # console.log([...new URL().searchParams.entries()].map(e => `curlparams+=(--data-urlencode ${e[0]}=${e[1]})`).join('\n'))

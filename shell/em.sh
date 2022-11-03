@@ -67,16 +67,16 @@ function quote() {
     local alertLowPercent=${alertLowPercents[@]:$i:1}
     local script=''
     if [[ $alertHighPrice && 1 -eq $(bc <<< "$price >= $alertHighPrice") ]]; then
-      script="display notification (\"预警：涨超${alertHighPrice}；现价：$price\" as Unicode text) with title (\"📈\" as Unicode text) subtitle (\"$name\" as Unicode text)"
+      script="display notification (\"预警：涨超${alertHighPrice}；现价：$price, $percentText\" as Unicode text) with title (\"📈\" as Unicode text) subtitle (\"$name\" as Unicode text)"
     fi
     if [[ $alertLowPrice && 1 -eq $(bc <<< "$price <= $alertLowPrice") ]]; then
-      script="display notification (\"预警：跌超${alertLowPrice}；现价：$price\" as Unicode text) with title (\"📉\" as Unicode text) subtitle (\"$name\" as Unicode text)"
+      script="display notification (\"预警：跌超${alertLowPrice}；现价：$price, $percentText\" as Unicode text) with title (\"📉\" as Unicode text) subtitle (\"$name\" as Unicode text)"
     fi
     if [[ $alertHighPercent && 1 -eq $(bc <<< "$percent >= $alertHighPercent") ]]; then
-      script="display notification (\"预警：涨超${alertHighPercent}；现价：$price\" as Unicode text) with title (\"📈\" as Unicode text) subtitle (\"$name\" as Unicode text)"
+      script="display notification (\"预警：涨超${alertHighPercent}%；现价：$price, $percentText\" as Unicode text) with title (\"📈\" as Unicode text) subtitle (\"$name\" as Unicode text)"
     fi
     if [[ $alertLowPercent && 1 -eq $(bc <<< "$percent <= $alertLowPercent") ]]; then
-      script="display notification (\"预警：跌超${alertLowPercent}；现价：$price\" as Unicode text) with title (\"📉\" as Unicode text) subtitle (\"$name\" as Unicode text)"
+      script="display notification (\"预警：跌超${alertLowPercent}%；现价：$price, $percentText\" as Unicode text) with title (\"📉\" as Unicode text) subtitle (\"$name\" as Unicode text)"
     fi
     [[ $script ]] && osascript -e "$script"
   done

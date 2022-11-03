@@ -384,11 +384,10 @@ class Pipe:
     @classmethod
     def apply(cls, v, pipes, data={}):
         def replacer(m):
-            key = m.group(1)
-            if key.startswith("."):
-                return str(retrieve(data["__"], key.split(".")[1:]))
-            else:
-                return str(data.get(key))
+            token = tokenize(m.group(1)).data
+            key = token['key']
+            value = str(retrieve(data["__"], key.split(".")[1:])) if key.startswith(".") else str(data.get(key))
+            return cls.apply(value, token['pipes'], data)
 
         for pipe in pipes:
             args = []
@@ -419,6 +418,8 @@ class Pipe:
             try:
                 # "Tue, 18 Oct 2022 23:00:23 +0800"
                 v = time.strptime(v, "%a, %d %b %Y %H:%M:%S %z")
+                # 2022-11-01 00:00:00
+                v = time.strftime(v, '%Y-%m-%d %H:%M:%S')
             except:
                 return v
         fmts = {
@@ -445,7 +446,7 @@ class Pipe:
             return "{:+.2f}".format(v)
         elif type == "cn":
             for e in ["", "万", "亿", "兆"]:
-                if v > 10000:
+                if abs(v) > 10000:
                     v = v / 10000
                 else:
                     return str(v) + e if str(v).isnumeric() else "{:.4f}".format(v) + e
@@ -454,7 +455,7 @@ class Pipe:
 
     @classmethod
     def indicator(cls, v, *args, **kwargs):
-        return Pipe.green(v) + " 📉" if str(v).startswith("-") else Pipe.red(v) + " 📈"
+        return Pipe.green(v) if str(v).startswith("-") else Pipe.red(v)
 
     @classmethod
     def style(cls, v, styles=[], *args, **kwargs):
@@ -637,6 +638,10 @@ class Pipe:
     @classmethod
     def striptags(cls, v, *args, **kwargs):
         return re.sub(r"</?\w+(\s+[^>]*)*>", "", str(v))
+
+    @classmethod
+    def slice(cls, v, *args, **kwargs):
+        return v[slice(*list(map(lambda e, *argss: int(e), args)))]
 
 
 def trim_ansi(a):
