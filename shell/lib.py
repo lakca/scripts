@@ -10,12 +10,16 @@ from urllib import request
 
 IMGCAT = False
 SIMPLE = False
+LINK = False
 
 if os.environ.get("IMGCAT", None):
     IMGCAT = True
 
 if os.environ.get("SIMPLE", None):
     SIMPLE = True
+
+if os.environ.get("LINK", None):
+    LINK = True
 
 TABLE = os.environ.get("TABLE")
 
@@ -275,7 +279,7 @@ def tokenize(fmt):
 def retrieve(obj, keys, default=None):
     for key in keys:
         if obj:
-            if str(key).isdigit() and isinstance(obj, (list, int)):
+            if str(key).isdecimal() and isinstance(obj, (list, int)):
                 index = int(key)
                 if len(obj) > index:
                     obj = obj[index]
@@ -382,13 +386,7 @@ class Pipe:
     }
 
     @classmethod
-    def apply(cls, v, pipes, data={}):
-        def replacer(m):
-            token = tokenize(m.group(1)).data
-            key = token['key']
-            value = str(retrieve(data["__"], key.split(".")[1:])) if key.startswith(".") else str(data.get(key))
-            return cls.apply(value, token['pipes'], data)
-
+    def apply(cls, v, pipes, data={}, **opts):
         for pipe in pipes:
             args = []
             kwargs = {}
@@ -400,17 +398,29 @@ class Pipe:
                         args.append(e)
                 pipe = pipe[0]
 
-            if pipe.startswith("$"):
-                v = re.sub(r"\{([^\}]+)\}", replacer, pipe[1:])
+            if 'interpolate' in opts and pipe.startswith(opts['interpolate']):
+                v = cls._interpolate(pipe[1:], data)
             else:
                 attr = getattr(cls, pipe, None)
                 if attr:
                     v = attr(v, *args, data=data, **kwargs)
+
         return v
 
     @classmethod
+    def _interpolate(cls, template, data, *args, **kwargs):
+        def replacer(m):
+            token = tokenize(m.group(1)).data
+            key = token['key']
+            keys = token['keys']
+            if key.startswith("."): value = str(retrieve(data.get("__", None), key.split(".")[1:], ''))
+            else: value = str(retrieve(data, keys, ''))
+            return cls.apply(value, token['pipes'], data)
+        return re.sub(r"\{([^\}]+)\}", replacer, template)
+
+    @classmethod
     def date(cls, v, *args, **kwargs):
-        if isinstance(v, int) or v.isdigit():
+        if isinstance(v, int) or v.isdecimal():
             v = str(v)
             v = int(v) / 1000 if len(v) == 13 and "." not in v else float(v)
             v = time.localtime(v)
@@ -432,10 +442,22 @@ class Pipe:
         return time.strftime(fmts.get(kwargs.get("format", ""), "%Y-%m-%d %H:%M:%S"), v)
 
     @classmethod
+    def toNumber(cls, v, *args, **kwargs):
+        ''' v: str<int|float> '''
+        return v if isinstance(v, (int, float)) else float(v) if '.' in v else int(v)
+
+    @classmethod
+    def numberOf(cls, v, *args, **kwargs):
+        ''' v: str<number + any> '''
+        v = re.sub(r'[^\d]*$', '', str(v))
+        return cls.toNumber(v)
+
+    @classmethod
     def number(cls, v, type=",", *args, **kwargs):
         if not v:
             return v
-        v = int(v) if str(v).isnumeric() else float(v)
+        v = cls.toNumber(v)
+
         if type == ",":
             return "{:,}".format(v)
         elif type == "%":
@@ -449,13 +471,26 @@ class Pipe:
                 if abs(v) > 10000:
                     v = v / 10000
                 else:
-                    return str(v) + e if str(v).isnumeric() else "{:.4f}".format(v) + e
+                    return str(v) + e if isinstance(v, int) else "{:.4f}".format(v) + e
         else:
             return type.format(v)
 
     @classmethod
     def indicator(cls, v, *args, **kwargs):
-        return Pipe.green(v) if str(v).startswith("-") else Pipe.red(v)
+        data = kwargs.get('data')
+        interpolate = lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
+        ops = []
+        if 'cmp' in kwargs:
+            ops = [cls.numberOf(interpolate(kwargs["cmp"])), 0]
+        elif len(args):
+            if len(args) == 1:
+                ops = [float(v), float(interpolate(args[0:1]))]
+            else:
+                ops = [float(interpolate(args[0:1])), float(interpolate(args[1:1]))]
+        else:
+            ops = [cls.numberOf(v), 0]
+        print(v, ops, ops[0] < ops[1], ops[0] > ops[1])
+        return Pipe.green(v) if ops[0] < ops[1] else Pipe.red(v) if ops[0] > ops[1] else str(v)
 
     @classmethod
     def style(cls, v, styles=[], *args, **kwargs):
@@ -584,7 +619,7 @@ class Pipe:
         return v
 
     @classmethod
-    def getLeftStyleANSI(cls, text, *args, **kwargs):
+    def _getLeftStyleANSI(cls, text, *args, **kwargs):
         text = str(text)
         start = kwargs.get("start", 0)
         end = kwargs.get("end", len(text) - 1)
@@ -600,7 +635,7 @@ class Pipe:
         return ansi
 
     @classmethod
-    def rebaseNestedStyleANSI(cls, text, *args, **kwargs):
+    def _rebaseNestedStyleANSI(cls, text, *args, **kwargs):
         reg = re.compile(r"((?P<reset>\033\[0m)|(?P<style>\033\[(?:\d;?)+m))")
         style = []
 
@@ -629,7 +664,7 @@ class Pipe:
             nonlocal start
             nonlocal text
             end = match.start()
-            ansi = cls.getLeftStyleANSI(text, start=start, end=end)
+            ansi = cls._getLeftStyleANSI(text, start=start, end=end)
             start = end
             return "\033[7m" + match.group(3) + "\033[0m" + "".join(ansi)
 
@@ -727,7 +762,7 @@ class Parser:
 
     @classmethod
     def applyPipes(cls, value, pipes, data):
-        return Pipe.apply(value, pipes, data)
+        return Pipe.apply(value, pipes, data, interpolate='$')
 
     @classmethod
     def shouldHidden(cls, token, index):
@@ -736,7 +771,7 @@ class Parser:
         label = token.get("label", key)
         global SIMPLE
         return "HIDE" in pipes or (
-            SIMPLE and index != 0 and label not in ["链接"] and "SIMPLE" not in pipes
+            SIMPLE and index != 0 and not (LINK and label in ["链接"]) and "SIMPLE" not in pipes
         )
 
     @classmethod
@@ -830,8 +865,9 @@ class Parser:
             bodies.append([Pipe.apply(str(i + 1), ["dim", "italic"])])
             widths.append([len(str(i + 1))])
             for j, child in enumerate(children):
+                'index' in child["pipes"] and child["pipes"].remove('index')
                 text = str(
-                    Pipe.apply(record.get(child["key"], "-"), child["pipes"], record)
+                    cls.applyPipes(record.get(child["key"], "-"), child["pipes"], record)
                 )
                 bodies[-1].append(text)
                 widths[-1].append(Unicode.simpleWidth(trim_ansi(text)))
