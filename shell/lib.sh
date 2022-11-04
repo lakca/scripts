@@ -299,12 +299,15 @@ function ask2() {
 function question() {
   local msg="$1"
   local default="$2"
-  if [[ $PROGRESS || -z $default ]]; then
-    read -ep $'\033[33m'${1}$'\033[0m: \033[31m'
+  debug "$1"
+  debug "$2"
+  if [[ $PROGRESS || -z "$default" ]]; then
+    echo -en "$1\033[31m" >&2
+    read
     debug $REPLY
-    [[ -z $REPLY ]] && echo $default || echo $REPLY
+    [[ -z $REPLY ]] && echo "$default" || echo $REPLY
   else
-    echo $default
+    echo "$default"
   fi
 }
 

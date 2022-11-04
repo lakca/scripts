@@ -31,6 +31,18 @@ ZHIHU_HOT_URL='https://www.zhihu.com/billboard'
 ZHIHU_DOMAINS=(全部 数码 科技 互联网 商业财经 职场 教育 法律 军事 汽车 人文社科 自然科学 工程技术 情感 心理学 两性 母婴亲子 家居 健康 艺术 音乐 设计 影视娱乐 宠物 体育电竞 运动健身 动漫游戏 美食 旅行 时尚)
 ZHIHU_DOMAINS_NUM=(0  100001  100002  100003  100004  100005  100006  100007  100008  100009  100010  100011  100012  100013  100014  100015  100016  100017  100018  100019  100020  100021  100022  100023  100024  100025  100026  100027  100028  100029)
 
+function ask_date() {
+  local d=$(question "请输入日期（日期格式如$(date +%Y-%m-%d)）：")
+  echo ${d:-$1}
+}
+
+function ask_date2() {
+  local d=($(question "请输入起止日期（如\033[2m$(date +%Y-%m-%d) $(date +%Y-%m-%d)\033[0m，相同可以省略，默认为\033[2m$1 $2\033[0m）："))
+  d[0]=${{d[@]:0:1}:-$1}
+  d[1]=${{d[@]:1:1}:-$2}
+  echo "${d[@]}"
+}
+
 function json_res() {
   local url
   local text
@@ -44,6 +56,7 @@ function json_res() {
   local curlparams=(-G)
   local outputfile="$1"
   local tailer=''
+  local _today=$(date +%Y-%m-%d)
   case $1 in
     微博|weibo|wb)
       outputfile="$outputfile.$2"
@@ -871,6 +884,7 @@ function json_res() {
           outputfile=$outputfile.$3
           case $3 in
             龙虎榜|lhb)
+              local date_range=$(ask_date2 $_today $_today)
               url='https://datacenter-web.eastmoney.com/api/data/v1/get'
               curlparams+=(--data-urlencode callback=jQuery112307241680021281278_1667469097363)
               curlparams+=(--data-urlencode sortColumns=SECURITY_CODE,TRADE_DATE)
@@ -881,10 +895,10 @@ function json_res() {
               curlparams+=(--data-urlencode columns=SECURITY_CODE,SECUCODE,SECURITY_NAME_ABBR,TRADE_DATE,EXPLAIN,CLOSE_PRICE,CHANGE_RATE,BILLBOARD_NET_AMT,BILLBOARD_BUY_AMT,BILLBOARD_SELL_AMT,BILLBOARD_DEAL_AMT,ACCUM_AMOUNT,DEAL_NET_RATIO,DEAL_AMOUNT_RATIO,TURNOVERRATE,FREE_MARKET_CAP,EXPLANATION,D1_CLOSE_ADJCHRATE,D2_CLOSE_ADJCHRATE,D5_CLOSE_ADJCHRATE,D10_CLOSE_ADJCHRATE,SECURITY_TYPE_CODE)
               curlparams+=(--data-urlencode source=WEB)
               curlparams+=(--data-urlencode client=WEB)
-              curlparams+=(--data-urlencode "filter=(TRADE_DATE<='2022-11-03')(TRADE_DATE>='2022-11-01')")
+              curlparams+=(--data-urlencode "filter=(TRADE_DATE<='"${date_range[@]:0:1}"')(TRADE_DATE>="${date_range[@]:1:1}")")
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
 
-              jsonFormat='result.data:(证券名称)SECURITY_NAME_ABBR|red|bold|index,(证券代码)SECURITY_CODE|red,(上榜原因)EXPLANATION|dim,(其他)EXPLAIN|dim,(买入)BILLBOARD_BUY_AMT|number(cn),(卖出)BILLBOARD_SELL_AMT|number(cn),(净买入)BILLBOARD_NET_AMT|number(cn)|indicator,(龙虎榜成交额)BILLBOARD_DEAL_AMT,(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|append(%),(涨跌幅)CHANGE_RATE|number(+)|append(%)|indicator,(交易日)TRADE_DATE|date(date),(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$'
+              jsonFormat='result.data:(证券名称)SECURITY_NAME_ABBR|indicator(cmp={.CHANGE_RATE})|bold|index,(证券代码)SECURITY_CODE|red,(涨跌幅)CHANGE_RATE|number(+)|append(%)|indicator|SIMPLE,(其他)EXPLAIN|dim,(买入)BILLBOARD_BUY_AMT|number(cn),(卖出)BILLBOARD_SELL_AMT|number(cn),(净买入)BILLBOARD_NET_AMT|number(cn)|indicator|SIMPLE,(龙虎榜成交额)BILLBOARD_DEAL_AMT|number(cn),(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|append(%)|SIMPLE,(上榜原因)EXPLANATION|dim|SIMPLE,(交易日)TRADE_DATE|date(date),(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$'
             ;;
           esac
         ;;
