@@ -1,5 +1,6 @@
 # coding=utf-8
 
+from datetime import datetime
 from functools import cmp_to_key
 import json
 import sys
@@ -292,7 +293,7 @@ def retrieve(obj, keys, default=None):
                     return default
         else:
             return default
-    return obj
+    return default if obj is None else obj
 
 
 class Unicode:
@@ -388,6 +389,8 @@ class Pipe:
     @classmethod
     def apply(cls, v, pipes, data={}, **opts):
         for pipe in pipes:
+            if pipe == "true" and not v:
+                return v
             args = []
             kwargs = {}
             if isinstance(pipe, list):
@@ -398,7 +401,7 @@ class Pipe:
                         args.append(e)
                 pipe = pipe[0]
 
-            if 'interpolate' in opts and pipe.startswith(opts['interpolate']):
+            if "interpolate" in opts and pipe.startswith(opts["interpolate"]):
                 v = cls._interpolate(pipe[1:], data)
             else:
                 attr = getattr(cls, pipe, None)
@@ -411,27 +414,38 @@ class Pipe:
     def _interpolate(cls, template, data, *args, **kwargs):
         def replacer(m):
             token = tokenize(m.group(1)).data
-            key = token['key']
-            keys = token['keys']
-            if key.startswith("."): value = str(retrieve(data.get("__", None), key.split(".")[1:], ''))
-            else: value = str(retrieve(data, keys, ''))
-            return cls.apply(value, token['pipes'], data)
+            key = token["key"]
+            keys = token["keys"]
+            if key.startswith("."):
+                value = str(retrieve(data.get("__", ""), key.split(".")[1:], ""))
+            else:
+                value = str(retrieve(data, keys, ""))
+            return cls.apply(value, token["pipes"], data)
+
         return re.sub(r"\{([^\}]+)\}", replacer, template)
 
     @classmethod
     def date(cls, v, *args, **kwargs):
-        if isinstance(v, int) or v.isdecimal():
-            v = str(v)
-            v = int(v) / 1000 if len(v) == 13 and "." not in v else float(v)
-            v = time.localtime(v)
-        else:
+        sv = str(v)
+        try:
+            nv = float(v)
+        except:
+            pass
+        for case in (
+            # timestamp 1667632623
+            lambda: datetime.fromtimestamp(nv / 1000 if nv > 9999999999 else nv),
+            # ISO 2022-11-01T00:00:00, 2022-11-01 00:00:00 ...
+            lambda: datetime.fromisoformat(sv),
+            # UTC "Tue, 18 Oct 2022 23:00:23 +0800"
+            lambda: datetime.strptime(sv, "%a, %d %b %Y %H:%M:%S %z"),
+        ):
             try:
-                # "Tue, 18 Oct 2022 23:00:23 +0800"
-                v = time.strptime(v, "%a, %d %b %Y %H:%M:%S %z")
-                # 2022-11-01 00:00:00
-                v = time.strftime(v, '%Y-%m-%d %H:%M:%S')
+                v = case()
+                break
             except:
-                return v
+                pass
+        else:
+            return v
         fmts = {
             "date": "%Y-%m-%d",
             "time": "%H:%M:%S",
@@ -439,17 +453,21 @@ class Pipe:
             "md": "%m-%d",
             "hm": "%H:%M",
         }
-        return time.strftime(fmts.get(kwargs.get("format", ""), "%Y-%m-%d %H:%M:%S"), v)
+        return v.strftime(
+            fmts.get(
+                kwargs.get("format") or (len(args) and args[0]), "%Y-%m-%d %H:%M:%S"
+            ),
+        )
 
     @classmethod
     def toNumber(cls, v, *args, **kwargs):
-        ''' v: str<int|float> '''
-        return v if isinstance(v, (int, float)) else float(v) if '.' in v else int(v)
+        """v: str<int|float>"""
+        return v if isinstance(v, (int, float)) else float(v) if "." in v else int(v)
 
     @classmethod
     def numberOf(cls, v, *args, **kwargs):
-        ''' v: str<number + any> '''
-        v = re.sub(r'[^\d]*$', '', str(v))
+        """v: str<number + any>"""
+        v = re.sub(r"[^\d]*$", "", str(v))
         return cls.toNumber(v)
 
     @classmethod
@@ -477,20 +495,25 @@ class Pipe:
 
     @classmethod
     def indicator(cls, v, *args, **kwargs):
-        data = kwargs.get('data')
+        data = kwargs.get("data")
         interpolate = lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
         ops = []
-        if 'cmp' in kwargs:
+        if "cmp" in kwargs:
             ops = [cls.numberOf(interpolate(kwargs["cmp"])), 0]
         elif len(args):
             if len(args) == 1:
-                ops = [float(v), float(interpolate(args[0:1]))]
+                ops = [float(v), float(interpolate(args[0]))]
             else:
-                ops = [float(interpolate(args[0:1])), float(interpolate(args[1:1]))]
+                ops = [float(interpolate(args[0])), float(interpolate(args[1]))]
         else:
             ops = [cls.numberOf(v), 0]
-        print(v, ops, ops[0] < ops[1], ops[0] > ops[1])
-        return Pipe.green(v) if ops[0] < ops[1] else Pipe.red(v) if ops[0] > ops[1] else str(v)
+        return (
+            Pipe.green(v)
+            if ops[0] < ops[1]
+            else Pipe.red(v)
+            if ops[0] > ops[1]
+            else str(v)
+        )
 
     @classmethod
     def style(cls, v, styles=[], *args, **kwargs):
@@ -498,7 +521,7 @@ class Pipe:
         for style in styles:
             if style in cls.STYLES:
                 codes.append(cls.STYLES[style])
-        text = "\033[" + ";".join(codes) + "m" + v + "\033[0m"
+        text = "\033[" + ";".join(codes) + "m" + str(v) + "\033[0m"
         # if kwargs.get('preserve', False):
         #     regReset = re.compile(r"\033\[0m")
         return text
@@ -716,11 +739,6 @@ class Parser:
 
         data = cls.retrieve(data, node)
 
-        # global xxx
-        # if "0" in node["key"] and not xxx:
-        #     print(node["keys"], data)
-        #     xxx = True
-
         results = []
 
         if "children" in node:
@@ -762,7 +780,7 @@ class Parser:
 
     @classmethod
     def applyPipes(cls, value, pipes, data):
-        return Pipe.apply(value, pipes, data, interpolate='$')
+        return Pipe.apply(value, pipes, data, interpolate="$")
 
     @classmethod
     def shouldHidden(cls, token, index):
@@ -771,7 +789,10 @@ class Parser:
         label = token.get("label", key)
         global SIMPLE
         return "HIDE" in pipes or (
-            SIMPLE and index != 0 and not (LINK and label in ["链接"]) and "SIMPLE" not in pipes
+            SIMPLE
+            and index != 0
+            and not (LINK and label in ["链接"])
+            and "SIMPLE" not in pipes
         )
 
     @classmethod
@@ -865,9 +886,11 @@ class Parser:
             bodies.append([Pipe.apply(str(i + 1), ["dim", "italic"])])
             widths.append([len(str(i + 1))])
             for j, child in enumerate(children):
-                'index' in child["pipes"] and child["pipes"].remove('index')
+                "index" in child["pipes"] and child["pipes"].remove("index")
                 text = str(
-                    cls.applyPipes(record.get(child["key"], "-"), child["pipes"], record)
+                    cls.applyPipes(
+                        retrieve(record, [child["key"]], ""), child["pipes"], record
+                    )
                 )
                 bodies[-1].append(text)
                 widths[-1].append(Unicode.simpleWidth(trim_ansi(text)))
