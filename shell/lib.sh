@@ -230,39 +230,46 @@ function ask2() {
   unset _ASK_INDEX
   unset _ASK_RESULT
   unset _ASK_RESULTS
-  local question=${_ASK_MSG:-'请输入上述序号或值：'}
+  local question=${_ASK_MSG}
+  unset _ASK_MSG
   local values=()
-  local data=''
-  local index
+  local input
+  local default
+  local inputIndex
+  local defaultIndex
 
-  while getopts 'q:v:d:' opt; do
+  while getopts 'q:a:i:d:' opt; do
     case $opt in
-      q) question=$OPTARG ;;
-      v) values+=("$OPTARG") ;;
-      d) data=$OPTARG ;;
+      q) question="$OPTARG";;
+      a) values+=("$OPTARG");;
+      i) input="$OPTARG";;
+      d) default="$OPTARG";;
     esac
   done
+
+  question="\033[33m【交互】\033[0m请（从上述序号或值中选择）输入\033[31m${question}\033[0m"
+  [[ $default ]] && question="${question}（默认值为\033[2m${default}\033[0m）："
 
   local first=(${values[@]:0:1})
   local indexes=${!first[@]}
 
   values+=("${indexes[*]}")
 
-  debug 问题：$question, 输入值：$data, 选项：${values[@]}
+  debug 问题：$question, 输入值：$input, 选项：${values[@]}
 
   for value in "${values[@]}"; do
-    index=$(indexof "$value" $data)
-    [[ $index ]] && break
+    [[ ! $inputIndex ]] && inputIndex=$(indexof "$value" $input)
+    [[ ! $defaultIndex ]] && defaultIndex=$(indexof "$value" $default)
   done
 
-  debug 索引：$index
+  debug 索引：$inputIndex, $defaultIndex
 
   local reply
 
-  if [[ -z $index ]]; then
+  if [[ -z $inputIndex ]]; then
     printf '\n' >&2
     for i in "${!first[@]}"; do
-      printf '%b' "\033[37m$i\033[0m" >&2
+      printf '%b' "\033[31m$i\033[0m" >&2
       for value in "${values[@]}"; do
         value=($value)
         printf ',' >&2
@@ -272,16 +279,20 @@ function ask2() {
     done
     printf '\n' >&2
 
-    read -p $'\n'${question}'' reply
+    echo -en "\n${question}\033[31m" >&2
+    read reply
+    echo -en '\033[0m' >&2
   fi
 
   if [[ -n $reply ]]; then
     for value in "${values[@]}"; do
       debug 回复：$reply, 数组：$value
-      index=$(_INDEXOF_IGNORE_CASE=1 indexof "$value" $reply)
-      [[ $index ]] && break
+      inputIndex=$(_INDEXOF_IGNORE_CASE=1 indexof "$value" $reply)
+      [[ $inputIndex ]] && break
     done
   fi
+
+  local index=${inputIndex:-$defaultIndex}
 
   if [[ $index ]]; then
     _ASK_INDEX=$index
@@ -291,8 +302,9 @@ function ask2() {
       [[ ! $_ASK_RESULT ]] && _ASK_RESULT="${value[@]:$index:1}"
       _ASK_RESULTS+=("${value[@]:$index:1}")
     done
-    printf '您输入的有效值为：' >&2
-    printf '%b\n' "\033[31m${_ASK_RESULTS[*]}\033[0m" >&2
+    echo -en '\033[33m【输入】\033[0m\033\033[2;3;37m您输入的有效值为：\033[0m' >&2
+    echo -e "\033[2;3;31m${_ASK_RESULTS[*]}\033[0m" >&2
+    echo $_ASK_RESULT
   fi
 }
 
@@ -305,9 +317,37 @@ function question() {
     echo -en "$1\033[31m" >&2
     read
     debug $REPLY
-    [[ -z $REPLY ]] && echo "$default" || echo $REPLY
+    [[ -z $REPLY ]] && echo "$default" || echo "$REPLY"
   else
     echo "$default"
+  fi
+}
+
+function question2() {
+  local question
+  local default
+  local input
+  while getopts 'q:d:i:' opt; do
+    case $opt in
+      q) question="$OPTARG";;
+      d) default="$OPTARG";;
+      i) input="$OPTARG";;
+    esac
+  done
+  if [[ "$input" ]]; then
+    echo "$input"
+  else
+    local msg="\033[33m【交互】\033[0m请输入\033[31m$question\033[0m"
+    [[ $default ]] && msg="${msg}（默认值为\033[2m${default}\033[0m）："
+    msg="$msg\033[31m"
+    echo -en "$msg" >&2
+    read
+    debug $REPLY
+    echo -en '\033[0m' >&2
+    local answer
+    [[ -z $REPLY ]] && answer="$default" || answer="$REPLY"
+    echo -e "\033[33m【输入】\033[0m\033[2;3;37m您输入的有效值为：\033[0m\033[2;3;31m$answer\033[0m" >&2
+    echo "$answer"
   fi
 }
 

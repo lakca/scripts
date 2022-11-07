@@ -38,8 +38,8 @@ function ask_date() {
 
 function ask_date2() {
   local d=($(question "请输入起止日期（如\033[2m$(date +%Y-%m-%d) $(date +%Y-%m-%d)\033[0m，相同可以省略，默认为\033[2m$1 $2\033[0m）："))
-  d[0]=${{d[@]:0:1}:-$1}
-  d[1]=${{d[@]:1:1}:-$2}
+  [[ ! "${d[@]:0:1}" ]] && d[0]=$1
+  [[ ! "${d[@]:1:1}" ]] && d[1]=$2
   echo "${d[@]}"
 }
 
@@ -883,10 +883,10 @@ function json_res() {
         数据|data)
           outputfile=$outputfile.$3
           case $3 in
-            龙虎榜|lhb)
-              local date_range=$(ask_date2 $_today $_today)
+            龙虎榜|lhb) # https://data.eastmoney.com/stock/tradedetail.html
+              local date_range=($(ask_date2 $_today $_today))
               url='https://datacenter-web.eastmoney.com/api/data/v1/get'
-              curlparams+=(--data-urlencode callback=jQuery112307241680021281278_1667469097363)
+              curlparams+=(--data-urlencode callback=jQuery112307241680021281278_$(timestamp))
               curlparams+=(--data-urlencode sortColumns=SECURITY_CODE,TRADE_DATE)
               curlparams+=(--data-urlencode sortTypes=1,-1)
               curlparams+=(--data-urlencode pageSize=50)
@@ -895,14 +895,14 @@ function json_res() {
               curlparams+=(--data-urlencode columns=SECURITY_CODE,SECUCODE,SECURITY_NAME_ABBR,TRADE_DATE,EXPLAIN,CLOSE_PRICE,CHANGE_RATE,BILLBOARD_NET_AMT,BILLBOARD_BUY_AMT,BILLBOARD_SELL_AMT,BILLBOARD_DEAL_AMT,ACCUM_AMOUNT,DEAL_NET_RATIO,DEAL_AMOUNT_RATIO,TURNOVERRATE,FREE_MARKET_CAP,EXPLANATION,D1_CLOSE_ADJCHRATE,D2_CLOSE_ADJCHRATE,D5_CLOSE_ADJCHRATE,D10_CLOSE_ADJCHRATE,SECURITY_TYPE_CODE)
               curlparams+=(--data-urlencode source=WEB)
               curlparams+=(--data-urlencode client=WEB)
-              curlparams+=(--data-urlencode "filter=(TRADE_DATE<='"${date_range[@]:0:1}"')(TRADE_DATE>="${date_range[@]:1:1}")")
+              curlparams+=(--data-urlencode "filter=(TRADE_DATE<='${date_range[@]:0:1}')(TRADE_DATE>='${date_range[@]:1:1}')")
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
 
               jsonFormat='result.data:(证券名称)SECURITY_NAME_ABBR|indicator(cmp={.CHANGE_RATE})|bold|index,(证券代码)SECURITY_CODE|red,(涨跌幅)CHANGE_RATE|number(+)|append(%)|indicator|SIMPLE,(其他)EXPLAIN|dim,(买入)BILLBOARD_BUY_AMT|number(cn),(卖出)BILLBOARD_SELL_AMT|number(cn),(净买入)BILLBOARD_NET_AMT|number(cn)|indicator|SIMPLE,(龙虎榜成交额)BILLBOARD_DEAL_AMT|number(cn),(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|append(%)|SIMPLE,(上榜原因)EXPLANATION|dim|SIMPLE,(交易日)TRADE_DATE|date(date),(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$'
             ;;
           esac
         ;;
-        搜索|search|s) # https://data.eastmoney.com/xg/xg/calendar.html
+        搜索|search|s) # https://so.eastmoney.com/ann/s?keyword=%E8%99%9A%E6%8B%9F
           outputfile=$outputfile.$3
           local keyword="$4"
           case $3 in
@@ -959,9 +959,7 @@ function json_res() {
             ;;
             文章|article) # https://so.eastmoney.com/carticle/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
-              _ASK_MSG='请输入搜索范围（默认全部）：' ask2 -v '标题 正文' -v 'TITLE CONTENT' -d "$5"
-              local searchScope='ALL'
-              [[ $_ASK_INDEX ]] && searchScope=${_ASK_RESULTS[@]:1:1}
+              local searchScope=$(ask2 -q '请输入搜索范围（默认全部）：' -i "$5" -d 'ALL' -a 'ALL TITLE CONTENT' -a '全部 标题 正文')
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["article"],"client":"web","clientType":"web","clientVersion":"curr","param":{"article":{"searchScope":"'$searchScope'","sort":"DEFAULT","pageIndex":'${PAGE:-1}',"pageSize":'${SIZE:-10}',"preTag":"","postTag":""}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
@@ -1123,7 +1121,7 @@ function json_res() {
           outputfile=$outputfile.$3
           case $3 in
             新股申购|xg) # https://data.eastmoney.com/xg/xg/default.html
-              local apply_date=${4:-$(date +%Y-%m-%d)}
+              local apply_date=$(question2 -q '申购日期' -d "$_today" -i "$4" )
               curlparams+=(--data-urlencode sortColumns=APPLY_DATE,SECURITY_CODE)
               curlparams+=(--data-urlencode sortTypes=1,-1)
               curlparams+=(--data-urlencode reportName=RPTA_APP_IPOAPPLY)
@@ -1131,7 +1129,7 @@ function json_res() {
               curlparams+=(-d quoteType=0)
               curlparams+=(--data-urlencode filter="(APPLY_DATE>'$apply_date')")
 
-              jsonFormat='result.data:(证券名称)SECURITY_NAME|${.SECURITY_NAME} {.SECURITY_CODE}$|red|bold|index,(主营业务)MAIN_BUSINESS|white|dim,(申购日期)APPLY_DATE,(上市日期)LISTING_DATE,(连续一字板数量)CONTINUOUS_1WORD_NUM|cyan,(涨幅)TOTAL_CHANGE,(中签获利)PROFIT|number,(发行价)ISSUE_PRICE|magenta,(预测发行价)PREDICT_ISSUE_PRICE|${.PREDICT_ISSUE_PRICE}/{.PREDICT_ISSUE_PRICE1}/{.PREDICT_ISSUE_PRICE2}$,(市盈率)AFTER_ISSUE_PE,(发行市盈率)AFTER_ISSUE_PE,(行业市盈率)INDUSTRY_PE_NEW,(预测发行市盈率)PREDICT_ISSUE_PE,(预测市盈率)PREDICT_PE,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
+              jsonFormat='result.data|reverse:(证券名称)SECURITY_NAME|red|bold|index|SIMPLE,(证券代码)SECURITY_CODE|SIMPLE,(发行价（元）)ISSUE_PRICE|magenta|SIMPLE,(发行数量（万股）)ISSUE_NUM|magenta|SIMPLE,(连续一字板数量)CONTINUOUS_1WORD_NUM|magenta,(涨幅)TOTAL_CHANGE,(中签获利)PROFIT|number,(预测发行价（元）)PREDICT_ISSUE_PRICE|${.PREDICT_ISSUE_PRICE} {.PREDICT_ISSUE_PRICE1} {.PREDICT_ISSUE_PRICE2}$,(市盈率)AFTER_ISSUE_PE,(发行市盈率)AFTER_ISSUE_PE|SIMPLE,(行业市盈率)INDUSTRY_PE_NEW|SIMPLE,(预测发行市盈率)PREDICT_ISSUE_PE,(预测市盈率)PREDICT_PE,(申购日期)APPLY_DATE|date(date)|SIMPLE,(上市日期)LISTING_DATE|date(date)|magenta,(主营业务)MAIN_BUSINESS|white|dim|SIMPLE,(链接)url|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)info_url|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
             ;;
             IPO审核|ipo) # https://data.eastmoney.com/xg/ipo
               curlparams+=(--data-urlencode sortColumns=UPDATE_DATE,ORG_CODE)
@@ -1142,7 +1140,7 @@ function json_res() {
               local market=$_ASK_RESULT
               [[ $market ]] && curlparams+=(--data-urlencode filter="(PREDICT_LISTING_MARKET=\"$market\")")
 
-              jsonFormat='result.data:(企业名称)DECLARE_ORG|red|bold|index,(行业)CSRC_INDUSTRY|white|dim,(拟上市板块)PREDICT_LISTING_MARKET|cyan,(状态)STATE|magenta,(更新日期)UPDATE_DATE,(受理日期)ACCEPT_DATE,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
+              jsonFormat='result.data:(企业名称)DECLARE_ORG|red|bold|index|SIMPLE,(行业)CSRC_INDUSTRY|white|dim|SIMPLE,(拟上市板块)PREDICT_LISTING_MARKET|cyan|SIMPLE,(状态)STATE|magenta|SIMPLE,(更新日期)UPDATE_DATE|date(date),(受理日期)ACCEPT_DATE|date(date),(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim|SIMPLE'
             ;;
             打新收益|dxsy) # https://data.eastmoney.com/xg/xg/dxsyl.html
               curlparams+=(--data-urlencode sortColumns=LISTING_DATE,SECURITY_CODE)
@@ -1152,7 +1150,7 @@ function json_res() {
               curlparams+=(--data-urlencode quoteType=0)
               curlparams+=(--data-urlencode filter="((APPLY_DATE>'2010-01-01')(|@APPLY_DATE=\"NULL\"))((LISTING_DATE>'2010-01-01')(|@LISTING_DATE=\"NULL\"))(TRADE_MARKET_CODE!=\"069001017\")")
 
-              jsonFormat='result.data:(证券名称)SECURITY_NAME|${.SECURITY_NAME} {.SECURITY_CODE}$|red|bold|index,(主营业务)MAIN_BUSINESS|white|dim,(行业)INDUSTRY_NAME|white|dim,(上市日期)LISTING_DATE,(开盘溢价)LD_OPEN_PREMIUM|number(+)|append(%)|indicator,(首日最高)LD_HIGH_CHANG|number(+)|append(%)|indicator,(首日收盘)LD_CLOSE_CHANGE|number(+)|append(%)|indicator,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
+              jsonFormat='result.data:(证券名称)SECURITY_NAME|red|bold|index|SIMPLE,(证券代码)SECURITY_CODE,(开盘溢价)LD_OPEN_PREMIUM|true|number(+)|append(%)|indicator,(首日最高)LD_HIGH_CHANG|true|number(+)|append(%)|indicator|SIMPLE,(首日收盘)LD_CLOSE_CHANGE|true|number(+)|append(%)|indicator|SIMPLE,(上市日期)LISTING_DATE|date(date)|SIMPLE,(行业)INDUSTRY_NAME|white|dim|SIMPLE,(主营业务)MAIN_BUSINESS|white|dim|SIMPLE,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
             ;;
             增发|qbzf) #
               curlparams+=(--data-urlencode sortColumns=ISSUE_DATE)
@@ -1186,15 +1184,15 @@ function json_res() {
           case $3 in
             财经会议|cjhy) # https://data.eastmoney.com/cjrl/default.html
               curlparams+=(--data-urlencode "filter=(END_DATE>='$today')(START_DATE<'$end_date')(STD_TYPE_CODE=\"1\")")
-              jsonFormat='result.data:(会议名称)FE_NAME|red|bold|index,(会议类型)FE_TYPE|magenta,(主办单位)SPONSOR_NAME,(开始时间)START_DATE,(结束时间)END_DATE,(会议地点)CITY,(会议内容)CONTENT|white|dim'
+              jsonFormat='result.data|reverse:(会议名称)FE_NAME|red|bold|index,(会议类型)FE_TYPE|magenta,(主办单位)SPONSOR_NAME,(开始时间)START_DATE,(结束时间)END_DATE,(会议地点)CITY,(会议内容)CONTENT|white|dim'
             ;;
             经济数据|jjsj) # https://data.eastmoney.com/cjrl/default.html
               curlparams+=(--data-urlencode "filter=(END_DATE>='$today')(START_DATE<'$end_date')(STD_TYPE_CODE=\"2\")")
-              jsonFormat='result.data:(数据名称)FE_NAME|red|bold|index,(数据类型)FE_TYPE|magenta,(公布时间)START_DATE,(地区)CITY'
+              jsonFormat='result.data|reverse:(数据名称)FE_NAME|red|bold|index,(数据类型)FE_TYPE|magenta,(公布时间)START_DATE,(地区)CITY'
             ;;
             其他日程|qtrc) # https://data.eastmoney.com/cjrl/default.html
               curlparams+=(--data-urlencode "filter=(END_DATE>='$today')(START_DATE<'$end_date')(STD_TYPE_CODE=\"3\")")
-              jsonFormat='result.data:(名称)FE_NAME|red|bold|index,(时间)START_DATE'
+              jsonFormat='result.data|reverse:(名称)FE_NAME|red|bold|index,(时间)START_DATE'
             ;;
           esac
           text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
@@ -1202,28 +1200,128 @@ function json_res() {
         股市日历|gsrl)
           outputfile=$outputfile.$3
           url='https://datacenter-web.eastmoney.com/api/data/v1/get'
-          curlparams+=(-d callback=jQuery1123015335331911826122_$(date +%s))
+          curlparams+=(-d callback=jQuery1123015335331911826122_$(timestamp))
           curlparams+=(-d pageSize=${SIZE:-50})
           curlparams+=(-d pageNumber=${PAGE:-1})
           curlparams+=(-d source=WEB)
           curlparams+=(-d client=WEB)
           curlparams+=(--data-urlencode columns=ALL)
-          curlparams+=(-d _=$(date +%s))
-          local today=$(date +%Y-%m-%d)
-
+          curlparams+=(-d _=$(timestamp))
           case $3 in
-            公司动态|gsdt)
+            公司动态|gsdt) # https://data.eastmoney.com/gsrl/gsdt.html
+              local type=$(ask2 -q '分类' -i "$4" -d "RPT_ORGOP_ALL" -a 'RPT_ORGOP_ALL RPT_ORGOP_REORGANIZATION RPT_ORGOP_ACQUISITION RPT_ORGOP_GUARANTEE RPT_ORGOP_EQUITYPLEDGE' -a '全部 资产重组 资产收购 对外担保 股份质押')
               curlparams+=(--data-urlencode sortColumns=SECURITY_CODE)
               curlparams+=(--data-urlencode sortTypes=1)
-              # curlparams+=(--data-urlencode columns=SECURITY_CODE,SECUCODE,SECURITY_NAME_ABBR,EVENT_TYPE,EVENT_CONTENT,TRADE_DATE)
-              curlparams+=(--data-urlencode reportName=RPT_ORGOP_ALL)
-              local trade_date=$(question "请输入日期(默认今天，即$today)" $4)
-              trade_date=${trade_date:-$today}
+              curlparams+=(--data-urlencode reportName=$type)
+              local trade_date="$(question2 -q '日期' -d "$_today" -i "$5")"
               curlparams+=(--data-urlencode "filter=(TRADE_DATE='$trade_date')")
-              jsonFormat='result.data:(股票)SECURITY_NAME_ABBR${.SECURITY_NAME_ABBR} {.SECURITY_CODE}$,(事件类型)EVENT_TYPE,(内容)EVENT_CONTENT|white|dim,(时间)TRADE_DATE'
+              jsonFormat='result.data:(股票)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR}$|red|bold,(事件类型)EVENT_TYPE|magenta,(内容)EVENT_CONTENT|white|dim,(时间)TRADE_DATE,(链接)url|$https://data.eastmoney.com/notices/stock/{.SECURITY_CODE}.html$|dim'
+            ;;
+            股东大会|gddh) # https://data.eastmoney.com/gsrl/gddh.html
+              local all_date="$(question2 -q '日期' -d "$_today" -i "$4")"
+              curlparams+=(--data-urlencode sortColumns=SECURITY_CODE)
+              curlparams+=(--data-urlencode sortTypes=1)
+              curlparams+=(--data-urlencode reportName=RPT_CALENDER_HOLDERSMEETING_HOLDERS)
+              curlparams+=(--data-urlencode "filter=(SHARE_REGIST_DATE='$all_date')(|START_DATE='$all_date')(|END_DATE='$all_date')(|VOTE_START_DATE='$all_date')(|VOTE_END_DATE='$all_date')(|DECISION_DATE='$all_date')(|REDGIST_DATE='$all_date')(|UPDATE_DATE='$all_date')")
+              jsonFormat='result.data:(股票)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR}$|red|bold,(名称)ORG_NAME|magenta,(公告日)UPDATE_DATE,(决议日)DECISION_DATE,(召开日)START_DATE|${.START_DATE} ~ {.END_DATE}$|SIMPLE,(投票日)VOTE_START_DATE|${.VOTE_START_DATE} ~ {.VOTE_END_DATE}$|SIMPLE,(链接)url|$https://data.eastmoney.com/notices/stock/{.SECURITY_CODE}.html$|dim'
+            ;;
+            股份上市|gfss) # https://data.eastmoney.com/gsrl/gfss.html
+              local all_date="$(question2 -q '日期' -d "$_today" -i "$4")"
+              curlparams+=(--data-urlencode sortColumns=SECURITY_CODE)
+              curlparams+=(--data-urlencode sortTypes=1)
+              curlparams+=(--data-urlencode reportName=RPT_CALENDER_LISTEDSHARE)
+              curlparams+=(--data-urlencode "filter=(NOTICE_DATE='$all_date')(|LISTING_DATE='$all_date')")
+              jsonFormat='result.data:(股票)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR}$|red|bold,(变动原因)CHANGE_REASON_TYPE|magenta,(公告日)NOTICE_DATE|date(date),(上市日)LISTING_DATE,(链接)url|$https://data.eastmoney.com/notices/stock/{.SECURITY_CODE}.html$|dim'
+            ;;
+            增发配股|zfpg) # https://data.eastmoney.com/gsrl/zfpg.html
+              outputfile="$outputfile.$4"
+              curlparams+=(--data-urlencode sortColumns=SECUCODE)
+              curlparams+=(--data-urlencode sortTypes=1)
+              curlparams+=(--data-urlencode quoteColumns=f2)
+              local all_date="$(question2 -q '日期' -d "$_today" -i "$4")"
+              case $4 in
+                全部|RPT_CALENDER_INCREASE_ALL)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_INCREASE_ALL)
+                  curlparams+=(--data-urlencode "filter=(UPDATE_DATE='$all_date')")
+                  jsonFormat='result.data:(股票)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR}$|red|bold,(最新价)f2,(类型)EVENT_TYPE,(链接)url|$https://data.eastmoney.com/notices/stock/{.SECURITY_CODE}.html$|dim'
+                ;;
+                定向增发|PRT_CALENDER_INCREASE_DIRECTIONAL)
+                  curlparams+=(--data-urlencode reportName=PRT_CALENDER_INCREASE_DIRECTIONAL)
+                  curlparams+=(--data-urlencode "filter=(SEO_LISTING_DATE='$all_date')(|PUBLISH_DATE='$all_date')(|UPDATE_DATE='$all_date')")
+                  jsonFormat=''
+                ;;
+                公开增发|RPT_CALENDER_INCREASE_PUBLIC)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_INCREASE_PUBLIC)
+                  curlparams+=(--data-urlencode "filter=(EQUITY_RECORD_DATE='$all_date')(|ONLINE_ISSUE_DATE='$all_date')(|RECEIVE_DATE='$all_date')(|SEO_LISTING_DATE='$all_date')(|EX_DIVIDEND_DATE='$all_date')(|PUBLISH_DATE='$all_date')(|UPDATE_DATE='$all_date')")
+                  jsonFormat=''
+                ;;
+                其他发行|RPT_CALENDER_INCREASE_OTHERISSUE)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_INCREASE_OTHERISSUE)
+                  curlparams+=(--data-urlencode "filter=(SEO_LISTING_DATE='$all_date')(|PUBLISH_DATE='$all_date')(|UPDATE_DATE='$all_date')")
+                  jsonFormat='result.data:(股票)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR}$|red|bold,(公告日期)UPDATE_DATE,(最新价)f2,(发行规模（万股）)ISSUE_NUM_UPPER|number,(发行价（元）)EXERCISE_PRICE,总发行数量（万股）)INCENTIVE_SHARES,(实际募集资金（万元）)NET_RAISE_FUNDS,(发行对象)ISSUE_OBJECT,(增发股上市日)SEO_LISTING_DATE,(上市公告日)PUBLISH_DATE,(链接)url|$https://data.eastmoney.com/stockdata/{.SECURITY_CODE}.html$|dim'
+                ;;
+                增发预案|RPT_CALENDER_INCREASE_INCRASEPLAN)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_INCREASE_INCRASEPLAN)
+                  curlparams+=(--data-urlencode "filter=(SEO_LISTING_DATE='$all_date')(|PUBLISH_DATE='$all_date')(|UPDATE_DATE='$all_date')")
+                  jsonFormat='result.data:(股票)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR}$|red|bold,(公告日期)UPDATE_DATE,(最新价)f2,(预计增发价)PRICE_PRINCIPLE|magenta,(预案公告日)LEADERS_PUBLISH_DATE|date(date),(发行规模（万股）)ISSUE_NUM_UPPER|number,(预计募集资金（万元）)FINANCE_AMT_UPPER,(方案进度)APPROVE_PROCESS,(链接)url|$https://data.eastmoney.com/stockdata/{.SECURITY_CODE}.html$|dim'
+                ;;
+                配股实施|RPT_CALENDER_INCREASE_EXECUTE)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_INCREASE_EXECUTE)
+                  curlparams+=(--data-urlencode "filter=(REGISTER_DATE='$all_date')(|PAYSTART_DATE='$all_date')(|PAYEND_DATE='$all_date')(|DIVBASE_DATE='$all_date')(|LISTINGPUBLISH_DATE='$all_date')(|LISTING_DATE='$all_date')(|UPDATE_DATE='$all_date')")
+                  jsonFormat=''
+                ;;
+                配股预案|RPT_CALENDER_INCREASE_RATIONEDPLAN)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_INCREASE_RATIONEDPLAN)
+                  curlparams+=(--data-urlencode "filter=(DIRECTORS_DATE='$all_date')(|HOLDERS_DECISION_DATE='$all_date')(|HOLDERS_PROVED_DATE='$all_date')")
+                  jsonFormat=''
+                ;;
+              esac
+            ;;
+            年报季报|nbjb) # https://data.eastmoney.com/gsrl/nbjb.html
+              local type=$(ask2 -q '分类' -i "$4" -d "RPT_ORGOP_ALL"\
+              -a 'RPT_CALENDER_YEARQUARTER_ALL RPT_CALENDER_YEARQUARTER_REPORT RPT_CALENDER_YEARQUARTER_FASTREPORT RPT_CALENDER_YEARQUARTER_PREREPOR RPT_CALENDER_YEARQUARTER_ASSIGNSCHEME'\
+              -a '全部 资产重组 资产收购 对外担保 股份质押')
+              curlparams+=(--data-urlencode sortColumns=SECUCODE)
+              curlparams+=(--data-urlencode sortTypes=1)
+              local all_date="$(question2 -q '日期' -d "$_today" -i "$4")"
+              outputfile="$outputfile.$4"
+              case $4 in
+                全部|RPT_CALENDER_YEARQUARTER_ALL)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_YEARQUARTER_ALL)
+                  curlparams+=(--data-urlencode "filter=(UPDATE_DATE='$all_date')")
+                  jsonFormat=''
+                ;;
+                业绩报表|RPT_CALENDER_YEARQUARTER_REPORT)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_YEARQUARTER_REPORT)
+                  curlparams+=(--data-urlencode "filter=(UPDATE_DATE='$all_date')")
+                  jsonFormat=''
+                ;;
+                业绩快报|RPT_CALENDER_YEARQUARTER_FASTREPORT)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_YEARQUARTER_FASTREPORT)
+                  curlparams+=(--data-urlencode "filter=(UPDATE_DATE='$all_date')")
+                  jsonFormat=''
+                ;;
+                业绩预告|RPT_CALENDER_YEARQUARTER_PREREPOR)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_YEARQUARTER_PREREPOR)
+                  curlparams+=(--data-urlencode "filter=(UPDATE_DATE='$all_date')")
+                  jsonFormat=''
+                ;;
+                分红转增|RPT_CALENDER_YEARQUARTER_ASSIGNSCHEME)
+                  curlparams+=(--data-urlencode reportName=RPT_CALENDER_YEARQUARTER_ASSIGNSCHEME)
+                  curlparams+=(--data-urlencode "filter=(LEADERS_PUBLISH_DATE='$all_date')(|HOLDERS_PUBLISH_DATE='$all_date')(|EQUITY_RECORD_DATE='$all_date')(|EX_DIVIDEND_DATE='$all_date')(|PAY_CASH_DATE='$all_date')(|EXECUTE_DATE='$all_date')")
+                  jsonFormat=''
+                ;;
+              esac
             ;;
           esac
           text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
+        ;;
+        停复牌提示|tfpts)
+          curlparams+=(--data-urlencode sortColumns=SUSPEND_START_DATE)
+          curlparams+=(--data-urlencode sortTypes=-1)
+          curlparams+=(--data-urlencode reportName=RPT_CUSTOM_SUSPEND_DATA_INTERFACE)
+          curlparams+=(--data-urlencode filter=(MARKET="全部")(DATETIME='2022-11-06'))
+          jsonFormat=''
         ;;
       esac
     ;;
