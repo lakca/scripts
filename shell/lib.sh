@@ -230,7 +230,8 @@ function ask2() {
   unset _ASK_INDEX
   unset _ASK_RESULT
   unset _ASK_RESULTS
-  local question=${_ASK_MSG}
+  local question="$_ASK_MSG"
+  local question_desc="$_ASK_MSG2"
   unset _ASK_MSG
   local values=()
   local input
@@ -238,17 +239,19 @@ function ask2() {
   local inputIndex
   local defaultIndex
 
-  while getopts 'q:a:i:d:' opt; do
+  while getopts 'q:Q:a:i:d:' opt; do
     case $opt in
       q) question="$OPTARG";;
+      Q) question_desc="$OPTARG";;
       a) values+=("$OPTARG");;
       i) input="$OPTARG";;
       d) default="$OPTARG";;
     esac
   done
 
-  question="\033[33m【交互】\033[0m请（从上述序号或值中选择）输入\033[31m${question}\033[0m"
-  [[ $default ]] && question="${question}（默认值为\033[2m${default}\033[0m）："
+  [[ "$question_desc" ]] && question_desc="，${question_desc}"
+  question="\033[33m【交互】\033[0m请\033[2;4m从上述序号或值中选择\033[22;24m输入\033[31m${question}\033[0m${question_desc}："
+  [[ $default ]] && question="${question}（默认值为\033[2;3m${default}\033[0m）："
 
   local first=(${values[@]:0:1})
   local indexes=${!first[@]}
@@ -269,13 +272,13 @@ function ask2() {
   if [[ -z $inputIndex ]]; then
     printf '\n' >&2
     for i in "${!first[@]}"; do
-      printf '%b' "\033[31m$i\033[0m" >&2
+      printf '%b' "\033[3;32m$i\033[0m" >&2
       for value in "${values[@]}"; do
         value=($value)
-        printf ',' >&2
-        printf '%b' "\033[32m${value[@]:$i:1}\033[0m" >&2
+        printf ' ' >&2
+        printf '%b' "\033[3;40m${value[@]:$i:1}\033[0m" >&2
       done
-      printf '  \033[2;37m|\033[0m  ' >&2
+      printf '  \033[2m|\033[0m  ' >&2
     done
     printf '\n' >&2
 
@@ -302,7 +305,7 @@ function ask2() {
       [[ ! $_ASK_RESULT ]] && _ASK_RESULT="${value[@]:$index:1}"
       _ASK_RESULTS+=("${value[@]:$index:1}")
     done
-    echo -en '\033[33m【输入】\033[0m\033\033[2;3;37m您输入的有效值为：\033[0m' >&2
+    echo -en '\033[33m【输入】\033[0m\033\033[2;3;37m您输入的结果为：\033[0m' >&2
     echo -e "\033[2;3;31m${_ASK_RESULTS[*]}\033[0m" >&2
     echo $_ASK_RESULT
   fi
@@ -325,11 +328,13 @@ function question() {
 
 function question2() {
   local question
+  local question_desc
   local default
   local input
-  while getopts 'q:d:i:' opt; do
+  while getopts 'q:Q:d:i:' opt; do
     case $opt in
       q) question="$OPTARG";;
+      Q) question_desc="$OPTARG";;
       d) default="$OPTARG";;
       i) input="$OPTARG";;
     esac
@@ -337,8 +342,8 @@ function question2() {
   if [[ "$input" ]]; then
     echo "$input"
   else
-    local msg="\033[33m【交互】\033[0m请输入\033[31m$question\033[0m"
-    [[ $default ]] && msg="${msg}（默认值为\033[2m${default}\033[0m）："
+    local msg="\033[33m【交互】\033[0m请输入\033[31m${question}\033[0m${question_desc}"
+    [[ $default ]] && msg="${msg}（默认值为\033[2;3m${default}\033[22;23m）："
     msg="$msg\033[31m"
     echo -en "$msg" >&2
     read

@@ -31,13 +31,8 @@ ZHIHU_HOT_URL='https://www.zhihu.com/billboard'
 ZHIHU_DOMAINS=(全部 数码 科技 互联网 商业财经 职场 教育 法律 军事 汽车 人文社科 自然科学 工程技术 情感 心理学 两性 母婴亲子 家居 健康 艺术 音乐 设计 影视娱乐 宠物 体育电竞 运动健身 动漫游戏 美食 旅行 时尚)
 ZHIHU_DOMAINS_NUM=(0  100001  100002  100003  100004  100005  100006  100007  100008  100009  100010  100011  100012  100013  100014  100015  100016  100017  100018  100019  100020  100021  100022  100023  100024  100025  100026  100027  100028  100029)
 
-function ask_date() {
-  local d=$(question "请输入日期（日期格式如$(date +%Y-%m-%d)）：")
-  echo ${d:-$1}
-}
-
-function ask_date2() {
-  local d=($(question "请输入起止日期（如\033[2m$(date +%Y-%m-%d) $(date +%Y-%m-%d)\033[0m，相同可以省略，默认为\033[2m$1 $2\033[0m）："))
+function ask_date_range() {
+  local d=($(question2 -q "${_ASK_DATE_RANGE:-起止日期}" -Q "（如\033[4m$(date +%Y-%m-%d) $(date +%Y-%m-%d)\033[24m，相同可以省略第二个值）" -d "$1 $2"))
   [[ ! "${d[@]:0:1}" ]] && d[0]=$1
   [[ ! "${d[@]:1:1}" ]] && d[1]=$2
   echo "${d[@]}"
@@ -140,7 +135,7 @@ function json_res() {
           patterns=('_' '"(category|ad_type)":"[^"]*"' '"num":[^,]*,' '"raw_hot":[^,]*,' '_')
           indexes=(4 4 3 3 4)
           transformers=('_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-          jsonFormat='data.band_list:(标题)word|red|bold|index,(分类)category|magenta,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word}%23$'
+          jsonFormat='data.band_list|TABLE:(标题)word|red|bold|index,(分类)category|magenta,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word}%23$'
         ;;
         微博|post|ps)
           local postid="$3" # M7OL9bpQP
@@ -878,13 +873,16 @@ function json_res() {
               text=$(curl -s $url | grep -o '{.*}')
               jsonFormat='data.diff|TABLE:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|append(%)|indicator,(成交额)f6|number(cn),(代码)f12'
             ;;
+            *)
+
+            ;;
           esac
         ;;
         数据|data)
           outputfile=$outputfile.$3
           case $3 in
             龙虎榜|lhb) # https://data.eastmoney.com/stock/tradedetail.html
-              local date_range=($(ask_date2 $_today $_today))
+              local date_range=($(ask_date_range "$_today" "$_today"))
               url='https://datacenter-web.eastmoney.com/api/data/v1/get'
               curlparams+=(--data-urlencode callback=jQuery112307241680021281278_$(timestamp))
               curlparams+=(--data-urlencode sortColumns=SECURITY_CODE,TRADE_DATE)
@@ -895,7 +893,7 @@ function json_res() {
               curlparams+=(--data-urlencode columns=SECURITY_CODE,SECUCODE,SECURITY_NAME_ABBR,TRADE_DATE,EXPLAIN,CLOSE_PRICE,CHANGE_RATE,BILLBOARD_NET_AMT,BILLBOARD_BUY_AMT,BILLBOARD_SELL_AMT,BILLBOARD_DEAL_AMT,ACCUM_AMOUNT,DEAL_NET_RATIO,DEAL_AMOUNT_RATIO,TURNOVERRATE,FREE_MARKET_CAP,EXPLANATION,D1_CLOSE_ADJCHRATE,D2_CLOSE_ADJCHRATE,D5_CLOSE_ADJCHRATE,D10_CLOSE_ADJCHRATE,SECURITY_TYPE_CODE)
               curlparams+=(--data-urlencode source=WEB)
               curlparams+=(--data-urlencode client=WEB)
-              curlparams+=(--data-urlencode "filter=(TRADE_DATE<='${date_range[@]:0:1}')(TRADE_DATE>='${date_range[@]:1:1}')")
+              curlparams+=(--data-urlencode "filter=(TRADE_DATE<='${date_range[@]:1:1}')(TRADE_DATE>='${date_range[@]:0:1}')")
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
 
               jsonFormat='result.data:(证券名称)SECURITY_NAME_ABBR|indicator(cmp={.CHANGE_RATE})|bold|index,(证券代码)SECURITY_CODE|red,(涨跌幅)CHANGE_RATE|number(+)|append(%)|indicator|SIMPLE,(其他)EXPLAIN|dim,(买入)BILLBOARD_BUY_AMT|number(cn),(卖出)BILLBOARD_SELL_AMT|number(cn),(净买入)BILLBOARD_NET_AMT|number(cn)|indicator|SIMPLE,(龙虎榜成交额)BILLBOARD_DEAL_AMT|number(cn),(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|append(%)|SIMPLE,(上榜原因)EXPLANATION|dim|SIMPLE,(交易日)TRADE_DATE|date(date),(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$'
@@ -915,19 +913,18 @@ function json_res() {
               curlparams+=(--data-urlencode "keyword=$keyword")
               jsonFormat='result.cmsArticleWeb:(标题)title|red|bold|index,(内容)content|white|dim,(媒体)mediaName,(时间)date,(链接)url|dim'
             ;;
-            行情|quote) # https://so.eastmoney.com/quotation/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
-              local type="$5"
+            代码2|code2) # https://so.eastmoney.com/quotation/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               local types=(AB_STOCK AB股 INDEX 指数 BK 板块 HK 港股 UN 美股 UK 英股 TB 三板 FUND 基金 DEBT 债券 FU_OR_OP 期货期权 FE 外汇)
-              _ASK_MSG='如果仅返回特定类型，请输入（否则回车即可）:' ask "$(selectColumns "${types[*]}" 1 1)" $type
-              type=$(selectColumn "${types[*]}" $_ASK_INDEX -1)
-              type=${type:-ALL}
+              local type=$(ask2 -i "$type" -d 'AB_STOCK' -q '市场类型'\
+              -a "ALL AB_STOCK INDEX BK HK UN UK TB FUND DEBT FU_OR_OP FE"\
+              -a "所有 AB股 指数 板块 港股 美股 英股 三板 基金 债券 期货期权 外汇")
 
               url='https://search-api-web.eastmoney.com/search/jsonp'
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["codetableLabelWeb"],"client":"web","clientType":"wap","clientVersion":"curr","param":{"codetableLabelWeb":{"pageIndex":'${PAGE:-1}',"pageSize":'${SIZE:-10}',"preTag":"","postTag":"","isHighlight":false,"label":"'$type'"}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '\[.*\]')
-              jsonFormat=':(分类)name|red|bold|SIMPLE,(分类)type,(列表)quoteList|TABLE|SIMPLE:(证券名称)shortName|green|italic|SIMPLE,(行情)url|SIMPLE|$http://quote.eastmoney.com/unify/r/{.unifiedId}$|dim,(股吧)guba|$http://guba.eastmoney.com/interface/GetList.aspx?code={.unifiedId}$|dim'
+              jsonFormat=':(分类名称)name|red|bold|SIMPLE,(分类)type,(列表)quoteList|TABLE|SIMPLE:(证券名称)shortName|green|SIMPLE,(证券代码)unifiedCode|magenta|SIMPLE,(行情)url|SIMPLE|$http://quote.eastmoney.com/unify/r/{.unifiedId}$|dim,(股吧)guba|$http://guba.eastmoney.com/interface/GetList.aspx?code={.unifiedId}$|dim'
             ;;
             资讯|CMS) # https://so.eastmoney.com/news/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://searchapi.eastmoney.com/bussiness/Web/GetCMSSearchList'
@@ -959,7 +956,7 @@ function json_res() {
             ;;
             文章|article) # https://so.eastmoney.com/carticle/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
-              local searchScope=$(ask2 -q '请输入搜索范围（默认全部）：' -i "$5" -d 'ALL' -a 'ALL TITLE CONTENT' -a '全部 标题 正文')
+              local searchScope=$(ask2 -q '搜索范围' -i "$5" -d 'ALL' -a 'ALL TITLE CONTENT' -a '全部 标题 正文')
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["article"],"client":"web","clientType":"web","clientVersion":"curr","param":{"article":{"searchScope":"'$searchScope'","sort":"DEFAULT","pageIndex":'${PAGE:-1}',"pageSize":'${SIZE:-10}',"preTag":"","postTag":""}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
@@ -1020,7 +1017,7 @@ function json_res() {
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='result.baikeWeb:(名称)encyclopediaName|red|bold,(证券)stockName|${.stockName} {.stockCode}$|magenta,(描述)description|dim,(链接)url|$https://baike.eastmoney.com/item/{.encyclopediaName}$|dim'
             ;;
-            关联搜索|suggest)
+            建议词|suggestions)
               url='https://searchapi.eastmoney.com/api/dropdown/get'
               curlparams+=(--data-urlencode count=${SIZE:-10})
               curlparams+=(--data-urlencode cb=jQuery351042763412117835364_$(timestamp))
@@ -1029,7 +1026,8 @@ function json_res() {
               text=$(curl -s $url "${curlparams[@]}" | grep -o '\[.*\]')
               jsonFormat='|TABLE:(关键词)value|red|bold,(链接)url|$https://so.eastmoney.com/web/s?keyword={.value}$|dim'
             ;;
-            *)
+            建议|suggest) # 输入框的下拉搜索结果
+              local keyword="$5"
               url='https://searchapi.eastmoney.com/api/suggest/get'
               curlparams+=(--data-urlencode cb=jQuery1124007392431488856332_$(timestamp))
               curlparams+=(--data-urlencode input=$keyword)
@@ -1040,53 +1038,56 @@ function json_res() {
               curlparams+=(--data-urlencode classify=)
               curlparams+=(--data-urlencode securitytype=)
               curlparams+=(--data-urlencode status=)
-              curlparams+=(--data-urlencode count=${SIZE:-10})
+              curlparams+=(--data-urlencode count=${SIZE:-20})
               curlparams+=(--data-urlencode _=$(timestamp))
               local marketTypes=(1 沪A 2 深A 5 指数 _TB 三板 7 美股 8 基金 9 板块)
-              case $3 in
-                证券|QuotationCodeTable)
-                  type=14
+              local _type
+              case $4 in
+                证券|代码|QuotationCodeTable|code)
+                  _type=14
                   jsonFormat='QuotationCodeTable.Data|TABLE:(股票名称)Name|red|bold,(代码)UnifiedCode|magenta,(市场)SecurityTypeName,(市场2)JYS,(拼音)PinYin|red,(链接)QuoteID|$http://quote.eastmoney.com/unify/r/{.QuoteID}$|dim'
                 ;;
-                股吧|GubaCodeTable)
-                  type=8
+                股吧|GubaCodeTable|guba)
+                  _type=8
                   jsonFormat='GubaCodeTable.Data|TABLE:(股吧名称)ShortName|red|bold,(关联代码)RelatedCode|magenta,(链接)Url|dim'
                 ;;
-                专题|CMSTopic)
-                  type=16
+                专题|CMSTopic|topic)
+                  _type=16
                   jsonFormat='CMSTopic.Data|TABLE:(专题名称)Topic_Name,(链接)Topic_PinYin|$http://topic.eastmoney.com/{.Topic_PinYin}/$'
                 ;;
-                主题|CategoryInvestment)
-                  type=43
+                主题|CategoryInvestment|category)
+                  _type=43
                   jsonFormat='CategoryInvestment.Data|TABLE:(主题)CategoryName|red|bold,(链接)url|$http://quote.eastmoney.com/zhuti/topic/{.CategoryCode}$|dim'
                 ;;
-                数据|DataCenter)
-                  type=38
+                数据|DataCenter|data)
+                  _type=38
                   jsonFormat='DataCenter.Data|TABLE:(数据名称)Name|red|bold,(链接)PageUrl|dim'
                 ;;
-                财富账号|FortuneAccount)
-                  type=35
+                财富账号|FortuneAccount|account)
+                  _type=35
                   jsonFormat='FortuneAccount.Data|TABLE:'
                 ;;
                 话题|GubaTopic)
-                  type=501
+                  _type=501
                   jsonFormat='GubaTopic.Data|TABLE:(话题名称)Name|red|bold,(链接)Id|$http://gubatopic.eastmoney.com/topic_v3.html?htid={.Id}$|dim'
                 ;;
-                百科|NewEncyclopedia)
-                  type=2
+                百科|NewEncyclopedia|wiki)
+                  _type=2
                   jsonFormat='NewEncyclopedia.Data|TABLE:(词条名称)EncyclopediaName|red|bold,(链接)Url|$http://baike.eastmoney.com/item/{.EncyclopediaName}$|dim'
                 ;;
                 用户|Passport)
-                  type=7
+                  _type=7
                   jsonFormat='Passport.Data|TABLE:(用户名称)ualias|red|bold,(链接)url|dim'
                 ;;
                 组合|Portfolio)
-                  type=3
+                  _type=3
                   jsonFormat='Portfolio.Data|TABLE:(组合名称)zuheName|red|bold,(链接)url|dim'
                 ;;
               esac
-              curlparams+=(--data-urlencode type=$type)
-              text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
+              if [[ -n $_type ]]; then
+                curlparams+=(--data-urlencode type=$_type)
+                text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
+              fi
             ;;
           esac
         ;;
@@ -1135,9 +1136,7 @@ function json_res() {
               curlparams+=(--data-urlencode sortColumns=UPDATE_DATE,ORG_CODE)
               curlparams+=(--data-urlencode sortTypes=-1,-1)
               curlparams+=(--data-urlencode reportName=RPT_IPO_INFOALLNEW)
-              local markets=(科创板 创业板 上海主板 深圳主板 北交所)
-              _ASK_MSG='请输入板块（不指定板块回车即可）：' ask "${markets[*]}" $4
-              local market=$_ASK_RESULT
+              local market=$(ask2 -i "$4" -d '0' -q '（拟）上市板块' -a "科创板 创业板 上海主板 深圳主板 北交所")
               [[ $market ]] && curlparams+=(--data-urlencode filter="(PREDICT_LISTING_MARKET=\"$market\")")
 
               jsonFormat='result.data:(企业名称)DECLARE_ORG|red|bold|index|SIMPLE,(行业)CSRC_INDUSTRY|white|dim|SIMPLE,(拟上市板块)PREDICT_LISTING_MARKET|cyan|SIMPLE,(状态)STATE|magenta|SIMPLE,(更新日期)UPDATE_DATE|date(date),(受理日期)ACCEPT_DATE|date(date),(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim|SIMPLE'
@@ -1317,10 +1316,11 @@ function json_res() {
           text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
         ;;
         停复牌提示|tfpts)
+          local all_date=$(question2 -i "$3" -d "$_today" -q '日期')
           curlparams+=(--data-urlencode sortColumns=SUSPEND_START_DATE)
           curlparams+=(--data-urlencode sortTypes=-1)
           curlparams+=(--data-urlencode reportName=RPT_CUSTOM_SUSPEND_DATA_INTERFACE)
-          curlparams+=(--data-urlencode filter=(MARKET="全部")(DATETIME='2022-11-06'))
+          curlparams+=(--data-urlencode "filter=(MARKET=\"全部\")(DATETIME='$all_date')")
           jsonFormat=''
         ;;
       esac
@@ -1342,22 +1342,23 @@ function help() {
     local help_msg="$(cat $0 | grep -oE '^\s*[^|)( ]+(\|[^|)( ]*)*\)\s*(#.*)?$' | sed 's/    / /g;')"
     local stylish=(-e '/^ \S\+/i\ ' -e 's/^ \( \+\)/\1\1\1\1/;s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;s/\(\s*\)\([^ |)]\+\)\([|)]\)/\1\\033[31m\2\\033[0m\3/;s/\(|\)\([^ |)]\+\)/\1\\033[32m\2\\033[0m/g;/^\S/i\ ')
     local endLevel=0
-    for i in $#; do [[ ${@:$i:1} == '-h' ]] && endLevel=$i; done
+    for i in $(seq 0 $#); do [[ ${@:$i:1} == '-h' ]] && endLevel=$i; done
     [[ $endLevel == 1 ]] && echo -e "$(sed "${stylish[@]}" <<< "$help_msg")" && exit 0
     echo -e "$(
       nextLevel=1
       while IFS= read line; do
         lineLevel=$(grep -o '^\s*' <<< "$line")
         lineLevel=${#lineLevel}
+        local pattern="${@:$lineLevel:1}"
         # nextLevel至少为1
         [[ $nextLevel < 1 ]] && nextLevel=1
         # echo "$nextLevel,$lineLevel,$line"
         # 回溯
-        [[ $lineLevel < $nextLevel ]] && { [[ $line =~ ${@:$lineLevel:1} ]] &&  { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
+        [[ $lineLevel < $nextLevel ]] && { [[ $line =~ "$pattern" ]] &&  { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
         # 打印全部子命令
         [[ $lineLevel -ge $endLevel && $nextLevel -ge $endLevel ]] &&  echo -e "$line" && continue
         # 匹配上nextLevel，打印
-        [[ $lineLevel = $nextLevel && $line =~ ${@:$lineLevel:1} ]] && { echo -e "$line" && nextLevel=$((nextLevel + 1)) && continue; }
+        [[ $lineLevel = $nextLevel && $line =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((nextLevel + 1)) && continue; }
       done <<< "$help_msg" | sed "${stylish[@]}"
     )"
   else
