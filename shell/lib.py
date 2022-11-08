@@ -413,14 +413,24 @@ class Pipe:
     @classmethod
     def _interpolate(cls, template, data, *args, **kwargs):
         def replacer(m):
-            token = tokenize(m.group(1)).data
-            key = token["key"]
-            keys = token["keys"]
+            key = m.group(1)
+            escaped = False
+            index = -1
+            token = None
+            # 兼容定义中的绝对路径，如 data.band_list:word
+            for (char, i) in enumerate(key):
+                if char == '\\': escaped = True
+                elif char == '|' and not escaped: index = i
+                else: escaped = False
+            if index > -1:
+                token = tokenize(key[index:]).data
+                key = key[0:index]
+
             if key.startswith("."):
                 value = str(retrieve(data.get("__", ""), key.split(".")[1:], ""))
             else:
-                value = str(retrieve(data, keys, ""))
-            return cls.apply(value, token["pipes"], data)
+                value = str(retrieve(data, [key], ""))
+            return cls.apply(value, token["pipes"], data) if token else value
 
         return re.sub(r"\{([^\}]+)\}", replacer, template)
 
