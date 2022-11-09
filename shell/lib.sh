@@ -154,29 +154,28 @@ function print_record() {
   done
 }
 
-function selectColumns() {
-  local array=($1)
-  local skip=${2:-1}
-  local offset=${3:-0}
-  local length=${#array[@]}
-  local -a left=()
-  debug $1
-  debug $2
-  for i in $(seq $offset $((skip+1)) $((length-1))); do
-    left+=(${array[@]:$i:1})
+function select_columns() {
+  local OPTIND
+  local -a array=()
+  local -i offset=0
+  local -i skip=1
+  while getopts 'a:o:s:' opt; do
+    case $opt in
+      a) # 数组
+        array=($OPTARG);;
+      o) # 偏移
+        offset=$OPTARG;;
+      s) # 跳步
+        skip=$OPTARG;;
+    esac
   done
-  debug ${left[@]}
-  echo ${left[@]}
-}
-
-function selectColumn() {
-  local array=($1)
-  local offset=${3:-0}
-  local index=$(($2 + $offset))
-  debug $1
-  debug $2
-  debug $3
-  echo ${array[@]:$index:1}
+  local length=${#array[@]}
+  local -a selections=()
+  debug "offset: $offset, skip: $skip, length: $length"
+  for i in $(seq $offset $((skip+1)) $((length-1))); do
+    selections+=("${array[@]:$i:1}")
+  done
+  echo "${selections[@]}"
 }
 
 function ensureFolder() {
@@ -227,56 +226,100 @@ function ask() {
 }
 
 function ask2() {
-  unset _ASK_INDEX
-  unset _ASK_RESULT
-  unset _ASK_RESULTS
   local question="$_ASK_MSG"
   local question_desc="$_ASK_MSG2"
-  unset _ASK_MSG
-  local values=()
+  # 数组列表
+  local arraies=()
+  # 头部数组（获取数组长度和索引的基准数组）
+  local headArray=()
+  # 大数组（用于将所有数组的同位值放在一起便于观看）
+  local bigArray=()
+  # 大数组包含的数组数量
+  local bigArraySize
   local input
   local default
   local inputIndex
   local defaultIndex
+  local echoIndex=0
+  unset _ASK_INDEX
+  unset _ASK_RESULT
+  unset _ASK_RESULTS
+  unset _ASK_MSG
+  unset _ASK_MSG2
 
-  while getopts 'q:Q:a:i:d:' opt; do
+  while getopts 'q:Q:a:A:n:i:d:g:01' opt; do
     case $opt in
-      q) question="$OPTARG";;
-      Q) question_desc="$OPTARG";;
-      a) values+=("$OPTARG");;
-      i) input="$OPTARG";;
-      d) default="$OPTARG";;
+      q) # 问题内容
+        question="$OPTARG";;
+      Q) # 问题补充说明
+        question_desc="$OPTARG";;
+      a) # 值数组
+        arraies+=("$OPTARG")
+        [[ ! "${headArray[*]}" && ! "${bigArray[*]}" ]] && headArray=($OPTARG)
+        ;;
+      A) # 大数组（用于将所有数组的同位值放在一起便于观看）
+        bigArray=($OPTARG)
+        ;;
+      n) # 大数组包含的数组数量，如果前面通过`-a`提供了头部数组，可以省略该选项
+        bigArraySize=$OPTARG
+        debug "bigArraySize: $bigArraySize"
+        ;;
+      i) # 输入值
+        input="$OPTARG";;
+      d) # 默认值
+        default="$OPTARG";;
+      g) # _ASK_RESULT（和输出结果）的数组索引
+        echoIndex="$OPTARG";;
+      0) # _ASK_RESULT（和输出结果）的数组索引为0
+        echoIndex=0;;
+      1) # _ASK_RESULT（和输出结果）的数组索引为1
+        echoIndex=1;;
     esac
   done
 
+  if [[ "${bigArray[*]}" ]]; then
+    if [[ $bigArraySize ]]; then
+      local skip=$((bigArraySize - 1))
+      for i in $(seq 0 $skip); do
+        arraies+=("$(select_columns -o $i -s $skip -a "${bigArray[*]}")")
+      done
+    fi
+  fi
+
+  echo ${#arraies[@]}
+  echo ${arraies[@]}
+  exit 1
+
+  # 索引数组为头部数组的索引数组
+  local indexArray=${!headArray[@]}
+
+  # 用于比较的数组包含位于头部的索引数组
+  local comparingArraies=("${indexArray[*]}" "${arraies[@]}")
+
   [[ "$question_desc" ]] && question_desc="，${question_desc}"
   question="\033[33m【交互】\033[0m请\033[2;4m从上述序号或值中选择\033[22;24m输入\033[31m${question}\033[0m${question_desc}："
-  [[ $default ]] && question="${question}（默认值为\033[2;3m${default}\033[0m）："
 
-  local first=(${values[@]:0:1})
-  local indexes=${!first[@]}
+  debug 问题：$question, 输入值：$input, 选项：${arraies[@]}
 
-  values+=("${indexes[*]}")
-
-  debug 问题：$question, 输入值：$input, 选项：${values[@]}
-
-  for value in "${values[@]}"; do
-    [[ ! $inputIndex ]] && inputIndex=$(indexof "$value" $input)
-    [[ ! $defaultIndex ]] && defaultIndex=$(indexof "$value" $default)
+  for array in "${comparingArraies[@]}"; do
+    [[ ! $inputIndex ]] && inputIndex=$(indexof "$array" $input)
+    [[ ! $defaultIndex ]] && defaultIndex=$(indexof "$array" $default)
   done
+  # 提问增加默认值信息
+  [[ $defaultIndex ]] && question="${question}（默认值为\033[2;3m${default}\033[0m）："
 
-  debug 索引：$inputIndex, $defaultIndex
+  debug 输入索引：$inputIndex, 默认索引：$defaultIndex
 
   local reply
 
   if [[ -z $inputIndex ]]; then
     printf '\n' >&2
-    for i in "${!first[@]}"; do
+    for i in "${!headArray[@]}"; do
       printf '%b' "\033[3;32m$i\033[0m" >&2
-      for value in "${values[@]}"; do
-        value=($value)
+      for array in "${comparingArraies[@]}"; do
+        array=($array)
         printf ' ' >&2
-        printf '%b' "\033[3;40m${value[@]:$i:1}\033[0m" >&2
+        printf '%b' "\033[3;40m${array[@]:$i:1}\033[0m" >&2
       done
       printf '  \033[2m|\033[0m  ' >&2
     done
@@ -288,28 +331,32 @@ function ask2() {
   fi
 
   if [[ -n $reply ]]; then
-    for value in "${values[@]}"; do
-      debug 回复：$reply, 数组：$value
-      inputIndex=$(_INDEXOF_IGNORE_CASE=1 indexof "$value" $reply)
+    for array in "${comparingArraies[@]}"; do
+      debug 交互：$reply, 数组：$array
+      inputIndex=$(_INDEXOF_IGNORE_CASE=1 indexof "$array" $reply)
       [[ $inputIndex ]] && break
     done
   fi
 
   local index=${inputIndex:-$defaultIndex}
 
+  debug 输入索引：$inputIndex, 输入后索引：$index
+
   if [[ $index ]]; then
     _ASK_INDEX=$index
     _ASK_RESULTS=()
-    for value in "${values[@]}"; do
-      value=($value)
-      [[ ! $_ASK_RESULT ]] && _ASK_RESULT="${value[@]:$index:1}"
-      _ASK_RESULTS+=("${value[@]:$index:1}")
+    for i in "${!arraies[@]}"; do
+      local array=(${arraies[@]:$i:1})
+      [[ $i == $echoIndex ]] && _ASK_RESULT="${array[@]:$index:1}"
+      _ASK_RESULTS+=("${array[@]:$index:1}")
     done
     echo -en '\033[33m【输入】\033[0m\033\033[2;3;37m您输入的结果为：\033[0m' >&2
     echo -e "\033[2;3;31m${_ASK_RESULTS[*]}\033[0m" >&2
     echo $_ASK_RESULT
   fi
 }
+
+ask2 -A 'a 1 b 2 c 3' -n 2 -a 'x y z'
 
 function question() {
   local msg="$1"
@@ -331,6 +378,7 @@ function question2() {
   local question_desc
   local default
   local input
+  local OPTIND
   while getopts 'q:Q:d:i:' opt; do
     case $opt in
       q) question="$OPTARG";;
@@ -342,17 +390,45 @@ function question2() {
   if [[ "$input" ]]; then
     echo "$input"
   else
-    local msg="\033[33m【交互】\033[0m请输入\033[31m${question}\033[0m${question_desc}"
-    [[ $default ]] && msg="${msg}（默认值为\033[2;3m${default}\033[22;23m）："
-    msg="$msg\033[31m"
+    local msg="\033[33m【交互】\033[0m请输入\033[31m${question}\033[0m"
+    [[ $question_desc ]] && msg="${msg}，${question_desc}"
+    [[ $default ]] && msg="${msg}（默认值为\033[2;3m${default}\033[22;23m）" || msg="${msg}"
+    msg="${msg}：\033[31m"
     echo -en "$msg" >&2
     read
     debug $REPLY
     echo -en '\033[0m' >&2
     local answer
     [[ -z $REPLY ]] && answer="$default" || answer="$REPLY"
-    echo -e "\033[33m【输入】\033[0m\033[2;3;37m您输入的有效值为：\033[0m\033[2;3;31m$answer\033[0m" >&2
+    [[ ! $_ASK_NO_VERBOSE ]] && echo -e "\033[33m【输入】\033[0m\033[2;3;37m您输入的有效值为：\033[0m\033[2;3;31m$answer\033[0m" >&2
     echo "$answer"
+  fi
+}
+
+function whether() {
+  local question
+  local required
+  local zero
+  local OPTIND
+  while getopts 'q:y0' opt; do
+    case $opt in
+      q) question="$OPTARG";;
+      y) required=1;;
+      0) zero=1;;
+    esac
+  done
+  if [[ $required ]]; then
+    while true; do
+      answer=$(_ASK_NO_VERBOSE=1 question2 -q "是否${question}" -Q "是则输入\033[3;31my\033[0m，否则输入\033[3;31mn\033[0m")
+      [[ "$answer" == y ]] && echo 1 && break
+      [[ "$answer" == n ]] && { [[ $zero ]] && echo 0 || return; } && break
+    done
+  else
+    while true; do
+      answer=$(_ASK_NO_VERBOSE=1 question2 -q "是否${question}" -Q "是则输入\033[3;31my\033[0m，否则\033[3;31m直接回车\033[0m或输入\033[3;31mn\033[0m")
+      [[ "$answer" == y ]] && echo 1 && break
+      [[ -z "$answer" || "$answer" == n ]] && { [[ $zero ]] && echo 0 || return; } && break
+    done
   fi
 }
 
@@ -375,6 +451,7 @@ function indexof() {
   for i in ${!values[@]}; do
     if [[ ${values[@]:$i:1} == $value ]]; then
       echo $i
+      debug 返回索引：$i
     fi
   done
   eval "$revoke"

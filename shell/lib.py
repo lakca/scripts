@@ -448,6 +448,8 @@ class Pipe:
             lambda: datetime.fromisoformat(sv),
             # UTC "Tue, 18 Oct 2022 23:00:23 +0800"
             lambda: datetime.strptime(sv, "%a, %d %b %Y %H:%M:%S %z"),
+            # Mon Jan 31 20:50:10 +0800 2022
+            lambda: datetime.strptime(sv, "%a %b %d %H:%M:%S %z %Y"),
         ):
             try:
                 v = case()

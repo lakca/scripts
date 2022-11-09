@@ -358,7 +358,6 @@ function sprintf() {
   local postfix
   local args=()
   while getopts ":i:f:v:n" opt; do
-    echo "sprintf: $opt, $OPTARG"
     case "$opt" in
     i)
       input+=("$OPTARG")

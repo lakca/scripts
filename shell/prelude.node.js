@@ -1,23 +1,11 @@
 const vm = require('vm')
 
 const FILTERS = {
-  datetime(date) {
-    if (!date) return date
-    date = new Date(date)
-    date.setHours(date.getHours() + 8)
-    return date.toISOString().slice(0, -5)
-  },
   date(date) {
-    if (!date) return date
     date = new Date(date)
+    if (isNaN(date.getHours())) return ''
     date.setHours(date.getHours() + 8)
     return date.toISOString().slice(0, -14)
-  },
-  time(date) {
-    if (!date) return date
-    date = new Date(date)
-    date.setHours(date.getHours() + 8)
-    return date.toISOString().slice(-13, -5)
   },
   trim(s) {
     return typeof s === 'string' ? s.trim() : s

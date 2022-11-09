@@ -14,8 +14,6 @@ WEIBO_TOPIC_URL='https://weibo.com/ajax/statuses/topic_band?sid=v_weibopro&categ
 WEIBO_HOT_SEARCH_URL='https://weibo.com/ajax/statuses/hot_band'
 WEIBO_YAOWEN_URL='https://s.weibo.com/top/summary?cate=socialevent'
 WEIBO_WENYU_URL='https://s.weibo.com/top/summary?cate=entrank'
-# 用户微博 https://weibo.com/u/2209943702
-WEIBO_USER_POSTS_URL='https://weibo.com/ajax/statuses/mymblog?uid={uid}&page={page}&feature=0'
 # 单个微博 https://weibo.com/2209943702/LdmCDsWJ1 https://weibo.com/1600463082/M74GseLpY
 WEIBO_POST_URL='https://weibo.com/ajax/statuses/show?id={postid}'
 # 微博评论
@@ -105,19 +103,23 @@ function json_res() {
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
           jsonFormat='statuses:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{statuses:user.idstr}$,(链接)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
         ;;
-        用户微博|userpost|up)
-          uid="$3"
-          page=${4:-1}
-          url="$WEIBO_USER_POSTS_URL"
-          url="${url//\{uid\}/$uid}"
-          url="${url//\{page\}/$page}"
-          curlparams=('-b' "$WEIBO_COOKIE")
+        用户微博|userpost|up) # 用户微博 https://weibo.com/u/2209943702
+          uid=$(question2 -q '微博用户ID' -i "$3")
+          stat_date=$(question2 -q "微博发布月份" -Q "如$(date +%Y%m)" -i "$4" -d "$(date +%Y%m)")
+          feature=$(ask2 -q '分类' -d 0 -1 -a '全部 原创 热门 付费' -a '0 1 2 17')
+          url='https://weibo.com/ajax/statuses/mymblog'
+          curlparams+=(--data-urlencode uid=$uid)
+          curlparams+=(--data-urlencode page=${PAGE:-1})
+          curlparams+=(--data-urlencode feature=$feature)
+          curlparams+=(--data-urlencode stat_date=$stat_date)
+          curlparams+=(-b "$WEIBO_COOKIE")
+
           aliases=('内容' '来源' '博主' '空间' 'mid' '链接' '地域');
           fields=('content' 'source' 'user' 'uid' 'mid' 'mblogid' 'region_name');
           patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
           indexes=(4 4 4 4 4 4 4);
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
-          jsonFormat='data.list:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{data.list:user.idstr}$,(链接)mblogid|$https://weibo.com/{data.list:user.idstr}/{data.list:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
+          jsonFormat='data.list:(内容)text_raw|red|bold|index,(用户)user.screen_name|magenta,(发布设备)source,(发布地点)region_name,(发布时间)created_at|date,(用户空间)user.idstr|$https://weibo.com/u/{data.list:user.idstr}$|dim,(链接)mblogid|$https://weibo.com/{data.list:user.idstr}/{data.list:mblogid}$|dim,(视频封面)page_info.page_pic|dim|image,(视频)page_info.media_info.mp4_sd_url|dim,(图片)pic_infos*.original.url|dim|image'
         ;;
         话题榜|hottopic|ht)
           url="$WEIBO_TOPIC_URL"
@@ -749,7 +751,8 @@ function json_res() {
             军事新闻-分享数排行 wbrmzfjsxw
           )
           local category=$3
-          ask "$(selectColumns "${categories[*]}" 1)" $category
+          ask "$(select_columns -a "${categories[*]}" -s 1)" $category
+          local category=$(ask2 -1 -i "$3")
           category=${categories[@]:$((_ASK_INDEX * 2 + 1)):1}
           url=${url//\{category\}/$category}
           outputfile="$outputfile.$category"
