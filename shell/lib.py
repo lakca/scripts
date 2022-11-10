@@ -8,6 +8,7 @@ import re
 import os
 import time
 from urllib import request
+from urllib.parse import quote
 
 IMGCAT = False
 SIMPLE = False
@@ -418,14 +419,16 @@ class Pipe:
             index = -1
             token = None
             # 兼容定义中的绝对路径，如 data.band_list:word
-            for (char, i) in enumerate(key):
-                if char == '\\': escaped = True
-                elif char == '|' and not escaped: index = i
-                else: escaped = False
+            for (i, char) in enumerate(key):
+                if char == "\\":
+                    escaped = True
+                elif char == "|" and not escaped:
+                    index = i
+                else:
+                    escaped = False
             if index > -1:
                 token = tokenize(key[index:]).data
                 key = key[0:index]
-
             if key.startswith("."):
                 value = str(retrieve(data.get("__", ""), key.split(".")[1:], ""))
             else:
@@ -712,6 +715,10 @@ class Pipe:
     @classmethod
     def slice(cls, v, *args, **kwargs):
         return v[slice(*list(map(lambda e, *argss: int(e), args)))]
+
+    @classmethod
+    def urlencode(cls, v, *args, **kwargs):
+        return quote(v)
 
 
 def trim_ansi(a):
