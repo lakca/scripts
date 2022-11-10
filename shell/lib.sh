@@ -27,9 +27,20 @@ function debug() {
   #   printf :${FUNCNAME[@]:$i:1} >&2
   #   printf '\n'
   # done
-  if [[ -n "$DEBUG" ]]; then
-    echo "$*" | while IFS=$'\n' read line ; do
-      printf "\033[2;31m[DEBUG:`realpath ${BASH_SOURCE[@]:1:1}`:${BASH_LINENO[@]:0:1} \033[3;32m${FUNCNAME[@]:1:1}\033[0m]\033[0m \033[0;37m%s\033[0m\n" "$line" 1>&2
+  local funcname="${FUNCNAME[@]:1:1}"
+  if [[ "$DEBUG" == '*' || "${FUNCNAME[*]}" =~ $DEBUG ]]; then
+    local OPTIND
+    {
+      while getopts 'k:v:' opt; do
+        case $opt in
+          k) printf "\033[2;33m%s\033[0m" "$OPTARG" ;;
+          v) printf " \033[2m%s\033[0m\n" "$OPTARG" ;;
+        esac
+      done;
+      local args="${@:$OPTIND}"
+      [[ $args ]] && printf '%s\n' "${args[*]}"
+    } | while IFS=$'\n' read line ; do
+      printf "\033[2;31m[DEBUG:`realpath ${BASH_SOURCE[@]:1:1}`:${BASH_LINENO[@]:0:1} \033[32m${funcname}\033[0m]\033[0m \033[2m%s\033[0m\n" "$line" 1>&2
     done
   fi
 }
@@ -255,7 +266,7 @@ function ask2() {
         question_desc="$OPTARG";;
       a) # 值数组
         arraies+=("$OPTARG")
-        [[ ! "${headArray[*]}" && ! "${bigArray[*]}" ]] && headArray=($OPTARG)
+        [[ ! "$headArray" && ! "$bigArray" ]] && headArray=($OPTARG)
         ;;
       A) # 大数组（用于将所有数组的同位值放在一起便于观看）
         bigArray=($OPTARG)
@@ -277,18 +288,18 @@ function ask2() {
     esac
   done
 
-  if [[ "${bigArray[*]}" ]]; then
+  if [[ "$bigArray" ]]; then
     if [[ $bigArraySize ]]; then
       local skip=$((bigArraySize - 1))
       for i in $(seq 0 $skip); do
-        arraies+=("$(select_columns -o $i -s $skip -a "${bigArray[*]}")")
+        local array=$(select_columns -o $i -s $skip -a "${bigArray[*]}")
+        [[ ! "$headArray" ]] && headArray=($array)
+        arraies+=("$array")
       done
     fi
   fi
 
-  echo ${#arraies[@]}
-  echo ${arraies[@]}
-  exit 1
+  debug -k "headArray" -v "$array"
 
   # 索引数组为头部数组的索引数组
   local indexArray=${!headArray[@]}
@@ -299,7 +310,7 @@ function ask2() {
   [[ "$question_desc" ]] && question_desc="，${question_desc}"
   question="\033[33m【交互】\033[0m请\033[2;4m从上述序号或值中选择\033[22;24m输入\033[31m${question}\033[0m${question_desc}："
 
-  debug 问题：$question, 输入值：$input, 选项：${arraies[@]}
+  debug -k '问题：' -v "$question" -k '输入值：' -v "$input" -k '选项：' -v "${arraies[*]}"
 
   for array in "${comparingArraies[@]}"; do
     [[ ! $inputIndex ]] && inputIndex=$(indexof "$array" $input)
@@ -319,7 +330,7 @@ function ask2() {
       for array in "${comparingArraies[@]}"; do
         array=($array)
         printf ' ' >&2
-        printf '%b' "\033[3;40m${array[@]:$i:1}\033[0m" >&2
+        printf '%b' "\033[2;3;40m${array[@]:$i:1}\033[0m" >&2
       done
       printf '  \033[2m|\033[0m  ' >&2
     done
@@ -355,8 +366,6 @@ function ask2() {
     echo $_ASK_RESULT
   fi
 }
-
-ask2 -A 'a 1 b 2 c 3' -n 2 -a 'x y z'
 
 function question() {
   local msg="$1"

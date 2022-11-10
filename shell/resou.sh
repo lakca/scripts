@@ -137,7 +137,7 @@ function json_res() {
           patterns=('_' '"(category|ad_type)":"[^"]*"' '"num":[^,]*,' '"raw_hot":[^,]*,' '_')
           indexes=(4 4 3 3 4)
           transformers=('_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-          jsonFormat='data.band_list|TABLE:(标题)word|red|bold|index,(分类)category|magenta,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word}%23$'
+          jsonFormat='data.band_list|TABLE:(标题)word|red|bold|index,(分类)category|magenta,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word|urlencode}%23$'
         ;;
         微博|post|ps)
           local postid="$3" # M7OL9bpQP
@@ -709,7 +709,6 @@ function json_res() {
         排行榜|rank) # https://sinanews.sina.cn/h5/top_news_list.d.html
           # （历史）首页 http://news.sina.com.cn/head/news20221020am.shtml
           # （历史）排行榜 https://news.sina.com.cn/hotnews/
-          url='https://top.news.sina.com.cn/ws/GetTopDataList.php?top_type={type}&top_cat={category}&top_time={date}&top_show_num={count}&top_order=DESC&js_var=channel_'
           # console.log([...document.querySelectorAll('.loopblk')].reduce((v, e) => {
           #   let name=e.querySelector('h2').textContent
           #   let tabs=[...e.querySelectorAll('.Tabs li')]
@@ -750,9 +749,7 @@ function json_res() {
             军事新闻-评论数排行 jsxwpl
             军事新闻-分享数排行 wbrmzfjsxw
           )
-          local category=$3
-          ask "$(select_columns -a "${categories[*]}" -s 1)" $category
-          local category=$(ask2 -1 -i "$3")
+          local category=$(ask2 -q '分类' -1 -i "$3" -A "${categories[*]}" -n 2)
           category=${categories[@]:$((_ASK_INDEX * 2 + 1)):1}
           url=${url//\{category\}/$category}
           outputfile="$outputfile.$category"
@@ -766,7 +763,16 @@ function json_res() {
           url=${url//\{date\}/$date}
 
           local count=$(question "输入排行榜新闻数量：" "${6:-20}")
-          url=${url//\{count\}/$count}
+
+          url='https://top.news.sina.com.cn/ws/GetTopDataList.php'
+          curlparams+=(--data-urlencode top_type=$type)
+          curlparams+=(--data-urlencode top_cat=$category)
+          curlparams+=(--data-urlencode top_time=$date)
+          curlparams+=(--data-urlencode top_show_num=$count)
+          curlparams+=(--data-urlencode top_order=DESC)
+          curlparams+=(--data-urlencode js_var=channel_)
+
+          exit 0
 
           text=$(curl -s "$url" | grep -o '{.*}')
           debug $text
@@ -901,6 +907,22 @@ function json_res() {
 
               jsonFormat='result.data:(证券名称)SECURITY_NAME_ABBR|indicator(cmp={.CHANGE_RATE})|bold|index,(证券代码)SECURITY_CODE|red,(涨跌幅)CHANGE_RATE|number(+)|append(%)|indicator|SIMPLE,(其他)EXPLAIN|dim,(买入)BILLBOARD_BUY_AMT|number(cn),(卖出)BILLBOARD_SELL_AMT|number(cn),(净买入)BILLBOARD_NET_AMT|number(cn)|indicator|SIMPLE,(龙虎榜成交额)BILLBOARD_DEAL_AMT|number(cn),(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|append(%)|SIMPLE,(上榜原因)EXPLANATION|dim|SIMPLE,(交易日)TRADE_DATE|date(date),(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$'
             ;;
+            领涨概念|lzgn)
+              url='https://push2.eastmoney.com/api/qt/clist/get'
+              curlparams+=(--data-urlencode pn=1)
+              curlparams+=(--data-urlencode pz=10)
+              curlparams+=(--data-urlencode po=1)
+              curlparams+=(--data-urlencode np=1)
+              curlparams+=(--data-urlencode ut=fa5fd1943c7b386f172d6893dbfba10b)
+              curlparams+=(--data-urlencode fltt=2)
+              curlparams+=(--data-urlencode invt=2)
+              curlparams+=(--data-urlencode fid=f3)
+              curlparams+=(--data-urlencode 'fs=m:90 t:3')
+              curlparams+=(--data-urlencode fields=f1,f2,f3,f4,f14,f12,f13,f62,f128,f136,f1520e76d4e)
+              curlparams+=(--data-urlencode cb=jQuery3510780095733559149_$(timestamp))
+              curlparams+=(--data-urlencode _=$(timestamp))
+
+            ;;
           esac
         ;;
         搜索|search|s) # https://so.eastmoney.com/ann/s?keyword=%E8%99%9A%E6%8B%9F
@@ -947,7 +969,7 @@ function json_res() {
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["noticeWeb"],"client":"web","clientVersion":"curr","clientType":"web","param":{"noticeWeb":{"preTag":"<em class=\"red\">","postTag":"</em>","pageSize":'${SIZE:-10}',"pageIndex":'${PAGE:-1}'}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
-              jsonFormat='result.noticeWeb:(标题)title|red|bold,(证券)securityFullName|magenta,(内容)content|dim|tag,(时间)date,(链接)url|dim'
+              jsonFormat='result.noticeWeb:(标题)title|red|bold,(证券)securityFullName|magenta,(内容)content|dim|tag,(时间)date|date(date),(链接)url|dim'
             ;;
             研报|report) # https://so.eastmoney.com/yanbao/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
               url='https://search-api-web.eastmoney.com/search/jsonp'
@@ -1102,7 +1124,7 @@ function json_res() {
           curlparams+=(--data-urlencode token=1D50F6FB3B72F7D5F478A23B9BE911DB)
           curlparams+=(--data-urlencode _=$(timestamp))
           case $3 in
-            搜索|hotkeyword)
+            搜索|search)
               text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
               jsonFormat='Data|TABLE:(关键词)KeyPhrase|red|bold,(链接)JumpAddress|dim'
             ;;
