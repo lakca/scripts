@@ -1391,6 +1391,12 @@ function help() {
   fi
 }
 
-help "$@" || json_res ${@:1}
+declare -a args=()
+
+for op in "$@"; do
+  [[ $op == '-t' ]] && TABLE=1 || [[ $op == '-s' ]] && SIMPLE=1 || args+=("$op")
+done
+
+ help "${args[@]}" || json_res "${args[@]}"
 
 # console.log([...new URL().searchParams.entries()].map(e => `curlparams+=(--data-urlencode ${e[0]}=${e[1]})`).join('\n'))
