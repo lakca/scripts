@@ -10,35 +10,50 @@ function indicate() {
 }
 
 function quote() {
-  local codes=''
-  local idx=1
-  local key=''
-  while [[ $idx -le $# ]]; do
-    local arg="${!idx}"
-    case "$arg" in
-      --low-price|-v) key=QUOTE_ALERT_LOW_PRICES;;
-      --high-price|+v) key=QUOTE_ALERT_HIGH_PRICES;;
-      --low-percent|-p) key=QUOTE_ALERT_LOW_PERCENTS;;
-      --high-percent|+p) key=QUOTE_ALERT_HIGH_PERCENTS;;
-      *)
-        if [[ -n $key ]]; then
-          declare $key="$arg"
-          key=''
-        else
-          codes="$arg"
-        fi
-      ;;
-    esac
-    idx=$((1 + idx))
-  done
-
-  IFS=',' read -r -a alertLowPrices <<< "$QUOTE_ALERT_LOW_PRICES"
-  IFS=',' read -r -a alertHighPrices <<< "$QUOTE_ALERT_HIGH_PRICES"
-  IFS=',' read -r -a alertLowPercents <<< "$QUOTE_ALERT_LOW_PERCENTS"
-  IFS=',' read -r -a alertHighPercents <<< "$QUOTE_ALERT_HIGH_PERCENTS"
+  local key codes alertLowPrices alertHighPrices alertLowPercents alertHighPercents
+  if [[ $1 == '-x' ]]; then
+    for arg in "${@:1}"; do
+      case "$arg" in
+        --low-price|-v) key=QUOTE_ALERT_LOW_PRICES;;
+        --high-price|+v) key=QUOTE_ALERT_HIGH_PRICES;;
+        --low-percent|-p) key=QUOTE_ALERT_LOW_PERCENTS;;
+        --high-percent|+p) key=QUOTE_ALERT_HIGH_PERCENTS;;
+        *)
+          if [[ $key ]]; then
+            declare $key="$arg"
+            unset key
+          else
+            IFS=',' read -r -a codes <<< "$arg"
+          fi
+        ;;
+      esac
+    done
+    IFS=',;: ' read -r -a alertLowPrices <<< "$QUOTE_ALERT_LOW_PRICES"
+    IFS=',;: ' read -r -a alertHighPrices <<< "$QUOTE_ALERT_HIGH_PRICES"
+    IFS=',;: ' read -r -a alertLowPercents <<< "$QUOTE_ALERT_LOW_PERCENTS"
+    IFS=',;: ' read -r -a alertHighPercents <<< "$QUOTE_ALERT_HIGH_PERCENTS"
+  else
+    local index
+    while getopts 'c:v:V:p:P:' opt; do
+      case $opt in
+        c)
+          codes+=("$OPTARG")
+          [[ $index ]] && index=$((index + 1)) || index=0
+          ;;
+        v) echo alertLowPrices:$index:$OPTARG;alertLowPrices[$index]="$OPTARG" ;;
+        V) echo alertHighPrices:$index:$OPTARG;alertHighPrices[$index]="$OPTARG" ;;
+        p) echo alertLowPercents:$index:$OPTARG;alertLowPercents[$index]="$OPTARG" ;;
+        P) echo alertHighPercents:$index:$OPTARG;alertHighPercents[$index]="$OPTARG" ;;
+      esac
+    done
+  fi
   local prices=($PRICES)
-
-  local url="https://hq.sinajs.cn/list=$codes"
+  echo $index
+echo "${#alertLowPrices[@]},${alertLowPrices[@]};";
+echo "${#alertHighPrices[@]},${alertHighPrices[@]};";
+echo "${#alertLowPercents[@]},${alertLowPercents[@]};";
+echo "${#alertHighPercents[@]},${alertHighPercents[@]};"; exit 0
+  local url="https://hq.sinajs.cn/list="$(tr ' ' , <<< ${codes[*]})
   local list=($(curl -s "$url" -H 'Referer:http://finance.sina.com.cn/' | iconv -f gb18030 -t utf8 | cut -d '"' -f2))
   # https://www.jianshu.com/p/fabe3811a01d
   local keys=(name open close price high low buy sell volume amount bv1 bp1 bv2 bp2 bv3 bp3 bv4 bp4 bv5 bp5 sv1 sp1 sv2 sp2 sv3 sp3 sv4 sp4 sv5 sp5 date time)
@@ -48,16 +63,16 @@ function quote() {
   [[ ${#prices[@]} ]] && result=$result"\033[$((1 + ${#prices[@]}))A\033[2K\033[1A\n"
   result=$result'\033[2;37m名称 幅度 价格 成交额 时间\033[0m\n'
   for i in ${!list[@]}; do
-    fields=($(sed "s/,/ /g" <<< "${list[@]:$i:1}"))
-    name=${fields[@]:0:1}
-    open=${fields[@]:1:1}
-    close=${fields[@]:2:1}
-    price=${fields[@]:3:1}
-    amount=${fields[@]:9:1}
-    time=${fields[@]:31:1}
-    percent=$(bc <<< "scale=2;100*($price-$close)/$close")
-    percentText=$(printf "%+.2f" $percent)%
-    result=$result"$(indicate $name $open $close) $(indicate $percentText $price $close) $(indicate $price $price ${prices[@]:$i:1}) $(printf "%'.0f" $amount) $time\n"
+    local fields=($(sed "s/,/ /g" <<< "${list[@]:$i:1}"))
+    local name=${fields[@]:0:1}
+    local open=${fields[@]:1:1}
+    local close=${fields[@]:2:1}
+    local price=${fields[@]:3:1}
+    local amount=${fields[@]:9:1}
+    local time=${fields[@]:31:1}
+    local percent=$(bc <<< "scale=2;100*($price-$close)/$close")
+    local percentText=$(printf "%+.2f" $percent)%
+    local result=$result"$(indicate $name $open $close) $(indicate $percentText $price $close) $(indicate $price $price ${prices[@]:$i:1}) $(printf "%'.0f" $amount) $time\n"
     prices[$i]=$price
     [[ $i == 0 ]] && echo -en "\033];$percentText\007"
 

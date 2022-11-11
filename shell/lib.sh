@@ -466,6 +466,21 @@ function indexof() {
   eval "$revoke"
 }
 
+# encode_array "${array[@]}"
+function encode_array() {
+  for e in "$@";do
+    base64 <<< "$e"
+  done
+}
+
+# get_encoded_array_ele 5 "${encoded[@]}"
+function get_encoded_array_ele() {
+  local -i index=$1
+  local items=(${@:2})
+  local item=${items[@]:$index:1}
+  [[ $item ]] && base64 -d <<< "$item"
+}
+
 function print_json() {
   local -a fieldNames
   local -a fieldAliases
