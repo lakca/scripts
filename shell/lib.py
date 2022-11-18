@@ -24,6 +24,7 @@ if os.environ.get("LINK", None):
     LINK = True
 
 TABLE = os.environ.get("TABLE")
+TABLE_NO_HEADER = os.environ.get("TABLE_NO_HEADER")
 
 try:
     from imgcat import imgcat
@@ -483,11 +484,11 @@ class Pipe:
     def numberOf(cls, v, *args, **kwargs):
         """v: str<number + any>"""
         v = re.sub(r"[^\d]*$", "", str(v))
-        return cls.toNumber(v)
+        return v and cls.toNumber(v) or 0
 
     @classmethod
     def number(cls, v, type=",", *args, **kwargs):
-        if not v:
+        if not v or not re.match(r"^\d*\.?\d*$", str(v)):
             return v
         v = cls.toNumber(v)
 
@@ -874,7 +875,7 @@ class Parser:
                 )
 
     @classmethod
-    def printTable(cls, records, tokens, indent=0):
+    def printTable(cls, records, tokens, indent=0, header=True):
 
         children = []
 
@@ -885,20 +886,24 @@ class Parser:
         scopedStdout = lambda *args: sys.stdout.write(
             " " * indent + "".join(list(*args))
         )
-        bodies = [
-            [Pipe.apply("序号", ["yellow"])]
-            + list(
-                map(
-                    lambda child: str(
-                        Pipe.apply(
-                            child.get("label", child["key"]), ["yellow", "italic"]
-                        )
-                    ),
-                    children,
+        bodies = []
+        widths = [[0] * (len(children) + 1)]
+        if header:
+            bodies = [
+                [Pipe.apply("序号", ["yellow"])]
+                + list(
+                    map(
+                        lambda child: str(
+                            Pipe.apply(
+                                child.get("label", child["key"]), ["yellow", "italic"]
+                            )
+                        ),
+                        children,
+                    )
                 )
-            )
-        ]
-        widths = [list(map(lambda e: Unicode.simpleWidth(trim_ansi(e)), bodies[0]))]
+            ]
+            widths = [list(map(lambda e: Unicode.simpleWidth(trim_ansi(e)), bodies[0]))]
+
         maxWidths = widths[0].copy()
 
         for i, record in enumerate(records):
@@ -940,9 +945,10 @@ class Parser:
         records = Pipe.apply(records, tokens["pipes"])
 
         global TABLE
+        global TABLE_NO_HEADER
 
         if ("TABLE" in tokens["pipes"] and TABLE != "0") or TABLE == "1":
-            cls.printTable(records, tokens)
+            cls.printTable(records, tokens, header=not TABLE_NO_HEADER)
         else:
             for i, record in enumerate(records):
                 cls.printRecord(record, flatted)
