@@ -11,9 +11,9 @@ if [[ $pythonInstalled -eq 1 && -z $PURE ]]; then
     local format
     while getopts 'd:f:o:' opt; do
       case $opt in
-        d) data="$OPTARG";;
-        f) format="$OPTARG";;
-        o) file="$OPTARG";;
+      d) data="$OPTARG" ;;
+      f) format="$OPTARG" ;;
+      o) file="$OPTARG" ;;
       esac
     done
     printf %s "$data" | python3 $_dirname/lib.py "$format" "$file"
@@ -30,46 +30,59 @@ function debug() {
   local funcname="${FUNCNAME[@]:1:1}"
   if [[ "$DEBUG" == '*' || "${FUNCNAME[*]}" =~ $DEBUG ]]; then
     local OPTIND
+    local keyed
     {
       while getopts 'k:v:' opt; do
         case $opt in
-          k) printf "\033[2;33m%s\033[0m" "$OPTARG" ;;
-          v) printf " \033[2m%s\033[0m\n" "$OPTARG" ;;
+        k)
+          printf "\033[2;33m%s\033[0m" "$OPTARG"
+          keyed=1
+          ;;
+        v)
+          [[ $keyed ]] && printf ' '
+          printf "\033[2m%s\033[0m\n" "$OPTARG"
+          keyed=''
+          ;;
         esac
-      done;
+      done
+      [[ $keyed ]] && printf '\n'
       local args="${@:$OPTIND}"
       [[ $args ]] && printf '%s\n' "${args[*]}"
-    } | while IFS=$'\n' read line ; do
-      printf "\033[2;31m[DEBUG:`realpath ${BASH_SOURCE[@]:1:1}`:${BASH_LINENO[@]:0:1} \033[32m${funcname}\033[0m]\033[0m \033[2m%s\033[0m\n" "$line" 1>&2
+    } | while IFS=$'\n' read line; do
+      printf "\033[2;31m[DEBUG:$(realpath ${BASH_SOURCE[@]:1:1}):${BASH_LINENO[@]:0:1} \033[32m${funcname}\033[0m]\033[0m \033[2m%s\033[0m\n" "$line" 1>&2
     done
   fi
 }
 
 function UnicodePointToUtf8() {
-    local x="$1"               # ok if '0x2620'
-    x=${x/\\u/0x}              # '\u2620' -> '0x2620'
-    x=${x/U+/0x}; x=${x/u+/0x} # 'U-2620' -> '0x2620'
-    x=$((x)) # from hex to decimal
-    local y=$x n=0
-    [ $x -ge 0 ] || return 1
-    while [ $y -gt 0 ]; do y=$((y>>1)); n=$((n+1)); done
-    if [ $n -le 7 ]; then       # 7
-        y=$x
-    elif [ $n -le 11 ]; then    # 5+6
-        y=" $(( ((x>> 6)&0x1F)+0xC0 )) \
-            $(( (x&0x3F)+0x80 ))"
-    elif [ $n -le 16 ]; then    # 4+6+6
-        y=" $(( ((x>>12)&0x0F)+0xE0 )) \
-            $(( ((x>> 6)&0x3F)+0x80 )) \
-            $(( (x&0x3F)+0x80 ))"
-    else                        # 3+6+6+6
-        y=" $(( ((x>>18)&0x07)+0xF0 )) \
-            $(( ((x>>12)&0x3F)+0x80 )) \
-            $(( ((x>> 6)&0x3F)+0x80 )) \
-            $(( (x&0x3F)+0x80 ))"
-    fi
-    printf -v y '\\x%x' $y
-    echo $y
+  local x="$1"  # ok if '0x2620'
+  x=${x/\\u/0x} # '\u2620' -> '0x2620'
+  x=${x/U+/0x}
+  x=${x/u+/0x} # 'U-2620' -> '0x2620'
+  x=$((x))     # from hex to decimal
+  local y=$x n=0
+  [ $x -ge 0 ] || return 1
+  while [ $y -gt 0 ]; do
+    y=$((y >> 1))
+    n=$((n + 1))
+  done
+  if [ $n -le 7 ]; then # 7
+    y=$x
+  elif [ $n -le 11 ]; then # 5+6
+    y=" $((((x >> 6) & 0x1F) + 0xC0)) \
+            $(((x & 0x3F) + 0x80))"
+  elif [ $n -le 16 ]; then # 4+6+6
+    y=" $((((x >> 12) & 0x0F) + 0xE0)) \
+            $((((x >> 6) & 0x3F) + 0x80)) \
+            $(((x & 0x3F) + 0x80))"
+  else # 3+6+6+6
+    y=" $((((x >> 18) & 0x07) + 0xF0)) \
+            $((((x >> 12) & 0x3F) + 0x80)) \
+            $((((x >> 6) & 0x3F) + 0x80)) \
+            $(((x & 0x3F) + 0x80))"
+  fi
+  printf -v y '\\x%x' $y
+  echo $y
 }
 
 export -f UnicodePointToUtf8
@@ -80,31 +93,31 @@ function escapeUnicode() {
   local prev=''
   local char
   for i in $(seq 0 $((${#raw_text} - 1))); do
-      char="${raw_text[@]:$i:1}"
-      if [[ -z "$prev" && "$char" == '\' ]]; then
+    char="${raw_text[@]:$i:1}"
+    if [[ -z "$prev" && "$char" == '\' ]]; then
+      prev="$prev$char"
+    elif [[ "$prev" == '\' ]]; then
+      if [[ "$char" == 'u' ]]; then
         prev="$prev$char"
-      elif [[ "$prev" == '\' ]]; then
-          if [[ "$char" == 'u' ]]; then
-              prev="$prev$char"
-          else
-              text="$text$prev$char"
-              prev=''
-          fi
-      elif [[ "$prev" =~ ^\\u[0-9a-f]{0,3}$ ]]; then
-          if [[ "$char" == [0-9a-f] ]]; then
-              prev="$prev$char"
-          else
-              text="$text$prev$char"
-              prev=''
-          fi
       else
-          text="$text$prev$char"
-          prev=''
+        text="$text$prev$char"
+        prev=''
       fi
-      if [[ "$prev" =~ ^\\u[0-9a-f]{4}$ ]]; then
-          text="$text$(UnicodePointToUtf8 "$prev")"
-          prev=''
+    elif [[ "$prev" =~ ^\\u[0-9a-f]{0,3}$ ]]; then
+      if [[ "$char" == [0-9a-f] ]]; then
+        prev="$prev$char"
+      else
+        text="$text$prev$char"
+        prev=''
       fi
+    else
+      text="$text$prev$char"
+      prev=''
+    fi
+    if [[ "$prev" =~ ^\\u[0-9a-f]{4}$ ]]; then
+      text="$text$(UnicodePointToUtf8 "$prev")"
+      prev=''
+    fi
   done
   printf %s "$text"
 }
@@ -115,7 +128,7 @@ function escapeUnicode2() {
 }
 
 function escapeSpace() {
-  ( [[ -p /dev/stdin ]] && tee || printf '%s' "$*" ) | sed 's/ /\\x20/g;s/\n/\\xa/g;s/\t/\\x9/g;s/\v/\\xb/g;s/\f/\\xc/g;s/\r/\\xd/g;s/\\"/\\x22/gI'
+  ([[ -p /dev/stdin ]] && tee || printf '%s' "$*") | sed 's/ /\\x20/g;s/\n/\\xa/g;s/\t/\\x9/g;s/\v/\\xb/g;s/\f/\\xc/g;s/\r/\\xd/g;s/\\"/\\x22/gI'
 }
 
 function random() {
@@ -142,10 +155,10 @@ function print_record() {
   local OPTIND
   while getopts ':a:v:n:y:' opt; do
     case "$opt" in
-      a) fields+=($OPTARG);;
-      v) values+=($OPTARG);;
-      y) filters+=($OPTARG);;
-      n) id=$OPTARG;;
+    a) fields+=($OPTARG) ;;
+    v) values+=($OPTARG) ;;
+    y) filters+=($OPTARG) ;;
+    n) id=$OPTARG ;;
     esac
   done
   local primary=0
@@ -172,21 +185,21 @@ function select_columns() {
   local -i skip=1
   while getopts 'a:o:s:' opt; do
     case $opt in
-      a) # 数组
-        array=($OPTARG);;
-      o) # 偏移
-        offset=$OPTARG;;
-      s) # 跳步
-        skip=$OPTARG;;
+    a) # 数组
+      array=($OPTARG) ;;
+    o) # 偏移
+      offset=$OPTARG ;;
+    s) # 跳步
+      skip=$OPTARG ;;
     esac
   done
   local length=${#array[@]}
   local -a selections=()
   debug "offset: $offset, skip: $skip, length: $length"
-  for i in $(seq $offset $((skip+1)) $((length-1))); do
+  for i in $(seq $offset $((skip + 1)) $((length - 1))); do
     selections+=("${array[@]:$i:1}")
   done
-  echo "${selections[@]}"
+  echo "${selections[*]}"
 }
 
 function ensureFolder() {
@@ -198,7 +211,7 @@ function resolveLink() {
   link=${link//\\\?*/}
   link=${link//\#*/}
   link=${link//\\\#*/}
-  local parts=(`echo $link | grep -oE '[^\/]+'`)
+  local parts=($(echo $link | grep -oE '[^\/]+'))
   echo "${parts[*]}"
 }
 
@@ -224,7 +237,7 @@ function ask() {
     local revoke=$(shopt -p nocasematch)
     shopt -s nocasematch
     for i in "${!values[@]}"; do
-      if [[ "$REPLY" = $i  || "$REPLY" = "${values[@]:$i:1}" ]]; then
+      if [[ "$REPLY" = $i || "$REPLY" = "${values[@]:$i:1}" ]]; then
         printf "${_ASK_MSG:-输入值：}%b\n" "\033[31m${values[@]:$i:1}\033[0m" 1>&2
         _ASK_RESULT="${values[@]:$i:1}"
         _ASK_INDEX=$i
@@ -234,6 +247,28 @@ function ask() {
     done
     eval $revoke
   fi
+}
+
+function prompt_select() {
+  local arraies=("$@")
+  local headArray=(${arraies[@]:0:1})
+  printf '\033[33m【选项】\033[0m' >&2
+  for i in "${!headArray[@]}"; do
+    printf '%b' "\033[3;32m$i\033[0m" >&2
+    for array in "${arraies[@]}"; do
+      array=($array)
+      printf ' ' >&2
+      printf '%b' "\033[2;3;33;40m${array[@]:$i:1}\033[0m" >&2
+    done
+    printf '  \033[2m|\033[0m  ' >&2
+  done
+  printf '\n' >&2
+
+  echo -en "${_PROMPT_SELECT_MSG}\033[31m" >&2
+  read
+  echo -en '\033[0m' >&2
+  echo $REPLY
+  unset _PROMPT_SELECT_MSG
 }
 
 function ask2() {
@@ -249,42 +284,53 @@ function ask2() {
   local bigArraySize
   local input
   local default
-  local inputIndex
-  local defaultIndex
   local echoIndex=0
+  local multiple
+  local defaultConst
+  local OPTIND
+  local selectableArrayIndexes
   unset _ASK_INDEX
   unset _ASK_RESULT
   unset _ASK_RESULTS
   unset _ASK_MSG
   unset _ASK_MSG2
-
-  while getopts 'q:Q:a:A:n:i:d:g:01' opt; do
+  while getopts 'q:Q:a:A:N:i:d:D:e:01S:m' opt; do
     case $opt in
-      q) # 问题内容
-        question="$OPTARG";;
-      Q) # 问题补充说明
-        question_desc="$OPTARG";;
-      a) # 值数组
-        arraies+=("$OPTARG")
-        [[ ! "$headArray" && ! "$bigArray" ]] && headArray=($OPTARG)
-        ;;
-      A) # 大数组（用于将所有数组的同位值放在一起便于观看）
-        bigArray=($OPTARG)
-        ;;
-      n) # 大数组包含的数组数量，如果前面通过`-a`提供了头部数组，可以省略该选项
-        bigArraySize=$OPTARG
-        debug "bigArraySize: $bigArraySize"
-        ;;
-      i) # 输入值
-        input="$OPTARG";;
-      d) # 默认值
-        default="$OPTARG";;
-      g) # _ASK_RESULT（和输出结果）的数组索引
-        echoIndex="$OPTARG";;
-      0) # _ASK_RESULT（和输出结果）的数组索引为0
-        echoIndex=0;;
-      1) # _ASK_RESULT（和输出结果）的数组索引为1
-        echoIndex=1;;
+    q) # 问题内容
+      question="$OPTARG" ;;
+    Q) # 问题补充说明
+      question_desc="$OPTARG" ;;
+    a) # 值数组
+      arraies+=("$OPTARG")
+      [[ ! "$headArray" && ! "$bigArray" ]] && headArray=($OPTARG)
+      ;;
+    A) # 大数组（用于将所有数组的同位值放在一起便于观看）
+      bigArray=($OPTARG)
+      ;;
+    N) # 大数组包含的数组数量，如果前面通过`-a`提供了头部数组，可以省略该选项
+      bigArraySize=$OPTARG
+      debug "bigArraySize: $bigArraySize"
+      ;;
+    i) # 输入值
+      input="$OPTARG" ;;
+    d) # 默认值
+      default="$OPTARG"
+      defaultConst=''
+      ;;
+    D) # 特殊默认值
+      defaultConst="$OPTARG"
+      default=''
+      ;;
+    e) # _ASK_RESULT（和输出结果）的数组索引
+      echoIndex="$OPTARG" ;;
+    0) # _ASK_RESULT（和输出结果）的数组索引为0
+      echoIndex=0 ;;
+    1) # _ASK_RESULT（和输出结果）的数组索引为1
+      echoIndex=1 ;;
+    S) # 接受多值
+      selectableArrayIndexes=$OPTARG ;;
+    m) # 接受多值
+      multiple=1 ;;
     esac
   done
 
@@ -299,71 +345,140 @@ function ask2() {
     fi
   fi
 
-  debug -k "headArray" -v "$array"
+  debug -k "headArray" -v "${headArray[*]}"
 
   # 索引数组为头部数组的索引数组
   local indexArray=${!headArray[@]}
 
   # 用于比较的数组包含位于头部的索引数组
   local comparingArraies=("${indexArray[*]}" "${arraies[@]}")
+  #
+  local selectableArraies=()
+  for index in "${!comparingArraies[@]}"; do
+    [[ ! $selectableArrayIndexes || $(indexof $(($index - 1)) "$selectableArrayIndexes") ]] && selectableArraies+=("${comparingArraies[@]:$index:1}")
+  done
 
   [[ "$question_desc" ]] && question_desc="，${question_desc}"
-  question="\033[33m【交互】\033[0m请\033[2;4m从上述序号或值中选择\033[22;24m输入\033[31m${question}\033[0m${question_desc}："
+  question="\033[33m【输入】\033[0m请\033[2;4m从上述序号或值中选择\033[22;24m输入\033[31m${question}\033[0m${question_desc}："
 
   debug -k '问题：' -v "$question" -k '输入值：' -v "$input" -k '选项：' -v "${arraies[*]}"
 
-  for array in "${comparingArraies[@]}"; do
-    [[ ! $inputIndex ]] && inputIndex=$(indexof "$array" $input)
-    [[ ! $defaultIndex ]] && defaultIndex=$(indexof "$array" $default)
-  done
-  # 提问增加默认值信息
-  [[ $defaultIndex ]] && question="${question}（默认值为\033[2;3m${default}\033[0m）："
-
-  debug 输入索引：$inputIndex, 默认索引：$defaultIndex
-
-  local reply
-
-  if [[ -z $inputIndex ]]; then
-    printf '\n' >&2
-    for i in "${!headArray[@]}"; do
-      printf '%b' "\033[3;32m$i\033[0m" >&2
-      for array in "${comparingArraies[@]}"; do
-        array=($array)
-        printf ' ' >&2
-        printf '%b' "\033[2;3;40m${array[@]:$i:1}\033[0m" >&2
-      done
-      printf '  \033[2m|\033[0m  ' >&2
-    done
-    printf '\n' >&2
-
-    echo -en "\n${question}\033[31m" >&2
-    read reply
-    echo -en '\033[0m' >&2
-  fi
-
-  if [[ -n $reply ]]; then
+  # 多选
+  if [[ $multiple ]]; then
+    debug -k '多值选择'
+    local inputIndexes
+    local defaultIndexes
     for array in "${comparingArraies[@]}"; do
-      debug 交互：$reply, 数组：$array
-      inputIndex=$(_INDEXOF_IGNORE_CASE=1 indexof "$array" $reply)
-      [[ $inputIndex ]] && break
+      if [[ $input ]]; then
+        local i=-1
+        for el in $(_INDEXOF_NO_INDEX=-1 indexesof "$input" "$array"); do
+          i=$((i + 1))
+          [[ ! ${inputIndexes[@]:$i:1} || ${inputIndexes[@]:$i:1} -eq -1 ]] && inputIndexes[$i]="$el"
+        done
+        unset i
+      fi
+      if [[ $default ]]; then
+        local i=-1
+        for el in $(_INDEXOF_NO_INDEX=-1 indexesof "$default" "$array"); do
+          i=$((i + 1))
+          [[ ! ${defaultIndexes[@]:$i:1} || ${defaultIndexes[@]:$i:1} -eq -1 ]] && defaultIndexes[$i]="$el"
+        done
+        unset i
+      fi
     done
-  fi
+    case "$defaultConst" in
+    ALL)
+      defaultIndexes=(${!headArray[@]})
+      ;;
+    esac
+    # 提问增加默认值信息
+    [[ ${defaultIndexes[*]} ]] && question="${question}（默认值为\033[2;3;33m${defaultIndexes[@]}\033[0m）："
+    debug 输入多索引：${inputIndexes[*]}, 默认多索引：${defaultIndexes[*]}
 
-  local index=${inputIndex:-$defaultIndex}
+    local reply
+    if [[ ! ${inputIndexes[*]} ]]; then
+      reply=$(_PROMPT_SELECT_MSG=$question prompt_select "${selectableArraies[@]}")
+    fi
 
-  debug 输入索引：$inputIndex, 输入后索引：$index
+    if [[ $reply ]]; then
+      for array in "${comparingArraies[@]}"; do
+        debug 交互：$reply, 数组：$array
+        local i=-1
+        inputIndexes=()
+        for el in $(_INDEXOF_NO_INDEX=-1 indexesof "$reply" "$array"); do
+          i=$((i + 1))
+          [[ ! ${inputIndexes[@]:$i:1} || ${inputIndexes[@]:$i:1} -eq -1 ]] && inputIndexes[$i]="$el"
+        done
+        unset i
+      done
+    fi
 
-  if [[ $index ]]; then
-    _ASK_INDEX=$index
-    _ASK_RESULTS=()
-    for i in "${!arraies[@]}"; do
-      local array=(${arraies[@]:$i:1})
-      [[ $i == $echoIndex ]] && _ASK_RESULT="${array[@]:$index:1}"
-      _ASK_RESULTS+=("${array[@]:$index:1}")
+    local indexes=(${inputIndexes[*]:-${defaultIndexes[*]}})
+
+    debug 输入索引：${inputIndexes[*]}, 输入后索引：${indexes[*]}
+
+    if [[ ${indexes[*]} ]]; then
+      _ASK_INDEX=(${indexes[@]})
+      _ASK_RESULT=()
+      _ASK_RESULTS=()
+      for i in "${!arraies[@]}"; do
+        local array=(${arraies[@]:$i:1})
+        for e in "${indexes[@]}"; do
+          _ASK_RESULTS+=("${array[@]:$e:1}")
+          if [[ $i -eq $echoIndex ]]; then
+            _ASK_RESULT+=("${array[@]:$e:1}")
+          fi
+        done
+      done
+      [[ ! $_ASK_NO_VERBOSE ]] && echo -en '\033[33m【结果】\033[0m\033[2;3;37m您输入的结果为：\033[0m' >&2 && echo -e "\033[2;3;36m${_ASK_RESULT[*]}\033[0m" >&2
+      echo ${_ASK_RESULT[*]}
+    fi
+    [[ ! $_ASK_NO_VERBOSE ]] && printf '\n' >&2
+    return
+  else
+    debug -k '单值选择'
+    # 单选
+    local inputIndex
+    local defaultIndex
+
+    for array in "${comparingArraies[@]}"; do
+      [[ ! "$inputIndex" ]] && inputIndex=$(indexof "$input" "$array")
+      [[ ! "$defaultIndex" ]] && defaultIndex=$(indexof "$default" "$array")
     done
-    echo -en '\033[33m【输入】\033[0m\033\033[2;3;37m您输入的结果为：\033[0m' >&2
-    echo -e "\033[2;3;31m${_ASK_RESULTS[*]}\033[0m" >&2
-    echo $_ASK_RESULT
+    # 提问增加默认值信息
+    [[ $defaultIndex ]] && question="${question}（默认值为\033[2;3;33m${default}\033[0m）："
+    debug 输入索引：$inputIndex, 默认索引：$defaultIndex
+
+    local reply
+
+    if [[ ! $inputIndex ]]; then
+      reply=$(_PROMPT_SELECT_MSG=$question prompt_select "${selectableArraies[@]}")
+    fi
+
+    if [[ $reply ]]; then
+      for array in "${comparingArraies[@]}"; do
+        debug 交互：$reply, 数组：$array
+        inputIndex=$(_INDEXOF_IGNORE_CASE=1 indexof "$reply" "$array")
+        [[ $inputIndex ]] && break
+      done
+    fi
+
+    local index=${inputIndex:-$defaultIndex}
+
+    debug 输入索引：$inputIndex, 输入后索引：$index
+
+    if [[ $index ]]; then
+      _ASK_INDEX=$index
+      _ASK_RESULTS=()
+      for i in "${!arraies[@]}"; do
+        local array=(${arraies[@]:$i:1})
+        [[ $i -eq $echoIndex ]] && _ASK_RESULT="${array[@]:$index:1}"
+        _ASK_RESULTS+=("${array[@]:$index:1}")
+      done
+      [[ ! $_ASK_NO_VERBOSE ]] && echo -en '\033[33m【结果】\033[0m\033[2;3;37m您输入的结果为：\033[0m' >&2 && echo -e "\033[2;3;36m${_ASK_RESULTS[*]}\033[0m" >&2
+      echo $_ASK_RESULT
+    fi
+    [[ ! $_ASK_NO_VERBOSE ]] && printf '\n' >&2
   fi
 }
 
@@ -390,18 +505,18 @@ function question2() {
   local OPTIND
   while getopts 'q:Q:d:i:' opt; do
     case $opt in
-      q) question="$OPTARG";;
-      Q) question_desc="$OPTARG";;
-      d) default="$OPTARG";;
-      i) input="$OPTARG";;
+    q) question="$OPTARG" ;;
+    Q) question_desc="$OPTARG" ;;
+    d) default="$OPTARG" ;;
+    i) input="$OPTARG" ;;
     esac
   done
   if [[ "$input" ]]; then
     echo "$input"
   else
-    local msg="\033[33m【交互】\033[0m请输入\033[31m${question}\033[0m"
+    local msg="\033[33m【输入】\033[0m请输入\033[31m${question}\033[0m"
     [[ $question_desc ]] && msg="${msg}，${question_desc}"
-    [[ $default ]] && msg="${msg}（默认值为\033[2;3m${default}\033[22;23m）" || msg="${msg}"
+    [[ $default ]] && msg="${msg}（默认值为\033[2;3;33m${default}\033[22;23m）" || msg="${msg}"
     msg="${msg}：\033[31m"
     echo -en "$msg" >&2
     read
@@ -409,7 +524,7 @@ function question2() {
     echo -en '\033[0m' >&2
     local answer
     [[ -z $REPLY ]] && answer="$default" || answer="$REPLY"
-    [[ ! $_ASK_NO_VERBOSE ]] && echo -e "\033[33m【输入】\033[0m\033[2;3;37m您输入的有效值为：\033[0m\033[2;3;31m$answer\033[0m" >&2
+    [[ ! $_ASK_NO_VERBOSE ]] && echo -e "\033[33m【结果】\033[0m\033[2;3;37m您输入的有效值为：\033[0m\033[2;3;36m$answer\033[0m" >&2
     echo "$answer"
   fi
 }
@@ -419,24 +534,31 @@ function whether() {
   local required
   local zero
   local OPTIND
-  while getopts 'q:y0' opt; do
+  local yes=1
+  local no
+  local input
+  while getopts 'q:r0y:n:i:' opt; do
     case $opt in
-      q) question="$OPTARG";;
-      y) required=1;;
-      0) zero=1;;
+    q) question="$OPTARG" ;;
+    r) required=1 ;;
+    0) no=0 ;;
+    y) yes="$OPTARG" ;;
+    n) no="$OPTARG" ;;
+    i) input="$OPTARG" ;;
     esac
   done
+  [[ $input ]] && echo $input && return
   if [[ $required ]]; then
     while true; do
-      answer=$(_ASK_NO_VERBOSE=1 question2 -q "是否${question}" -Q "是则输入\033[3;31my\033[0m，否则输入\033[3;31mn\033[0m")
-      [[ "$answer" == y ]] && echo 1 && break
-      [[ "$answer" == n ]] && { [[ $zero ]] && echo 0 || return; } && break
+      answer=$(_ASK_NO_VERBOSE=1 question2 -q "是否${question}" -Q "\033[3;31m是\033[0m则输入\033[3;31my\033[0m，\033[3;32m否\033[0m则输入\033[3;32mn\033[0m")
+      [[ "$answer" == 'y' ]] && { echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m是\033[0m' >&2; echo $yes; } && break
+      [[ "$answer" == 'n' ]] && { echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m否\033[0m' >&2; echo $no; } && break
     done
   else
     while true; do
-      answer=$(_ASK_NO_VERBOSE=1 question2 -q "是否${question}" -Q "是则输入\033[3;31my\033[0m，否则\033[3;31m直接回车\033[0m或输入\033[3;31mn\033[0m")
-      [[ "$answer" == y ]] && echo 1 && break
-      [[ -z "$answer" || "$answer" == n ]] && { [[ $zero ]] && echo 0 || return; } && break
+      answer=$(_ASK_NO_VERBOSE=1 question2 -q "是否${question}" -Q "\033[3;31m是\033[0m则输入\033[3;31my\033[0m，\033[3;32m否\033[0m则\033[3;32m直接回车\033[0m或输入\033[3;32mn\033[0m")
+      [[ "$answer" == 'y' ]] && { echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m是\033[0m' >&2; echo $yes; } && break
+      [[ -z "$answer" || "$answer" == 'n' ]] && { echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m否\033[0m' >&2; echo $no; } && break
     done
   fi
 }
@@ -452,24 +574,35 @@ function datafile() {
 }
 
 function indexof() {
-  local values=($1)
-  local value="$2"
+  local value="$1"
+  local array=($2)
   local revoke=$(shopt -p nocasematch)
-  debug 索引值：$value, 数组长度：${#values[@]}, 数组：${values[@]}
+  local index=$_INDEXOF_NO_INDEX
+  unset _INDEXOF_NO_INDEX
+  debug 索引值：$value, 数组长度：${#array[@]}, 数组：${array[@]}
   [[ $_INDEXOF_IGNORE_CASE ]] && shopt -s nocasematch
-  for i in ${!values[@]}; do
-    if [[ ${values[@]:$i:1} == $value ]]; then
-      echo $i
-      debug 返回索引：$i
+  for i in ${!array[@]}; do
+    if [[ ${array[@]:$i:1} == $value ]]; then
+      index=$i
+      debug 返回索引：$index
+      break
     fi
   done
   eval "$revoke"
+  echo $index
+}
+
+function indexesof() {
+  local values=($1)
+  for value in "${values[@]}"; do
+    _INDEXOF_NO_INDEX=-1 indexof "$value" "$2"
+  done
 }
 
 # encode_array "${array[@]}"
 function encode_array() {
-  for e in "$@";do
-    base64 <<< "$e"
+  for e in "$@"; do
+    base64 <<<"$e"
   done
 }
 
@@ -478,7 +611,7 @@ function get_encoded_array_ele() {
   local -i index=$1
   local items=(${@:2})
   local item=${items[@]:$index:1}
-  [[ $item ]] && base64 -d <<< "$item"
+  [[ $item ]] && base64 -d <<<"$item"
 }
 
 function print_json() {
@@ -498,33 +631,36 @@ function print_json() {
   local OPTIND
   while getopts 'a:f:p:i:t:u:s:r:y:j:q:o:H:' opt; do
     case "$opt" in
-      a) fieldAliases+=($OPTARG);;
-      k) fieldKeys+=($OPTARG);;
-      f) fieldNames+=($OPTARG);;
-      p) fieldPatterns+=($OPTARG);;
-      i) fieldIndexes+=($OPTARG);;
-      t) transformers+=($OPTARG);;
-      y) filters+=($OPTARG);;
-      u) url="$OPTARG";;
-      q) curlparams+=($OPTARG);;
-      s) text="$OPTARG";;
-      r) raw=$OPTARG;;
-      j) jsonFormat=$OPTARG;;
-      o) file=$OPTARG;;
-      H) headers+=($OPTARG);;
-      *) echo '未知选项 $opt' 1>&2; exit 1;;
+    a) fieldAliases+=($OPTARG) ;;
+    k) fieldKeys+=($OPTARG) ;;
+    f) fieldNames+=($OPTARG) ;;
+    p) fieldPatterns+=($OPTARG) ;;
+    i) fieldIndexes+=($OPTARG) ;;
+    t) transformers+=($OPTARG) ;;
+    y) filters+=($OPTARG) ;;
+    u) url="$OPTARG" ;;
+    q) curlparams+=($OPTARG) ;;
+    s) text="$OPTARG" ;;
+    r) raw=$OPTARG ;;
+    j) jsonFormat=$OPTARG ;;
+    o) file=$OPTARG ;;
+    H) headers+=($OPTARG) ;;
+    *)
+      echo '未知选项 $opt' 1>&2
+      exit 1
+      ;;
     esac
   done
 
   local cmd="curl -s "$url" "${curlparams[@]}" "${headers[@]}""
 
-  echo "$cmd" >> resou.log
+  echo "$cmd" >>resou.log
 
   [[ -z "$text" ]] && text="$($cmd)"
 
-  [[ -n $file ]] && printf %s "$text" > "$(datafile $file)"
+  [[ -n $file ]] && printf %s "$text" >"$(datafile $file)"
 
-  if [[ -n "$jsonFormat" && `declare -f jsonparser` ]]; then
+  if [[ -n "$jsonFormat" && $(declare -f jsonparser) ]]; then
 
     if [[ -n $raw ]]; then
       printf '%s' "$text"
@@ -544,7 +680,7 @@ function print_json() {
       local primaryKey="${fieldNames[@]:0:1}"
 
       for index in "${!fieldNames[@]}"; do
-        local field="${fieldNames[@]:$index:1}";
+        local field="${fieldNames[@]:$index:1}"
         local pattern="${fieldPatterns[@]:$index:1}"
         if [[ "$pattern" = '_' ]]; then
           if [[ ${filters[@]:$index:1} = *:number:* ]]; then
@@ -556,7 +692,7 @@ function print_json() {
         declare -a "arr_$field"
         while read -r line; do
           debug $line
-          declare "arr_$field+=(\"${line:-~}\")";
+          declare "arr_$field+=(\"${line:-~}\")"
         done < <(printf '%s' "$text" | grep -oE "$pattern" | cut -d'"' -f${fieldIndexes[@]:$index:1})
       done
 
@@ -587,14 +723,14 @@ function print_json() {
           local tf="${transformers[@]:$idx:1}"
           _values[$idx]="${values[@]:$idx:1}"
           if [[ -n "$tf" && "$tf" != '_' ]]; then
-            _values[$idx]="`eval "printf '%s' $tf"`"
+            _values[$idx]="$(eval "printf '%s' $tf")"
           fi
         done
         for idx in "${!fieldNames[@]}"; do
           values[$idx]="${_values[@]:$idx:1}"
         done
 
-        print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n `expr 1 + $index` -y "${filters[*]}"
+        print_record -a "${fieldAliases[*]}" -v "${values[*]}" -n $(expr 1 + $index) -y "${filters[*]}"
         echo
       done
     fi
