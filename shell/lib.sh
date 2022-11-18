@@ -673,7 +673,7 @@ function print_json() {
 
     text=$(escapeSpace "$text")
 
-    if [[ -n $raw ]]; then
+    if [[ -n $raw || ! ${fieldPatterns[*]} ]]; then
       printf '%s' "$text"
     else
       debug "$text"

@@ -10,27 +10,22 @@ import time
 from urllib import request
 from urllib.parse import quote
 
-IMGCAT = False
-SIMPLE = False
-LINK = False
+NUMBER_REG = r'-?([0-9]+\.?[0-9]*|\.[0-9]*)'
 
-if os.environ.get("IMGCAT", None):
-    IMGCAT = True
-
-if os.environ.get("SIMPLE", None):
-    SIMPLE = True
-
-if os.environ.get("LINK", None):
-    LINK = True
-
-TABLE = os.environ.get("TABLE")
-TABLE_NO_HEADER = os.environ.get("TABLE_NO_HEADER")
+TABLE = bool(os.environ.get("TABLE"))
+NO_TABLE = bool(os.environ.get("NO_TABLE"))
+IMGCAT= bool(os.environ.get("IMGCAT"))
+SIMPLE= bool(os.environ.get("SIMPLE"))
+LINK= bool(os.environ.get("LINK"))
+TABLE_NO_HEADER= bool(os.environ.get("TABLE_NO_HEADER"))
+NO_EMPTY_DASH= bool(os.environ.get("NO_EMPTY_DASH"))
 
 try:
     from imgcat import imgcat
 except:
     IMGCAT = False
 
+def noop(*args): return args[0] if len(args) else None
 
 class Node:
     def __init__(self, parent=None):
@@ -395,6 +390,7 @@ class Pipe:
                 return v
             args = []
             kwargs = {}
+            kwargs['__interpolate'] = lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
             if isinstance(pipe, list):
                 for e in pipe[1:]:
                     if isinstance(e, dict) and e["__kwarg"]:
@@ -476,21 +472,23 @@ class Pipe:
         )
 
     @classmethod
-    def toNumber(cls, v, *args, **kwargs):
+    def string2Number(cls, v, *args, **kwargs):
         """v: str<int|float>"""
-        return v if isinstance(v, (int, float)) else float(v) if "." in v else int(v)
+        if isinstance(v, (float, int)): return v
+        return 0 if v == '.' else float(v) if "." in v else int(v) if re.match(NUMBER_REG + '$', str(v)) else None
 
     @classmethod
-    def numberOf(cls, v, *args, **kwargs):
+    def seekNumber(cls, v, *args, **kwargs):
         """v: str<number + any>"""
-        v = re.sub(r"[^\d]*$", "", str(v))
-        return v and cls.toNumber(v) or 0
+        if isinstance(v, (float, int)): return v
+        match = re.search(NUMBER_REG, str(v))
+        return match and cls.string2Number(match.group()) or 0
 
     @classmethod
     def number(cls, v, type=",", *args, **kwargs):
-        if not v or not re.match(r"^\d*\.?\d*$", str(v)):
+        if v is None or not re.match(NUMBER_REG + '$', str(v)):
             return v
-        v = cls.toNumber(v)
+        v = cls.string2Number(v)
 
         if type == ",":
             return "{:,}".format(v)
@@ -510,19 +508,29 @@ class Pipe:
             return type.format(v)
 
     @classmethod
+    def discount(cls, v, *args, **kwargs):
+        interpolate = kwargs.get('__interpolate', noop)
+        if len(args) > 1:
+            v = interpolate(args[1])
+        if len(args) > 0:
+            b = interpolate(args[0])
+            b = cls.seekNumber(b)
+            v = cls.seekNumber(v)
+            return '{:+.2%}'.format((v - b) / b) if b != 0 else ''
+
+    @classmethod
     def indicator(cls, v, *args, **kwargs):
-        data = kwargs.get("data")
-        interpolate = lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
+        interpolate = kwargs.get('__interpolate', noop)
         ops = []
         if "cmp" in kwargs:
-            ops = [cls.numberOf(interpolate(kwargs["cmp"])), 0]
+            ops = [cls.seekNumber(interpolate(kwargs["cmp"])), 0]
         elif len(args):
             if len(args) == 1:
-                ops = [float(v), float(interpolate(args[0]))]
+                ops = [cls.seekNumber(v), cls.seekNumber(interpolate(args[0]))]
             else:
-                ops = [float(interpolate(args[0])), float(interpolate(args[1]))]
+                ops = [cls.seekNumber(interpolate(args[0])), cls.seekNumber(interpolate(args[1]))]
         else:
-            ops = [cls.numberOf(v), 0]
+            ops = [cls.seekNumber(v), 0]
         return (
             Pipe.green(v)
             if ops[0] < ops[1]
@@ -721,6 +729,9 @@ class Pipe:
     def urlencode(cls, v, *args, **kwargs):
         return quote(v)
 
+    @classmethod
+    def dashempty(cls, v, *args, **kwargs):
+        return '-' if v is None or v == '' else v
 
 def trim_ansi(a):
     ESC = r"\x1b"
@@ -800,6 +811,9 @@ class Parser:
 
     @classmethod
     def applyPipes(cls, value, pipes, data):
+        global NO_EMPTY_DASH
+        if not NO_EMPTY_DASH:
+            pipes.append('dashempty')
         return Pipe.apply(value, pipes, data, interpolate="$")
 
     @classmethod
@@ -849,8 +863,8 @@ class Parser:
 
             elif isinstance(val, list):
                 scopedStdout("\n")
-
-                if "TABLE" in pipes and TABLE != "0":
+                global TABLE, NO_TABLE
+                if (TABLE or "TABLE" in pipes) and not NO_TABLE:
                     cls.printTable(val, meta[key], indent + INDENT)
                 else:
                     for i, item in enumerate(val):
@@ -944,10 +958,9 @@ class Parser:
 
         records = Pipe.apply(records, tokens["pipes"])
 
-        global TABLE
-        global TABLE_NO_HEADER
+        global TABLE, NO_TABLE, TABLE_NO_HEADER
 
-        if ("TABLE" in tokens["pipes"] and TABLE != "0") or TABLE == "1":
+        if (TABLE or "TABLE" in tokens["pipes"]) and not NO_TABLE:
             cls.printTable(records, tokens, header=not TABLE_NO_HEADER)
         else:
             for i, record in enumerate(records):
