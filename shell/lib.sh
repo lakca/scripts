@@ -327,7 +327,7 @@ function ask2() {
       echoIndex=0 ;;
     1) # _ASK_RESULT（和输出结果）的数组索引为1
       echoIndex=1 ;;
-    S) # 接受多值
+    S) # 选项中呈现的数组（索引）
       selectableArrayIndexes=$OPTARG ;;
     m) # 接受多值
       multiple=1 ;;

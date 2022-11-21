@@ -7,6 +7,7 @@ import sys
 import re
 import os
 import time
+from typing import MutableSequence, Sequence
 from urllib import request
 from urllib.parse import quote
 
@@ -623,12 +624,12 @@ class Pipe:
         index = (kwargs.get("data", {}).get("__index", 0)) + (
             (int(args[0]) if len(args) else 0)
         )
-        return cls.white(f"【{index}】") + v
+        return cls.white(f"【{index}】") + str(v)
 
     @classmethod
     def newline(cls, v, number=1, *args, **kwargs):
         number = int(number)
-        return "\n" * -number + v if number < 0 else v + "\n" * number
+        return "\n" * -number + str(v) if number < 0 else str(v) + "\n" * number
 
     @classmethod
     def join(cls, v, delimiter=", ", *args, **kwargs):
@@ -636,11 +637,11 @@ class Pipe:
 
     @classmethod
     def hr(cls, v, dividing="-" * 50 + "\n", *args, **kwargs):
-        return v + dividing
+        return str(v) + dividing
 
     @classmethod
     def sort(cls, v, *args, **kwargs):
-        if not v:
+        if not isinstance(v, list):
             return v
         useKwargs = {}
         if kwargs["key"]:
@@ -661,9 +662,7 @@ class Pipe:
 
     @classmethod
     def reverse(cls, v, *args, **kwargs):
-        if isinstance(v, list):
-            v.reverse()
-        return v
+        return v.reverse() if isinstance(v, MutableSequence) else v
 
     @classmethod
     def _getLeftStyleANSI(cls, text, *args, **kwargs):
@@ -703,6 +702,7 @@ class Pipe:
 
     @classmethod
     def tag(cls, text, *args, **kwargs):
+        if not isinstance(text, str): return
         regTag = re.compile(r"<(\w+)(\s+[^>]*)*>([\s\S]*?)</\1>")
         start = 0
         # print(text)
@@ -719,15 +719,16 @@ class Pipe:
 
     @classmethod
     def striptags(cls, v, *args, **kwargs):
-        return re.sub(r"</?\w+(\s+[^>]*)*>", "", str(v))
+        return re.sub(r"</?\w+(\s+[^>]*)*>", "", v) if isinstance(v, str) else v
 
     @classmethod
     def slice(cls, v, *args, **kwargs):
+        if not isinstance(v, Sequence): v = str(v)
         return v[slice(*list(map(lambda e, *argss: int(e), args)))]
 
     @classmethod
     def urlencode(cls, v, *args, **kwargs):
-        return quote(v)
+        return quote(v) if isinstance(v, str) else v
 
     @classmethod
     def dashempty(cls, v, *args, **kwargs):
@@ -812,19 +813,19 @@ class Parser:
     @classmethod
     def applyPipes(cls, value, pipes, data):
         global NO_EMPTY_DASH
-        if not NO_EMPTY_DASH:
+        if not NO_EMPTY_DASH and 'dashempty' not in pipes:
             pipes.append('dashempty')
         return Pipe.apply(value, pipes, data, interpolate="$")
 
     @classmethod
-    def shouldHidden(cls, token, index):
+    def shouldHidden(cls, token, **kwargs):
         key = token.get("key", "")
         pipes = token.get("pipes", [])
         label = token.get("label", key)
         global SIMPLE
         return "HIDE" in pipes or (
             SIMPLE
-            and index != 0
+            and ('index' in kwargs and kwargs['index'] != 0)
             and not (LINK and label in ["链接"])
             and "SIMPLE" not in pipes
         )
@@ -844,7 +845,7 @@ class Parser:
             if key.startswith("__"):
                 continue
 
-            if cls.shouldHidden(meta[key], index):
+            if cls.shouldHidden(meta[key], index=index):
                 continue
 
             pipes = meta[key].get("pipes", [])
@@ -894,7 +895,7 @@ class Parser:
         children = []
 
         for index, token in enumerate(tokens["children"]):
-            if not cls.shouldHidden(token, index):
+            if not cls.shouldHidden(token, index=index):
                 children.append(token)
 
         scopedStdout = lambda *args: sys.stdout.write(
@@ -939,7 +940,7 @@ class Parser:
             sys.stdout.write("\n")
 
     @classmethod
-    def output(cls, fmt, data, file):
+    def output(cls, fmt, data, file=None):
         # print(data)
         if fmt.startswith(":") and not isinstance(data, list):
             data = [data]
@@ -963,9 +964,45 @@ class Parser:
         if (TABLE or "TABLE" in tokens["pipes"]) and not NO_TABLE:
             cls.printTable(records, tokens, header=not TABLE_NO_HEADER)
         else:
-            for i, record in enumerate(records):
+            for record in records:
                 cls.printRecord(record, flatted)
                 sys.stdout.write("-" * 50 + "\n")
+
+    @classmethod
+    def printToken(cls, data, token: dict, indent=0, INDENT=2):
+        key = token.get('key')
+        pipes = token.get('pipes')
+        label = token.get('label')
+        children = token.get('children')
+        rawValue = data.get(key) if data else None
+        useDowngrade = "DOWNGRADE" in pipes
+        useTable = "TABLE" in pipes
+        value = cls.applyPipes(rawValue, pipes, data)
+        scopedStdout = lambda *args: sys.stdout.write(" " * indent + "".join(list(*args)))
+        scopedStdout("{}: ".format(Pipe.apply(label if label is not None else key, ["yellow", "italic"])))
+        if cls.shouldHidden(token):
+            return
+        if useDowngrade:
+            indent -= max(indent, INDENT)
+        if children:
+            if isinstance(value, list):
+                scopedStdout('\n')
+                if useTable:
+                    cls.printTable(value, token, indent + INDENT)
+                else:
+                    for val in value:
+                        for child in children:
+                            cls.printToken(val, child, indent=indent + INDENT, INDENT=INDENT)
+                        scopedStdout(' ' * INDENT + '-' * 50 + '\n')
+            else:
+                for child in children:
+                    cls.printToken(value, child, indent=indent + INDENT, INDENT=INDENT)
+        elif isinstance(value, list):
+            for item in value:
+                scopedStdout("\n")
+                scopedStdout("  {}\n".format(item))
+        else:
+            scopedStdout("  {}\n".format(value))
 
 
 if __name__ == "__main__":

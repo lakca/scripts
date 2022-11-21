@@ -277,7 +277,7 @@ function json_res() {
           aliases=(标题 链接)
           patterns=('"title":"[^"]*"' '"url":"[^"]*"')
           indexes=(4 4)
-          jsonFormat='data:(标题)question.title|red|bold|index,(链接)question.url,(时间)question.created|date,(标签)question.topics*.name'
+          jsonFormat='data:(标题)question.title|red|bold|index,(链接)question.url,(时间)question.created|date,(标签)question.topics*.name|join'
           outputfile="$outputfile.$3"
           case ${3:-hour} in
             日榜|day)
@@ -451,61 +451,37 @@ function json_res() {
           jsonFormat='result.tag:(建议词)term'
         ;;
         搜索|search|s) # 搜索
-          local args=($@)
-          url="https://api.bilibili.com/x/web-interface/search/all/v2?__refresh__=true&page=1&page_size=42&platform=pc"
-          curlparams=("-b buvid3=oc; -G")
-          local keyword=$(question '输入搜索词：' $3)
+          url='https://api.bilibili.com/x/web-interface/search/all/v2'
+          curlparams+=(-b 'buvid3=oc;')
+          curlparams+=(--data-urlencode __refresh__=true)
+          curlparams+=(--data-urlencode page=${PAGE:-1})
+          curlparams+=(--data-urlencode page_size=${SIZE:-42})
+          curlparams+=(--data-urlencode platform=pc)
+          jsonFormat='data.result|sort(key=data.result:result_type,sorts=[video,user]):(搜索结果类型)result_type,(结果列表)data|TABLE|SIMPLE:(标题)title|red|tag|SIMPLE,(UP主)author,(标签)tag,(类型)typename,(项目类型)type,(链接)arcurl|SIMPLE,(图片)upic'
+
+          local keyword=$(question2 -q '搜索词' -i "$3")
           curlparams+=("--data-urlencode keyword=$keyword")
-          jsonFormat='data.result|sort(key=data.result:result_type,sorts=[video,user]):(搜索结果类型)result_type,(结果列表)data|hr:(标题)title,(UP主)author,(标签)tag,(类型)typename,(项目类型)type,(链接)arcurl,(图片)upic'
 
-          local orders=(click pubdate dm stow)
-          _ASK_MSG='请输入排序（如果不需要排序，直接回车即可）：' ask "最多点击 最新发布 最多弹幕 最多收藏" $4
-          local order=${orders[@]:$_ASK_INDEX:1}
-          [[ $order ]] && curlparams+=("--data-urlencode order=$order")
-          args[4]=$order
-
-          local type=''
-          case $5 in
-            视频|video)
-              type='video'
-              jsonFormat='data.result:(标题)title|red|bold|index,(简介)description|white|dim,(分类)typename|magenta,(播放量)play|number,(点赞数)favorites|number,(收藏量)video_review|number,(弹幕数)danmaku|number,(UP主)author,(空间)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(发布时间)pubdate|date,(链接)arcurl|dim,(图片)pic|image|dim'
-            ;;
-            影视|media_ft|film)
-              type='media_ft'
-              jsonFormat='data.result:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)styles|magenta,(地区)areas,(演职人员)staff,(媒体类型)season_type_name|magenta,(发布时间)pubdate|date,(链接)url|dim,(图片)cover|image|dim'
-            ;;
-            番剧|media_bangumi|anime)
-              type='media_bangumi'
-              jsonFormat='data.result:(标题)title|red|bold|index,(分类)styles|magenta,(地区)areas,(简介)desc|white|dim,(演职人员)staff,(媒体类型)season_type_name|magenta,(发布时间)pubdate|date,(链接)url|dim,(图片)cover|image|dim'
-            ;;
-            直播|live)
-              type='live'
-              jsonFormat='data.result:live_room:(标题)title|red|bold|index,(分类)cate_name|magenta,(标签)tag,(链接)url|dim,(图片)cover|image|dim;live_user:(UP主)uname,(分类)cate_name,(图片)cover|image|dim,(直播时间)live_time,(关注人数)attentions,(直播间)roomid|$https://live.bilibili.com/{data.result:live_user:roomid}$'
-            ;;
-            专栏|article)
-              type='article'
-              jsonFormat='data.result:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)category_name,(浏览量)view|number,(链接)id|$https://www.bilibili.com/read/cv{data.result:id}$|dim,(发布时间)pubdate|date,(图片)image_urls|image|dim'
-            ;;
-            话题|topic)
-              type='topic'
-              jsonFormat='data.result:(标题)title|red|bold|index,(UP主)author,(空间)mid$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description,(描述)description,(发布时间)pubdate|date,(链接)arcurl|dim,(图片)cover|image|dim'
-            ;;
-            用户|bili_user|user|up)
-              type='bili_user'
-              jsonFormat='data.result:(UP主)uname|red|bold|index,(官方认证)official_verify.desc,(简介)usign,(视频数)videos,(链接)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(头像)upic,(作品)res:(标题)title,(链接)arcurl,(发布时间)pubdate|date'
-            ;;
-            *)
-              _ASK_MSG='请输入分类（如果不需要分类，直接回车即可）：' ask "视频 番剧 影视 直播 专栏 话题 用户"
-              if [[ $_ASK_RESULT ]]; then
-                args[5]=$_ASK_RESULT
-                json_res "${args[@]}"
-                return
-              fi
-            ;;
-          esac
-          [[ $type ]] && curlparams+=("--data-urlencode search_type=$type")
+          local order=$(ask2 -q '排序' -1 -i "$4" -N 2 -A "最多点击 click 最新发布 pubdate 最多弹幕 dm 最多收藏 stow")
+          [[ $order ]] && curlparams+=(--data-urlencode "order=$order")
+text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/2022-11-21.17:27:08.json')
+          local types=(
+            视频 video 'data.result:(标题)title|red|bold|index,(简介)description|white|dim,(分类)typename|magenta,(播放量)play|number,(点赞数)favorites|number,(收藏量)video_review|number,(弹幕数)danmaku|number,(UP主)author,(空间)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(发布时间)pubdate|date,(链接)arcurl|dim,(图片)pic|image|dim'
+            影视 media_ft 'data.result:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)styles|magenta,(地区)areas,(演职人员)staff,(媒体类型)season_type_name|magenta,(发布时间)pubdate|date,(链接)url|dim,(图片)cover|image|dim'
+            番剧 media_bangumi 'data.result:(标题)title|red|bold|index,(分类)styles|magenta,(地区)areas,(简介)desc|white|dim,(演职人员)staff,(媒体类型)season_type_name|magenta,(发布时间)pubdate|date,(链接)url|dim,(图片)cover|image|dim'
+            直播 live 'data.result:live_room:(标题)title|red|bold|index,(分类)cate_name|magenta,(标签)tag,(链接)url|dim,(图片)cover|image|dim;live_user:(UP主)uname,(分类)cate_name,(图片)cover|image|dim,(直播时间)live_time,(关注人数)attentions,(直播间)roomid|$https://live.bilibili.com/{data.result:live_user:roomid}$'
+            专栏 article 'data.result:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)category_name,(浏览量)view|number,(链接)id|$https://www.bilibili.com/read/cv{data.result:id}$|dim,(发布时间)pubdate|date,(图片)image_urls|image|dim'
+            话题 topic 'data.result:(标题)title|red|bold|index,(UP主)author,(空间)mid$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description,(描述)description,(发布时间)pubdate|date,(链接)arcurl|dim,(图片)cover|image|dim'
+            用户 bili_user 'data.result:(UP主)uname|red|bold|index,(官方认证)official_verify.desc,(简介)usign,(视频数)videos,(链接)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(头像)upic,(作品)res:(标题)title,(链接)arcurl,(发布时间)pubdate|date'
+          )
+          ask2 -q '类型' -i "$5" -1 -N 3 -S '0 1' -A "${types[*]}"
+          local type=$_ASK_RESULT
+          if [[ $type ]]; then
+            curlparams+=(--data-urlencode "search_type=$type")
+            jsonFormat=${_ASK_RESULTS[@]:2:1}
+          fi
           if [[ $order || $type ]]; then
-            url="https://api.bilibili.com/x/web-interface/search/type?__refresh__=true&page=1&page_size=42&platform=pc"
+            url='https://api.bilibili.com/x/web-interface/search/type'
           fi
         ;;
         用户投稿|space|up) # 用户投稿
