@@ -2,6 +2,7 @@
 
 source `dirname $0`/lib.sh
 
+export SHOULD_STORE=${SHOULD_STORE-1}
 # 微博 #
 
 WEIBO_RESOU='https://weibo.com/ajax/side/hotSearch'
@@ -30,9 +31,10 @@ ZHIHU_DOMAINS=(全部 数码 科技 互联网 商业财经 职场 教育 法律 
 ZHIHU_DOMAINS_NUM=(0  100001  100002  100003  100004  100005  100006  100007  100008  100009  100010  100011  100012  100013  100014  100015  100016  100017  100018  100019  100020  100021  100022  100023  100024  100025  100026  100027  100028  100029)
 
 function ask_date_range() {
-  local d=($(question2 -q "${_ASK_DATE_RANGE:-起止日期}" -Q "（如\033[4m$(date +%Y-%m-%d) $(date +%Y-%m-%d)\033[24m，相同可以省略第二个值）" -d "$1 $2"))
-  [[ ! "${d[@]:0:1}" ]] && d[0]=$1
-  [[ ! "${d[@]:1:1}" ]] && d[1]=$2
+  local format=${DATE_FORMAT:-%Y-%m-%d}
+  local d=($(question2 -q "${_ASK_DATE_RANGE:-起止日期}" -Q "（如\033[4m$(date +$format) $(date +$format)\033[24m，相同可以省略第二个值）" -d "$1 $2"))
+  [[ $1 && ! "${d[@]:0:1}" ]] && d[0]=$1
+  [[ $2 && ! "${d[@]:1:1}" ]] && d[1]=$2
   echo "${d[@]}"
 }
 
@@ -58,11 +60,26 @@ function json_res() {
   local -a transformers
   local -a filters
   local jsonFormat
-  local curlparams=(-G)
+  local curlparams=(
+    -G --compressed
+    -H 'cache-control: no-cache'
+    -H 'pragma: no-cache'
+    -H 'sec-ch-ua: "Google Chrome";v="107", "Chromium";v="107", "Not=A?Brand";v="24"'
+    -H 'sec-ch-ua-mobile: ?0'
+    -H 'sec-ch-ua-platform: "macOS"'
+    -H 'sec-fetch-dest: empty'
+    -H 'sec-fetch-mode: cors'
+    -H 'sec-fetch-site: same-site'
+    -H 'user-agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36'
+  )
   local outputfile="$1"
   local tailer=''
   local _today=$(date +%Y-%m-%d)
   local _today2=$(date +%Y%m%d)
+  local _last_trade_day=$_today2
+  if [[ $(bc <<< "$(date +%H) < 9") ]]; then
+    _last_trade_day=$(date -v-1d +%Y%m%d)
+  fi
   local jsonp
   case $1 in
     微博|weibo|wb)
@@ -431,16 +448,20 @@ function json_res() {
     哔哩哔哩|bilibili|bb)
       outputfile="$outputfile.$2"
       case $2 in
-        热搜|hotsearch|hs) # 热搜 https://www.bilibili.com/blackboard/activity-trending-topic.html
+        热搜|resou) # 搜索框
+          url='https://api.bilibili.com/x/web-interface/search/square'
+          curlparams+=(--data-urlencode limit=30)
+          curlparams+=(--data-urlencode platform=web)
+          jsonFormat='data.trending.list|TABLE:(关键词)keyword,(链接)url|$https://search.bilibili.com/all?keyword={.keyword}&from_source=webtop_search$'
+        ;;
+        热搜|hotsearch) # 热搜 https://www.bilibili.com/blackboard/activity-trending-topic.html
           url='https://app.bilibili.com/x/v2/search/trending/ranking?limit=30'
-          # text=$(cat bilibili.hotsearch.json)
-          url=${url//\{query\}/$query}
           aliases=(关键词)
           fields=(show_name)
           indexes=(4)
           jsonFormat='data.list:(关键词)show_name'
         ;;
-        搜索建议|searchsuggest|suggest) # 搜索建议
+        搜索建议|searchsuggest) # 搜索建议
           url="https://s.search.bilibili.com/main/suggest?func=suggest&suggest_type=accurate&sub_type=tag&main_ver=v1&highlight=&userid=18358716&bangumi_acc_num=1&special_acc_num=1&topic_acc_num=1&upuser_acc_num=3&tag_num=10&special_num=10&bangumi_num=10&upuser_num=3&rnd=$(date +%s)"
           curlparams="-G --data-urlencode term={term}"
           local term=$(question '输入搜索词：' $3)
@@ -450,22 +471,27 @@ function json_res() {
           indexes=(4)
           jsonFormat='result.tag:(建议词)term'
         ;;
-        搜索|search|s) # 搜索
+        搜索|search) # 搜索
           url='https://api.bilibili.com/x/web-interface/search/all/v2'
           curlparams+=(-b 'buvid3=oc;')
           curlparams+=(--data-urlencode __refresh__=true)
           curlparams+=(--data-urlencode page=${PAGE:-1})
           curlparams+=(--data-urlencode page_size=${SIZE:-42})
           curlparams+=(--data-urlencode platform=pc)
-          jsonFormat='data.result|sort(key=data.result:result_type,sorts=[video,user]):(搜索结果类型)result_type,(结果列表)data|TABLE|SIMPLE:(标题)title|red|tag|SIMPLE,(UP主)author,(标签)tag,(类型)typename,(项目类型)type,(链接)arcurl|SIMPLE,(图片)upic'
+          jsonFormat='data.result|sort(key=data.result:result_type,sorts=(video,user)):(搜索结果类型)result_type,(结果列表)data|SIMPLE|+hr:(标题)title|red|tag|SIMPLE,(UP主)author,(标签)tag,(类型)typename,(链接)arcurl|SIMPLE,(图片)upic|image|dim'
 
           local keyword=$(question2 -q '搜索词' -i "$3")
           curlparams+=("--data-urlencode keyword=$keyword")
 
           local order=$(ask2 -q '排序' -1 -i "$4" -N 2 -A "最多点击 click 最新发布 pubdate 最多弹幕 dm 最多收藏 stow")
           [[ $order ]] && curlparams+=(--data-urlencode "order=$order")
-text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/2022-11-21.17:27:08.json')
-          local types=(
+
+          local time_from=$(question2 -q '起始时间，格式为：%Y%m%d')
+          [[ $time_from ]] && curlparams+=(--data-urlencode "time_from=${time_from}")
+          local time_to=$(question2 -q '起始时间，格式为：%Y%m%d')
+          [[ $time_to ]] && curlparams+=(--data-urlencode "time_to=${time_to}")
+
+          local search_types=(
             视频 video 'data.result:(标题)title|red|bold|index,(简介)description|white|dim,(分类)typename|magenta,(播放量)play|number,(点赞数)favorites|number,(收藏量)video_review|number,(弹幕数)danmaku|number,(UP主)author,(空间)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(发布时间)pubdate|date,(链接)arcurl|dim,(图片)pic|image|dim'
             影视 media_ft 'data.result:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)styles|magenta,(地区)areas,(演职人员)staff,(媒体类型)season_type_name|magenta,(发布时间)pubdate|date,(链接)url|dim,(图片)cover|image|dim'
             番剧 media_bangumi 'data.result:(标题)title|red|bold|index,(分类)styles|magenta,(地区)areas,(简介)desc|white|dim,(演职人员)staff,(媒体类型)season_type_name|magenta,(发布时间)pubdate|date,(链接)url|dim,(图片)cover|image|dim'
@@ -474,19 +500,18 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
             话题 topic 'data.result:(标题)title|red|bold|index,(UP主)author,(空间)mid$https://space.bilibili.com/{data.result:mid}$|dim,(简介)description,(描述)description,(发布时间)pubdate|date,(链接)arcurl|dim,(图片)cover|image|dim'
             用户 bili_user 'data.result:(UP主)uname|red|bold|index,(官方认证)official_verify.desc,(简介)usign,(视频数)videos,(链接)mid|$https://space.bilibili.com/{data.result:mid}$|dim,(头像)upic,(作品)res:(标题)title,(链接)arcurl,(发布时间)pubdate|date'
           )
-          ask2 -q '类型' -i "$5" -1 -N 3 -S '0 1' -A "${types[*]}"
-          local type=$_ASK_RESULT
-          if [[ $type ]]; then
-            curlparams+=(--data-urlencode "search_type=$type")
+          ask2 -s -q '类型' -i "$5" -1 -N 3 -S '0 1' -A "${search_types[*]}"
+          local search_type=$_ASK_RESULT
+          if [[ $search_type ]]; then
+            curlparams+=(--data-urlencode "search_type=$search_type")
             jsonFormat=${_ASK_RESULTS[@]:2:1}
           fi
-          if [[ $order || $type ]]; then
+          if [[ $order || $search_type ]]; then
             url='https://api.bilibili.com/x/web-interface/search/type'
           fi
         ;;
-        用户投稿|space|up) # 用户投稿
+        用户投稿|upload) # 用户投稿
           url="https://api.bilibili.com/x/space/arc/search?mid={upid}&pn={PAGE}&ps={SIZE}&index=1&order={order}&order_avoided=true&jsonp=jsonp"
-          curlparams='-H User-Agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36'
           # 482324117, 在美国的福建人, https://space.bilibili.com/482324117
           local upid=$(question '请输入用户ID、名称或主页链接：' $3)
           if [[ "$upid" = https://space.bilibili.com* ]]; then
@@ -507,126 +532,9 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
           url=${url//\{SIZE\}/${SIZE:-25}}
           jsonFormat='data.list.vlist:(标题)title|red|bold|index,(简介)description|white|dim,(播放量)play|number,(弹幕数)video_review,(评论数)comment|number,(发布时间)created|date(format=md)|magenta,(链接)bvid|$https://www.bilibili.com/video/{data.list.vlist:bvid}$|white|dim,(图片)pic|image|white|dim'
         ;;
-        综合热门) # 综合热门 https://www.bilibili.com/v/popular/all
+        综合热门|hot) # 综合热门 https://www.bilibili.com/v/popular/all
           url="https://api.bilibili.com/x/web-interface/popular?ps=${SIZE:-20}&pn=${PAGE:-1}"
           jsonFormat='data.list:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)tname|magenta,(UP主)owner.name|${.owner.name} https://space.bilibili.com/{.owner.mid}$,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(点赞数)stat.like|number,(评论数)stat.reply|number,(链接)short_link|dim,(图片)pic|image|dim'
-        ;;
-        排行榜|rank) # 排行榜 https://www.bilibili.com/v/popular/rank
-          local args=($@)
-          outputfile="$outputfile.$3"
-          local tabs=(全站 番剧 国产动画 国创相关 纪录片 动画 音乐 舞蹈 游戏 知识 科技 运动 汽车 生活 美食 动物圈 鬼畜 时尚 娱乐 影视 电影 电视剧 综艺 原创 新人)
-          # 类似 https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=all'
-          local jsonFormatTypeOne='data.list:(标题)title|red|bold|index,(简介)desc|white|dim,(分类)tname|magenta,(UP主)owner.name|${.owner.name} https://space.bilibili.com/{.owner.mid}$,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(点赞数)stat.like|number,(评论数)stat.reply|number,(链接)short_link|dim,(图片)pic|image|dim'
-          # 类似 https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=1
-          local jsonFormatTypeTwo='result.list:(标题)title|red|bold|index,(徽标)badge|magenta,(更新状态)new_ep.index_show,(评分)rating|magenta,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(追番数)stat.follow|number,(总追番数)stat.series_follow|number,(链接)url,(图片)cover|image|dim'
-          case $3 in
-            全站) # https://www.bilibili.com/v/popular/rank/all
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            番剧) # https://www.bilibili.com/v/popular/rank/bangumi
-              url='https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=1'
-              jsonFormat=$jsonFormatTypeTwo
-            ;;
-            国产动画) # https://www.bilibili.com/v/popular/rank/guochan
-              url='https://api.bilibili.com/pgc/web/rank/list?day=3&season_type=4'
-              jsonFormat=$jsonFormatTypeTwo
-            ;;
-            纪录片) # https://www.bilibili.com/v/popular/rank/documentary
-              url='https://api.bilibili.com/pgc/season/rank/web/list?day=3&season_type=3'
-              jsonFormat=$jsonFormatTypeTwo
-            ;;
-            电影) # https://www.bilibili.com/v/popular/rank/movie
-              url='https://api.bilibili.com/pgc/season/rank/web/list?day=3&season_type=2'
-              jsonFormat=$jsonFormatTypeTwo
-            ;;
-            电视剧) # https://www.bilibili.com/v/popular/rank/tv
-              url='https://api.bilibili.com/pgc/season/rank/web/list?day=3&season_type=5'
-              jsonFormat=$jsonFormatTypeTwo
-            ;;
-            综艺) # https://www.bilibili.com/v/popular/rank/variety
-              url='https://api.bilibili.com/pgc/season/rank/web/list?day=3&season_type=7'
-              jsonFormat=$jsonFormatTypeTwo
-            ;;
-            国产相关) # https://www.bilibili.com/v/popular/rank/guochuang
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=168&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            动画) # https://www.bilibili.com/v/popular/rank/douga
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=1&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            音乐) # https://www.bilibili.com/v/popular/rank/music
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=3&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            舞蹈) # https://www.bilibili.com/v/popular/rank/dance
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=129&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            游戏) # https://www.bilibili.com/v/popular/rank/game
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=4&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            知识) # https://www.bilibili.com/v/popular/rank/knowledge
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=36&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            科技) # https://www.bilibili.com/v/popular/rank/tech
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=188&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            运动) # https://www.bilibili.com/v/popular/rank/sports
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=234&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            汽车) # https://www.bilibili.com/v/popular/rank/car
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=223&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            生活) # https://www.bilibili.com/v/popular/rank/life
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=160&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            美食) # https://www.bilibili.com/v/popular/rank/food
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=160&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            动物圈) # https://www.bilibili.com/v/popular/rank/animal
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=217&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            鬼畜) # https://www.bilibili.com/v/popular/rank/kichiku
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=119&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            时尚) # https://www.bilibili.com/v/popular/rank/fashion
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=155&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            娱乐) # https://www.bilibili.com/v/popular/rank/ent
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=5&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            影视) # https://www.bilibili.com/v/popular/rank/cinephile
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=181&type=all'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            原创) # https://www.bilibili.com/v/popular/rank/origin
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=origin'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            新人) # https://www.bilibili.com/v/popular/rank/rookie
-              url='https://api.bilibili.com/x/web-interface/ranking/v2?rid=0&type=rookie'
-              jsonFormat=$jsonFormatTypeOne
-            ;;
-            *)
-              ask "${tabs[*]}"
-              args[2]=${tabs[@]:$_ASK_INDEX:1}
-              json_res "${args[@]}"
-              return
-            ;;
-          esac
         ;;
         每周必看|week) # 每周必看 https://www.bilibili.com/v/popular/weekly
           local week=$3
@@ -639,7 +547,7 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
           fi
           url="https://api.bilibili.com/x/web-interface/popular/series/one?number=$week"
         ;;
-        周列表|weeklist) # 周列表
+        周列表|weeklist) # 周列表 https://www.bilibili.com/v/popular/weekly
           url='https://api.bilibili.com/x/web-interface/popular/series/list'
           aliases=(主题 编号 名称)
           fields=(subject number name)
@@ -653,7 +561,7 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
           url="https://api.bilibili.com/x/web-interface/popular/precious?page_size=${SIZE:-100}&page=${PAGE:-1}"
           jsonFormat='data.list:(标题)title|red|bold|index,(简介)desc|white|dim,(成就)achievement|magenta,(分类)tname|magenta,(UP主)owner.name|${.owner.name} https://space.bilibili.com/{.owner.mid}$,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(点赞数)stat.like|number,(评论数)stat.reply|number,(链接)short_link|dim,(图片)pic|image|dim'
         ;;
-        全站音乐榜) # https://www.bilibili.com/v/popular/music
+        全站音乐榜) # 全站音乐榜 https://www.bilibili.com/v/popular/music
           local week=$3
           if [[ $week = 0 ]]; then
             week=`RAW=1 json_res bilibili musicweeklist | grep -oE '"number":[^,]*,' | head -1 | grep -oE '\d+'`
@@ -664,7 +572,7 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
           fi
           url="https://api.bilibili.com/x/copyright-music-publicity/toplist/music_list?list_id=$week"
         ;;
-        音乐周列表|musicweeklist)
+        音乐周列表|musicweeklist) # 音乐周列表 https://www.bilibili.com/v/popular/music
           url='https://api.bilibili.com/x/copyright-music-publicity/toplist/all_period?list_type=1'
           aliases=(编号 发布时间)
           fields=(period publish_time)
@@ -673,6 +581,374 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
           indexes=(3 3)
           transformers=('\\033[0m第\\033[31m${values[@]:1:1}\\033[0m期' _)
           jsonFormat=''
+        ;;
+        稿件详情|detail)
+          url='https://api.bilibili.com/x/web-interface/view'
+          curlparams+=(--data-urlencode aid=733261579)
+        ;;
+        用户空间|space)
+          outputfile="$outputfile.$3"
+          local old_cookie=$(store -g bilibili.cookie)
+          local cookie=$(question2 -q 'cookie')
+          [[ $cookie ]] && store -s bilibili.cookie "$cookie" || cookie=$old_cookie
+          curlparams+=(-b "$cookie")
+          # 频道
+          local channels=(
+            # route                                       tid name
+            anime                                         13  番剧
+            anime-serial                                  33  连载动画
+            anime-finish                                  32  完结动画
+            anime-information                             51  资讯
+            anime-offical                                 152 官方延伸
+            anime-timeline                                _   新番时间表
+            anime-index                                   _   番剧索引
+
+            movie                                         23  电影
+
+            guochuang                                     167 国创
+            guochuang-chinese                             153 国产动画
+            guochuang-original                            168 国产原创相关
+            guochuang-puppetry                            169 布袋戏
+            guochuang-motioncomic                         195 动态漫·广播剧
+            guochuang-information                         170 资讯
+            guochuang-timeline                            _   新番时间表
+            guochuang-index                               _   国产动画索引
+
+            tv                                            11  电视剧
+
+            variety                                       _   综艺
+
+            documentary                                   177 纪录片
+
+            douga                                         1   动画
+            douga-mad                                     24  MAD·AMV
+            douga-mmd                                     25  MMD·3D
+            douga-voice                                   47  短片·手书·配音
+            douga-garage_kit                              210 手办·模玩
+            douga-tokusatsu                               86  特摄
+            douga-acgntalks                               253 动漫杂谈
+            douga-other                                   27  综合
+
+            game                                          4   游戏
+            game-stand_alone                              17  单机游戏
+            game-esports                                  171 电子竞技
+            game-mobile                                   172 手机游戏
+            game-online                                   65  网络游戏
+            game-board                                    173 桌游棋牌
+            game-gmv                                      121 GMV
+            game-music                                    136 音游
+            game-mugen                                    19  Mugen
+            game-match                                    _   游戏赛事
+
+            kichiku                                       119 鬼畜
+            kichiku-guide                                 22  鬼畜调教
+            kichiku-mad                                   26  音MAD
+            kichiku-manual_vocaloid                       126 人力VOCALOID
+            kichiku-theatre                               216 鬼畜剧场
+            kichiku-course                                127 教程演示
+
+            music                                         3   音乐
+            music-original                                28  原创音乐
+            music-cover                                   31  翻唱
+            music-perform                                 59  演奏
+            music-vocaloid                                30  VOCALOID·UTAU
+            music-live                                    29  音乐现场
+            music-mv                                      193 MV
+            music-commentary                              243 乐评盘点
+            music-tutorial                                244 音乐教学
+            music-other                                   130 音乐综合
+            rap                                           _   说唱
+
+            dance                                         129 舞蹈
+            dance-otaku                                   20  宅舞
+            dance-hiphop                                  198 街舞
+            dance-star                                    199 明星舞蹈
+            dance-china                                   200 中国舞
+            dance-three_d                                 154 舞蹈综合
+            dance-demo                                    156 舞蹈教程
+
+            cinephile                                     181 影视
+            cinephile-cinecism                            182 影视杂谈
+            cinephile-montage                             183 影视剪辑
+            cinephile-shortfilm                           85  小剧场
+            cinephile-trailer_info                        184 预告·资讯
+
+            ent                                           5   娱乐
+            ent-variety                                   71  综艺
+            ent-talker                                    241 娱乐杂谈
+            ent-fans                                      242 粉丝创作
+            ent-celebrity                                 137 明星综合
+
+            knowledge                                     36  知识
+            knowledge-science                             201 科学科普
+            knowledge-social_science                      124 社科·法律·心理
+            knowledge-humanity_history                    228 人文历史
+            knowledge-business                            207 财经商业
+            knowledge-campus                              208 校园学习
+            knowledge-career                              209 职业职场
+            knowledge-design                              229 设计·创意
+            knowledge-skill                               122 野生技能协会
+
+            tech                                          188 科技
+            tech-digital                                  95  数码
+            tech-application                              230 软件应用
+            tech-computer_tech                            231 计算机技术
+            tech-industry                                 232 科工机械
+            tech-diy                                      _   极客DIY
+
+            information                                   202 资讯
+            information-hotspot                           203 热点
+            information-global                            204 环球
+            information-social                            205 社会
+            information-multiple                          206 综合
+
+            food                                          211 美食
+            food-make                                     76  美食制作
+            food-detective                                212 美食侦探
+            food-measurement                              213 美食测评
+            food-rural                                    214 田园美食
+            food-record                                   215 美食记录
+
+            life                                          160 生活
+            life-funny                                    138 搞笑
+            life-parenting                                254 亲子
+            life-travel                                   250 出行
+            life-rurallife                                251 三农
+            life-home                                     239 家居房产
+            life-handmake                                 161 手工
+            life-painting                                 162 绘画
+            life-daily                                    21  日常
+
+            car                                           223 汽车
+            car-racing                                    245 赛车
+            car-modifiedvehicle                           246 改装玩车
+            car-newenergyvehicle                          246 新能源车
+            car-touringcar                                248 房车
+            car-motorcycle                                240 摩托车
+            car-strategy                                  227 购车攻略
+            car-life                                      176 汽车生活
+
+            fashion                                       155 时尚
+            fashion-makeup                                157 美妆护肤
+            fashion-cos                                   252 仿妆cos
+            fashion-clothing                              158 穿搭
+            fashion-trend                                 159 时尚潮流
+
+            sports                                        234 运动
+            sports-basketball                             235 篮球
+            sports-football                               249 足球
+            sports-aerobics                               164 健身
+            sports-athletic                               236 竞技体育
+            sports-culture                                237 运动文化
+            sports-comprehensive                          238 运动综合
+
+            animal                                        217 动物圈
+            animal-cat                                    218 喵星人
+            animal-dog                                    219 汪星人
+            animal-reptiles                               222 小宠异宠
+            animal-wild_animal                            221 野生动物
+            animal-second_edition                         220 动物二创
+            animal-animal_composite                       75  动物综合
+
+            # life-daily                                    _   VLOG
+
+            # virtual                                       _   虚拟UP主
+
+            # _                                             _   公益
+
+            # mooc                                          _   公开课
+          )
+          case $3 in
+            观看历史|history)
+              local type=$(ask2 -q '内容类型' -i "$4" -d 0 -N 2 -1 -A '视频 archive 直播 live 专栏 article')
+              url='https://api.bilibili.com/x/web-interface/history/cursor'
+              curlparams+=(--data-urlencode type=archive)
+              curlparams+=(--data-urlencode ps=${SIZE:-20})
+              jsonFormat='data.list|TABLE:(id)id,(标题)title|red,(标签)tag_name,(作者)author_name,(作者主页)author_url|$https://space.bilibili.com/{.author_mid}/$|HIDE_IN_TABLE,(观看时间)view_at(date),(链接)url$https://www.bilibili.com/medialist/detail/ml{.id}$,(封面)cover|image|dim|HIDE_IN_TABLE'
+            ;;
+            收藏夹|folder)
+              local up_mid=$(question2 -i "$4" -q '用户ID')
+              url='https://api.bilibili.com/x/v3/fav/folder/created/list'
+              curlparams+=(--data-urlencode pn=${PAGE:-1})
+              curlparams+=(--data-urlencode ps=${SIZE:-20})
+              curlparams+=(--data-urlencode up_mid=$up_mid)
+              curlparams+=(--data-urlencode jsonp=jsonp)
+              # curlparams+=(-H "referer:https://space.bilibili.com/$up_mid")
+              jsonFormat='data.list|TABLE:(id)id,(名称)title|red,(数量)media_count,(创建时间)ctime(date),(更新时间)mtime(date),(链接)url$https://www.bilibili.com/medialist/detail/ml{.id}$,(封面)cover|image|dim|HIDE_IN_TABLE'
+            ;;
+            订阅列表|collected)
+              local up_mid=$(question2 -i "$4" -q '用户ID')
+              url='https://api.bilibili.com/x/v3/fav/folder/collected/list'
+              curlparams+=(--data-urlencode pn=${PAGE:-1})
+              curlparams+=(--data-urlencode ps=${SIZE:-20})
+              curlparams+=(--data-urlencode up_mid=$up_mid)
+              curlparams+=(--data-urlencode platform=web)
+              curlparams+=(--data-urlencode jsonp=jsonp)
+              # curlparams+=(-H "referer:https://space.bilibili.com/$up_mid/favlist")
+              jsonFormat='data.list|TABLE:(id)id,(标题)title|red,(简介)intro|HIDE_IN_TABLE,(作者)upper.name,(作者主页)author_url|$https://space.bilibili.com/{.upper.name}/$|HIDE_IN_TABLE,(链接)url$https://www.bilibili.com/medialist/detail/ml{.id}$,(封面)cover|image|dim|HIDE_IN_TABLE'
+            ;;
+            收藏夹内容|resource)
+              local folder_id=$(question2 -i "$4" -q '收藏夹ID')
+              url='https://api.bilibili.com/x/v3/fav/resource/list'
+              curlparams+=(--data-urlencode media_id=$folder_id)
+              curlparams+=(--data-urlencode pn=${PAGE:-1})
+              curlparams+=(--data-urlencode ps=${SIZE:-20})
+              curlparams+=(--data-urlencode keyword=)
+              curlparams+=(--data-urlencode order=mtime)
+              curlparams+=(--data-urlencode type=0)
+              curlparams+=(--data-urlencode tid=0)
+              curlparams+=(--data-urlencode platform=web)
+              curlparams+=(--data-urlencode jsonp=jsonp)
+              jsonFormat='data.medias|TABLE:(id)id|HIDE_IN_TABLE,(标题)title|red,(收藏时间)fav_time|date,(简介)intro|HIDE_IN_TABLE,(链接)url|https://www.bilibili.com/video/${.bvid}/$,(封面)cover|image|dim|HIDE_IN_TABLE'
+            ;;
+            订阅项内容|season)
+              local season_id=$(question2 -i "$4" -q '订阅项ID')
+              url='https://api.bilibili.com/x/space/fav/season/list'
+              curlparams+=(--data-urlencode season_id=$season_id)
+              curlparams+=(--data-urlencode pn=${PAGE:-1})
+              curlparams+=(--data-urlencode ps=${SIZE:-20})
+              curlparams+=(--data-urlencode jsonp=jsonp)
+              jsonFormat='data.medias|TABLE:(id)id|HIDE_IN_TABLE,(标题)title|red,(发布时间)pubtime|date,(链接)url|$https://www.bilibili.com/video/${.bvid}/$,(封面)cover|image|dim|HIDE_IN_TABLE'
+            ;;
+            追番列表|follow)
+              url='https://api.bilibili.com/x/space/bangumi/follow/list'
+              curlparams+=(--data-urlencode vmid=$up_mid)
+              curlparams+=(--data-urlencode type=1)
+              curlparams+=(--data-urlencode jsonp=jsonp)
+              jsonFormat='data.list:'
+            ;;
+            人气漫画|hotmanga)
+              url='https://manga.bilibili.com/twirp/comic.v1.Comic/GetRecommendComics'
+              jsonFormat='data|TABLE:(标题)title|red,(标签)styles*.name,(链接)url|$https://manga.bilibili.com/detail/mc{.comic_id}$,(封面)vertical_cover|image|dim|HIDE_IN_TABLE'
+            ;;
+            推荐漫画|manga) # https://www.bilibili.com/
+              url='https://manga.bilibili.com/twirp/comic.v1.Comic/HomeHot'
+              curlparams+=(--data-urlencode device=pc)
+              curlparams+=(--data-urlencode platform=web)
+              jsonFormat='data|TABLE:(标题)title|red,(标签)styles*.name,(作者)author*,(链接)url|$https://manga.bilibili.com/detail/mc{.comic_id}$,(封面)vertical_cover|image|dim|HIDE_IN_TABLE'
+            ;;
+            公开课|mooc)
+              local classifications=(学科课程 1 硬核技能 2 考试考证 3)
+              local orders=(最新发布 1 播放最多 2)
+              local classification=$(ask2 -q '分类' -i "$4" -d 0 -1 -N 2 -A "${classifications[*]}")
+              local order=$(ask2 -q '排序方式' -i "$5" -d 0 -1 -N 2 -A "${orders[*]}")
+              url='https://api.bilibili.com/x/open-course/course'
+              curlparams+=(--data-urlencode ps=${SIZE:-12})
+              curlparams+=(--data-urlencode pn=${PAGE:-1})
+              curlparams+=(--data-urlencode classification=$classification)
+              curlparams+=(--data-urlencode sort=$order)
+              jsonFormat='data.course|TABLE:(课程)course_name|red,(分类)category_name,(作者)nickname,(播放量)view|number(cn),(链接)url|$https://www.bilibili.com/video/{.bvid}$,(封面)cover|image|dim|HIDE_IN_TABLE'
+            ;;
+            热门排行榜|ranking) # 排行榜 https://www.bilibili.com/v/popular/rank
+              # VueComponent: [index.js]PgcRankList
+              local season_types=(
+                # slug                 tid   season_type rank_type      name
+                all                  0     _           _              全站
+                bangumi              13    1           _              番剧
+                guochan              168   4           _              国产动画
+                guochuang            168   _           _              国创相关
+                documentary          177   3           _              纪录片
+                douga                1     _           _              动画
+                music                3     _           _              音乐
+                dance                129   _           _              舞蹈
+                game                 4     _           _              游戏
+                knowledge            36    _           _              知识
+                tech                 188   _           _              科技
+                sports               234   _           _              运动
+                car                  223   _           _              汽车
+                life                 160   _           _              生活
+                food                 211   _           _              美食
+                animal               217   _           _              动物圈
+                kichiku              119   _           _              鬼畜
+                fashion              155   _           _              时尚
+                ent                  5     _           _              娱乐
+                cinephile            181   _           _              影视
+                movie                23    2           _              电影
+                tv                   11    5           _              电视剧
+                variety              _     7           _              综艺
+                origin               0     _           origin         原创
+                rookie               0     _           rookie         新人
+              )
+              ask2 -s -q '类型' -1 -i "$4" -d 0 -N 5 -S '-1' -A "${season_types[*]}"
+              local tid=${_ASK_RESULT}
+              local season_type=${_ASK_RESULTS[@]:2:1}
+              local rank_type=${_ASK_RESULTS[@]:3:1}
+              if [[ ! $season_type = '_' ]]; then
+                [[ $season_type = 1 ]] && url='https://api.bilibili.com/pgc/web/rank/list' || url='https://api.bilibili.com/pgc/season/rank/web/list'
+                curlparams+=(--data-urlencode day=3)
+                curlparams+=(--data-urlencode season_type=$season_type)
+                jsonFormat='result.list|TABLE:(标题)title|red|bold|index,(徽标)badge|magenta,(更新状态)new_ep.index_show,(评分)rating|magenta,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(追番数)stat.follow|number,(总追番数)stat.series_follow|number,(链接)url|HIDE_IN_TABLE,(图片)cover|image|dim|HIDE_IN_TABLE'
+              else
+                url='https://api.bilibili.com/x/web-interface/ranking/v2'
+                curlparams+=(--data-urlencode rid=$rid)
+                [[ $rank_type = '_' ]] && rank_type=all
+                curlparams+=(--data-urlencode type=$rank_type)
+                jsonFormat='data.list|TABLE:(标题)title|red|bold|index,(简介)desc|white|dim|HIDE_IN_TABLE,(分类)tname|magenta,(UP主)owner.name|${.owner.name} https://space.bilibili.com/{.owner.mid}$,(观看数)stat.view|number,(弹幕数)stat.danmaku|number,(点赞数)stat.like|number,(评论数)stat.reply|number,(链接)short_link|dim|HIDE_IN_TABLE,(图片)pic|image|dim|HIDE_IN_TABLE'
+              fi
+            ;;
+            首页推流|feed) # 首页推流 https://www.bilibili.com/
+              local index=$(question2 -a '页面' -i $4)
+              local fresh_idx_1h=$index
+              local fetch_row=$(($index * 3 + 1))
+              local fresh_idx=$index
+              local brush=$index
+              url='https://api.bilibili.com/x/web-interface/index/top/feed/rcmd'
+              curlparams+=(--data-urlencode y_num=5)
+              curlparams+=(--data-urlencode fresh_type=4)
+              curlparams+=(--data-urlencode feed_version=V11) # window.__SERVER_CONFIG__.for_ai_home_version
+              curlparams+=(--data-urlencode fresh_idx_1h=$fresh_idx_1h)
+              curlparams+=(--data-urlencode fetch_row=$fetch_row)
+              curlparams+=(--data-urlencode fresh_idx=$fresh_idx)
+              curlparams+=(--data-urlencode brush=$brush)
+              curlparams+=(--data-urlencode homepage_ver=1)
+              curlparams+=(--data-urlencode ps=${SIZE:-15})
+              curlparams+=(--data-urlencode outside_trigger=)
+              jsonFormat='item|TABLE:(标题)title|red,(播放量)stat.view|number(cn),(弹幕数)stat.danmaku|number(cn),(链接)url|dim,(作者)owner.name,(链接)url|$https://www.bilibili.com/video/{.bvid}/$|dim,(封面)pic|image|dim|HIDE_IN_TABLE'
+            ;;
+            频道动态|channel) # 首页频道动态 https://www.bilibili.com/
+              local channel=$(ask2 -q '类型'  -1 -i "$4" -d 0 -N 3 -S '-2 -1' -A "${channels[*]}")
+              url='https://api.bilibili.com/x/web-interface/dynamic/region'
+              curlparams+=(--data-urlencode ps=12)
+              curlparams+=(--data-urlencode pn=1)
+              curlparams+=(--data-urlencode rid=$channel)
+              jsonFormat='[item,data.archives]|TABLE:(标题)title|red,(播放量)stat.view|number(cn),(弹幕数)stat.danmaku|number(cn),(链接)url|dim,(作者)owner.name,(链接)url|$https://www.bilibili.com/video/{.bvid}/$|dim,(封面)pic|image|dim|HIDE_IN_TABLE'
+            ;;
+            频道排行榜|channelranking) # 首页频道侧边栏排行榜 https://www.bilibili.com/
+              # VueComponent: [index.js]VideoRankList
+              local channel=$(ask2 -q '类型' -2 -i "$4" -d 0 -N 3 -S '0' -A "${channels[*]}")
+              local day=$(question2 -q '统计天数' -i "$5" -d 3)
+              url='https://api.bilibili.com/x/web-interface/ranking/region'
+              curlparams+=(--data-urlencode day=$day)
+              curlparams+=(--data-urlencode original=0)
+              curlparams+=(--data-urlencode rid=$channel)
+              jsonFormat='data|TABLE:(标题)title|red,(分类)typename,(简介)description|HIDE_IN_TABLE,(播放量)play|number(cn),(弹幕数)video_review|number(cn)|HIDE_IN_TABLE,(收藏量)favorites|number(cn)|HIDE_IN_TABLE,(作者)author,(链接)url|$https://www.bilibili.com/video/{.bvid}/$|dim,(封面)pic|image|dim|HIDE_IN_TABLE'
+            ;;
+            标签|tag) # 频道下的标签 https://www.bilibili.com/v/life/daily/?tag=66605
+              url='https://api.bilibili.com/x/web-interface/dynamic/tag'
+              curlparams+=(--data-urlencode ps=${SIZE:-14})
+              curlparams+=(--data-urlencode pn=${PAGE:-1})
+              curlparams+=(--data-urlencode rid=21)
+              curlparams+=(--data-urlencode tag_id=66605)
+            ;;
+            标签排行榜|tagranking) # 标签下的排行榜 https://www.bilibili.com/v/life/daily/?tag=66605
+              url='https://api.bilibili.com/x/web-interface/ranking/tag'
+              curlparams+=(--data-urlencode tag_id=66605)
+              curlparams+=(--data-urlencode rid=21)
+            ;;
+            热门标签|hottag) # 频道热门标签 https://www.bilibili.com/v/life/daily/?tag=66605
+              url='http://api.bilibili.com/x/tag/hots'
+              curlparams+=(--data-urlencode rid=21)
+              curlparams+=(--data-urlencode type=0)
+              jsonFormat='tags|TABLE:(标签)tag_name|red,(id)tag_id|dim'
+            ;;
+            最新列表|newlist) # 标签下的最新列表 https://www.bilibili.com/v/life/daily/?tag=66605
+              url='https://api.bilibili.com/x/web-interface/newlist'
+              curlparams+=(--data-urlencode rid=21)
+              curlparams+=(--data-urlencode type=0)
+              curlparams+=(--data-urlencode ps=${SIZE:-30})
+              curlparams+=(--data-urlencode pn=${PAGE:-1})
+            ;;
+          esac
         ;;
       esac
     ;;
@@ -818,17 +1094,135 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
     # eastmoney
     东方财富|eastmoney|em)
       outputfile=$outputfile.$2
+      local columns=(
+        f2 Close 最新价（元）,
+        f3 ChangePercent 涨跌幅（%）,
+        f4 Change 涨跌额（元）,
+        f5 Volume 成交量（手）,
+        f6 Amount 成交额（元）,
+        f7 Amplitude 振幅（%）,
+        f8 TurnoverRate 换手率（%）,
+        f9 PERation 市盈率（动态）,
+        f10 VolumeRate 量比,
+        f11 FiveMinuteChangePercent 5分钟涨跌（%）,
+        f12 Code 证券代码,
+        f13 MarketId 市场编号,
+        f14 Name 证券名称,
+        f15 Hign 最高价（元）,
+        f16 Low 最低价（元）,
+        f17 Open 开盘价（元）,
+        f18 PreviousClose 昨天收盘价（元）,
+        f20 MarketValue 总市值（元）,
+        f21 FlowCapitalValue 流通市值（元）,
+        f22 Speed 涨速（%）,
+        f23 PB 市净率,
+        f24 ChangePercent60Day 60日涨跌幅（%）,
+        f25 ChangePercent360Day 年初至今涨跌幅（%）,
+        f26 shtime 上市时间,
+        f62 主力净流入,
+        f115 PERation 市盈率,
+        # 其他
+        f104 上涨家数,
+        f105 下跌家数,
+        f106 平盘家数,
+        f128 领涨股票,
+        f28 PreviousClose 昨结,
+        f30 Change 现量,
+        f31 Change 买入价,
+        f32 Change 卖出价,
+        f108 持仓量,
+        f163 Amount 日增,
+        f211 buycount 买量,
+        f212 sellcount 卖量,
+        f136 涨跌幅（%）,
+      )
+      local markets=(
+        # http://quote.eastmoney.com/center/gridlist.html
+        A股 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048'
+        上证A股 'm:1+t:2,m:1+t:23'
+        深证A股 'm:0+t:6,m:0+t:80'
+        北证A股 'm:0+t:81+s:2048'
+        新股 'm:0+f:8,m:1+f:8'
+        中小板 'm:0+t:13'
+        创业板 'm:0+t:80'
+        创业板-注册制 'm:0+t:80+s:131072'
+        创业板-核准制 'm:0+t:80+s:!131072'
+        科创板 'm:1+t:23'
+        北向通 'b:BK0707,b:BK0804'
+        北向通-沪股通 'b:BK0707'
+        北向通-深股通 'b:BK0804'
+        风险警示板 'm:0+f:4,m:1+f:4'
+        风险警示板-上证 'm:1+f:4'
+        风险警示板-深证 'm:0+f:4'
+        风险警示板-科创板 'm:1+t:23+f:4'
+        风险警示板-创业板 'm:0+t:80+f:4'
+        两网及退市 'm:0+s:3'
+        新三板 'm:0+t:81+s:!2052'
+        新三板-精选层 'm:0+t:81+s:2048'
+        新三板-创新层 'm:0+s:512'
+        新三板-基础层 'm:0+s:256'
+        # http://quote.eastmoney.com/center/hszs.html
+        指数-中证系列指数 'm:2'
+        指数-指数成分 'm:1+s:3,m:0+t:5'
+        指数-深证系列指数 'm:0+t:5'
+        指数-上证系列指数 'm:1+s:2'
+        # http://quote.eastmoney.com/center/boardlist.html
+        板块-概念板块 'm:90+t:3+f:!50'
+        板块-地域板块 'm:90+t:1+f:!50'
+        板块-行业板块 'm:90+t:2+f:!50'
+
+        港股 'm:128+t:3,m:128+t:4,m:128+t:1,m:128+t:2'
+        港股-主板 'm:128+t:3'
+        港股-创业板 'm:128+t:4'
+        港股-知名港股 'b:DLMK0106'
+        港股-港股通 'b:DLMK0146,b:DLMK0144'
+        港股-蓝筹股 'b:MK0104'
+        港股-红筹股 'b:MK0102'
+        港股-红筹指数成分股 'b:MK0111'
+        港股-国企股 'b:MK0103'
+        港股-国企指数成分股 'b:MK0112'
+        港股-港股通成份股 'b:MK0146,b:MK0144'
+        港股-ADR 'm:116+s:1'
+        港股-香港指数 'm:124,m:125,m:305'
+        港股-香港涡轮 'm:116+t:6'
+        港股-港股通ETF 'b:MK0837,b:MK0838'
+        港股-港股通ETF-沪 'b:MK0838'
+        港股-港股通ETF-深 'b:MK0837'
+        港股-港股牛熊证 'm:116+t:5'
+
+        美股 'm:105,m:106,m:107'
+        美股-中国概念股 'b:MK0201'
+        美股-美股指数 'i:100.NDX,i:100.DJIA,i:100.SPX'
+        美股-粉单市场 'm:153'
+        美股-知名美股 'b:MK0001'
+        美股-知名美股-科技类 'b:MK0216'
+        美股-知名美股-金融类 'b:MK0217'
+        美股-知名美股-医药食品类 'b:MK0218'
+        美股-知名美股-媒体类 'b:MK0220'
+        美股-知名美股-汽车能源类 'b:MK0219'
+        美股-知名美股-制造零售类 'b:MK0221'
+        美股-互联网中国 'b:MK0202'
+
+        全球指数-亚洲股市 'i:1.000001,i:0.399001,i:0.399005,i:0.399006,i:1.000300,i:100.HSI,i:100.HSCEI,i:124.HSCCI,i:100.TWII,i:100.N225,i:100.KOSPI200,i:100.KS11,i:100.STI,i:100.SENSEX,i:100.KLSE,i:100.SET,i:100.PSI,i:100.KSE100,i:100.VNINDEX,i:100.JKSE,i:100.CSEALL'
+        全球指数-美洲股市 'i:100.DJIA,i:100.SPX,i:100.NDX,i:100.TSX,i:100.BVSP,i:100.MXX'
+        全球指数-欧洲股市 'i:100.SX5E,i:100.FTSE,i:100.MCX,i:100.AXX,i:100.FCHI,i:100.GDAXI,i:100.RTS,i:100.IBEX,i:100.PSI20,i:100.OMXC20,i:100.BFX,i:100.AEX,i:100.WIG,i:100.OMXSPI,i:100.SSMI,i:100.HEX,i:100.OSEBX,i:100.ATX,i:100.MIB,i:100.ASE,i:100.ICEXI,i:100.PX,i:100.ISEQ'
+        全球指数-澳洲股市 'i:100.AS51,i:100.AORD,i:100.NZ50'
+        全球指数-其他指数 'i:100.UDI,i:100.BDI,i:100.CRB'
+
+        期货-中金所 'i:100.UDI,i:100.BDI,i:100.CRB'
+        国债 'm:8+s:16+f:!8192'
+      )
       case $2 in
         滚动新闻|7x24直播|roll|kuaixun) # 7x24直播 http://kuaixun.eastmoney.com/
-          url="https://newsapi.eastmoney.com/kuaixun/v2/api/list?callback=ajaxResult_102&column=102&limit=20&p=1&callback=kxall_ajaxResult102&_=$(date +%s)"
-          jsonFormat='news|reverse:(标题)title|red|bold|index,(内容)digest|white|dim,(时间)showtime,(链接)url_unique|dim'
+          url="https://newsapi.eastmoney.com/kuaixun/v2/api/list?callback=ajaxResult_102&column=102&limit=${SIZE:-20}&p=${PAGE:-1}&callback=kxall_ajaxResult102&_=$(date +%s)"
+          jsonFormat='news|TABLE:(标题)title|red|bold|index,(内容)digest|white|dim|HIDE_IN_TABLE,(时间)showtime,(链接)url_unique|dim'
           jsonp=OBJ
         ;;
         最新播报|zxbb) # http://roll.eastmoney.com/
           url="https://emres.dfcfw.com/60/zxbb2018.js?callback=zxbb2018&_=$(date +%s)"
           aliases=(标题 时间 链接)
           fields=(Art_Title Art_Showtime Art_UniqueUrl)
-          jsonFormat='Result|reverse:(标题)Art_Title|red|bold|index,(时间)Art_Showtime,(链接)Art_UniqueUrl|white|dim'
+          jsonFormat='Result|TABLE:(标题)Art_Title|red|bold|index,(时间)Art_Showtime,(链接)Art_UniqueUrl|white|dim'
           jsonp=OBJ
         ;;
         周末消息|zmxx) # https://data.eastmoney.com/xg/xg/calendar.html
@@ -851,61 +1245,95 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
         ;;
         行情|quote)
           outputfile=$outputfile.$3
+          local yd_types=(
+            火箭发射 8201 快速反弹 8202 大笔买入 8193 封涨停板 4 打开跌停板 32 有大买盘 64 竞价上涨 8207 高开5日线 8209 向上缺口 8211 60日新高 8213 60日大幅上涨 8215
+            加速下跌 8204 高台跳水 8203 大笔卖出 8194 封跌停板 8 打开涨停板 16 有大卖盘 128 竞价下跌 8208 低开5日线 8210 向下缺口 8212 60日新低 8214 60日大幅下跌 8216
+          )
           case $3 in
             国内股指|gngz)
-              url="https://push2.eastmoney.com/api/qt/clist/get?pi=0&pz=10&po=1&np=1&fields=f1,f2,f3,f4,f6,f12,f13,f14&fltt=2&invt=2&ut=433fd2d0e98eaf36ad3d5001f088614d&fs=i:1.000001,i:0.399001,i:0.399006,i:1.000300,i:0.300059&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
-              jsonFormat='data.diff|TABLE:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|append(%)|indicator,(成交额)f6|number(cn),(代码)f12'
+              url='https://push2.eastmoney.com/api/qt/clist/get'
+              curlparams+=(--data-urlencode pi=0)
+              curlparams+=(--data-urlencode pz=10)
+              curlparams+=(--data-urlencode po=1)
+              curlparams+=(--data-urlencode np=1)
+              curlparams+=(--data-urlencode fields=f1,f2,f3,f4,f6,f12,f13,f14,f18)
+              curlparams+=(--data-urlencode fltt=2)
+              curlparams+=(--data-urlencode invt=2)
+              curlparams+=(--data-urlencode ut=433fd2d0e98eaf36ad3d5001f088614d)
+              curlparams+=(--data-urlencode fs=i:1.000001,i:1.000047,i:1.000902,i:1.000985,i:2.930903,i:0.399001,i:0.399106,i:0.399006,i:0.399102,i:1.000300,i:1.000016,i:1.000688,i:0.300059)
+              curlparams+=(--data-urlencode "cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)")
+              jsonFormat='data.diff|TABLE:(指数)f14|indicator({.f2},{.f18}),(点数)f2,(涨跌幅)f3|format(%)|indicator,(成交额)f6|number(cn),(代码)f12'
               jsonp=OBJ
             ;;
             国外股指|gwgz)
               url="https://push2.eastmoney.com/api/qt/ulist.np/get?fields=f1,f2,f12,f13,f14,f3,f4,f6,f104,f152&secids=100.ATX,100.FCHI,100.GDAXI,100.HSI,100.N225,100.FTSE,100.NDX,100.DJIA&ut=13697a1cc677c8bfa9a496437bfef419&cb=jQuery112408605893827100204_$(date +%s)&_=$(date +%s)"
-              jsonFormat='data.diff|TABLE:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|append(%)|indicator,(成交额)f6|number(cn),(代码)f12'
+              jsonFormat='data.diff|TABLE:(指数)f14|red|bold|index,(点数)f2,(涨跌幅)f3|format(%)|indicator,(成交额)f6|number(cn),(代码)f12'
               jsonp=OBJ
             ;;
+            分时图|fst) #
+              url='http://push2.eastmoney.com/api/qt/stock/trends2/get'
+              local cb=cb_$(timestamp)_$(random 8)
+              local code=$(question2 -q '代码' -i $4)
+              curlparams+=(--data-urlencode secid=$code)
+              curlparams+=(--data-urlencode fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13)
+              curlparams+=(--data-urlencode fields2=f51,f52,f53,f54,f55,f56,f57,f58)
+              curlparams+=(--data-urlencode ut=e1e6871893c6386c5ff6967026016627)
+              curlparams+=(--data-urlencode iscr=0)
+              curlparams+=(--data-urlencode cb=$cb)
+              curlparams+=(--data-urlencode isqhquote=)
+              curlparams+=(--data-urlencode $cb=$cb)
+              jsonFormat='data.trends|plot(type=fst,m:name={/data.name},m:market={/data.market},m:code={/data.code},m:close={/data.preClose})'
+              jsonp=OBJ
+              export IMGCAT=${IMGCAT-1}
+            ;;
             盘口异动|pkyd) # http://quote.eastmoney.com/changes/
+              local type=$(ask2 -1 -m -i "$4" -D 'ALL' -q '异动类型' -Q '默认包含所有类型' -A "${yd_types[*]}" -N 2 | tr ' ' ,)
               url='http://push2ex.eastmoney.com/getAllStockChanges'
-              local type=$(ask2 -1 -m -D 'ALL' -q '异动类型' -Q '默认包含所有类型' -A '火箭发射 8201 快速反弹 8202 大笔买入 8193 封涨停板 4 打开跌停板 32 有大买盘 64 竞价上涨 8207 高开5日线 8209 向上缺口 8211 60日新高 8213 60日大幅上涨 8215 加速下跌 8204 高台跳水 8203 大笔卖出 8194 封跌停板 8 打开涨停板 16 有大卖盘 128 竞价下跌 8208 低开5日线 8210 向下缺口 8212 60日新低 8214 60日大幅下跌 8216' -N 2 | tr ' ' ,)
-              curlparams+=(--data-urlencode type=$type)
+              curlparams+=(-d type=$type)
               curlparams+=(--data-urlencode cb=jQuery35109544115898056558_$(timestamp))
               curlparams+=(--data-urlencode ut=7eea3edcaed734bea9cbfc24409ed989)
-              curlparams+=(--data-urlencode pageindex=0)
-              curlparams+=(--data-urlencode pagesize=${SIZE:-64})
+              curlparams+=(--data-urlencode pageindex=${PAGE:-0})
+              curlparams+=(--data-urlencode pagesize=${SIZE:-30})
               curlparams+=(--data-urlencode dpt=wzchanges)
               curlparams+=(--data-urlencode _=$(timestamp))
-              jsonFormat='data.allstock|TABLE:(证券名称)n|red|bold,(代码)c,'
+              jsonFormat='data.allstock|TABLE:(证券名称)n|red|bold,(代码)c|dim,(类型)t|map(bash:arr='${yd_types[*]}',bash:arrdim=2,bash:arridx=0)|indicator(exp=in,bash:arr='${yd_types[@]:0:22}'),(时间)tm|date(time,from=%H%M%S)|cyan,(链接)url|$http://quote.eastmoney.com/unify/r/{.m}.{.c}$|dim'
+              jsonp=OBJ
+            ;;
+            板块异动|bkyd) # http://quote.eastmoney.com/changes/boardlist.html
+              url='http://push2ex.eastmoney.com/getAllBKChanges'
+              curlparams+=(--data-urlencode cb=jQuery35109544115898056558_$(timestamp))
+              curlparams+=(--data-urlencode ut=7eea3edcaed734bea9cbfc24409ed989)
+              curlparams+=(--data-urlencode dpt=wzchanges)
+              curlparams+=(--data-urlencode pageindex=${PAGE:-0})
+              curlparams+=(--data-urlencode pagesize=${SIZE:-50})
+              curlparams+=(--data-urlencode _=$(timestamp))
+              jsonFormat='data.allbk|TABLE:(证券名称)n|red|bold,(代码)c|dim,(涨跌幅)u|format(%)|indicator,(主力净流入（万元）)zjl|indicator,(最频繁个股)ms.n|${.ms.t|map(bash:arr='${yd_types[*]}',bash:arrdim=2,bash:arridx=0)|indicator(exp=in,bash:arr='${yd_types[@]:0:22}')} {.ms.c|dim} {.ms.n|magenta}$,(链接)url|$http://quote.eastmoney.com/unify/r/{.m}.{.c}$|dim,(异动情况统计)ydl|TABLE|HIDE_IN_TABLE:(类型)t|map(bash:arr='${yd_types[*]}',bash:arrdim=2,bash:arridx=0)|indicator(exp=in,bash:arr='${yd_types[@]:0:22}'),(次数)ct'
+              jsonp=OBJ
+            ;;
+            盘口异动数据对比|yddb) # 图表 http://quote.eastmoney.com/changes/?from=center
+              local types=(
+                火箭发射 8201 快速反弹 8202 大笔买入 8193 封涨停板 4 打开跌停板 32 有大买盘 64 竞价上涨 8207 高开5日线 8209 向上缺口 8211 60日新高 8213 60日大幅上涨 8215
+                加速下跌 8204 高台跳水 8203 大笔卖出 8194 封跌停板 8 打开涨停板 16 有大卖盘 128 竞价下跌 8208 低开5日线 8210 向下缺口 8212 60日新低 8214 60日大幅下跌 8216
+              )
+              url='http://push2ex.eastmoney.com/getStockCountChanges'
+              curlparams+=(-d type=4,8,16,32,64,128,8193,8194,8201,8204,8202,8203,8207,8208,8209,8210,8211,8212,8213,8214,8215,8216)
+              curlparams+=(--data-urlencode cb=jQuery35108645588633523951_$(timestamp))
+              curlparams+=(--data-urlencode ut=7eea3edcaed734bea9cbfc24409ed989)
+              curlparams+=(--data-urlencode dpt=wzchanges)
+              curlparams+=(--data-urlencode _=$(timestamp))
+              # text=$(cat data/em.quote.yddb/2022-12-01.16:59:32.json)
+              jsonFormat='data.ydlist|plot(type=yddb)'
+              export IMGCAT=${IMGCAT-1}
               jsonp=OBJ
             ;;
             行情排行|rank) # https://quote.eastmoney.com/center/gridlist.html
               url='http://push2.eastmoney.com/api/qt/clist/get'
-              local markets=(
-                A股 'm:0+t:6,m:0+t:80,m:1+t:2,m:1+t:23,m:0+t:81+s:2048'
-                上证A股 'm:1+t:2,m:1+t:23'
-                深证A股 'm:0+t:6,m:0+t:80'
-                北证A股 'm:0+t:81+s:2048'
-                新股 'm:0+f:8,m:1+f:8'
-                中小板 'm:0+t:13'
-                创业板 'm:0+t:80'
-                科创板 'm:1+t:23'
-                北向通 'b:BK0707,b:BK0804'
-                沪股通 'b:BK0707'
-                深股通 'b:BK0804'
-                ST板 'm:0+f:4,m:1+f:4'
-                港股 'm:128+t:3,m:128+t:4,m:128+t:1,m:128+t:2'
-                港股主板 'm:128+t:3'
-                港股创业板 'm:128+t:4'
-                港股通 'b:DLMK0146,b:DLMK0144'
-                港股蓝筹 'b:DLMK0104'
-                港股红筹 'b:DLMK0102'
-                美股 'm:105,m:106,m:107'
-                美股中概 'b:MK0201'
-                知名美股 'b:MK0001'
-                中金期货 'i:100.UDI,i:100.BDI,i:100.CRB'
-              )
-              local sort=$(ask2 -q '排序字段' -i "$4" -1 -d f3 -N 2 -A '涨跌幅 f3 换手率 f8 流通市值 f21 量比 f10')
-              local market=$(ask2 -q '市场' -i "$5" -d 0 -1 -N 2 -S 0 -A "${markets[*]}")
+              local sort=$(ask2 -q '排序字段' -i "$4" -1 -d f3 -N 2 -A '涨跌幅 f3 换手率 f8 流通市值 f21 量比 f10 涨速 f22 量比 f10 5分钟涨跌 f11')
+              local market=$(ask2 -q '市场' -i "$5" -d 0 -1 -N 2 -S '0' -A "${markets[*]}")
               local order=$(whether -q '正序' -i "$6" -y 0 -n 1)
+              local page=${PAGE:-1}
               curlparams+=(--data-urlencode cb=jQuery112404812956954993921_$(timestamp))
-              curlparams+=(--data-urlencode pn=${PAGE:-1})
+              curlparams+=(--data-urlencode pn=$page)
               curlparams+=(--data-urlencode pz=20)
               curlparams+=(--data-urlencode po=$order)
               curlparams+=(--data-urlencode np=1)
@@ -914,13 +1342,107 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
               curlparams+=(--data-urlencode invt=2)
               curlparams+=(--data-urlencode 'wbp2u=9569356073124232|0|0|0|web')
               curlparams+=(--data-urlencode fid=$sort)
-              curlparams+=(--data-urlencode 'fs=m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048')
+              curlparams+=(--data-urlencode "fs=$market")
               curlparams+=(--data-urlencode 'fields=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f22,f11,f62,f128,f136,f115,f152')
               curlparams+=(--data-urlencode _=$(timestamp))
-              jsonFormat='data.diff|TABLE:(证券名称)f14|red|bold|${.f12} {.f14}$|indicator(cmp={.f3}),(涨跌幅)f3|append(%)|indicator,(最新价)f2|indicator(cmp={.f18}),(开盘价)f17|indicator(cmp={.f18}),(振幅)f7|append(%),(换手率)f8|append(%),(量比)f10,(动态市盈率)f9,(流通市值)f21|number(cn),(总市值)f20|number(cn)'
+              jsonFormat='data.diff|TABLE:(证券名称)f14|${.f12} {.f14}$|indicator({.f17},{.f18}),(涨速)f22|format(%)|indicator,(5分钟)f11|format(%)|indicator,(涨跌幅)f3|format(%)|indicator,(量比)f10|cyan,(振幅)f7|format(%),(换手率)f8|format(%),(最新价)f2|indicator(cmp={.f18}),(PE)f9,(流通市值)f21|number(cn),(链接)url|$http://quote.eastmoney.com/unify/r/{.f13}.{.f12}$|dim$'
               jsonp=OBJ
-              local pages=${PAGES:-5}
-              [[ $PAGE -lt $pages ]] && tailer="_ASK_NO_VERBOSE=1 TABLE_NO_HEADER=1 PAGES=5 PAGE=$(($PAGE + 1)) json_res ${@:1:3} $sort $market $order"
+              local pages=${PAGES:-1}
+              local offset=$(($page * 20))
+              local next=$(($page + 1))
+              [[ $page -lt $pages ]] && tailer="_ASK_NO_VERBOSE=1 PAGES=$pages PAGE=$next OFFSET=$offset json_res ${@:1:3} $sort $market $order"
+            ;;
+            股池|gc) # http://quote.eastmoney.com/ztb/detail
+              local types=(
+                涨停板股池 ztgc getTopicZTPool fbt:asc # 首次封板时间
+                昨日涨停股池 zrzt getYesterdayZTPool zs:desc # 涨速
+                强势股池 qsgc getTopicQSPool zdp:desc # 涨跌幅
+                次新股池 cxgc getTopicCXPooll ods:asc # 开板几日
+                炸板股池 zbgc getTopicZBPool fbt:asc #
+                跌停股池 dtgc getTopicDTPool fund:asc # 封单资金
+              )
+              ask2 -s -i $4 -S '0' -N 4 -A "${types[*]}"
+              name=${_ASK_RESULTS[@]:1:1}
+              sort=${_ASK_RESULTS[@]:3:1}
+              url=http://push2ex.eastmoney.com/${_ASK_RESULTS[@]:2:1}
+              curlparams+=(--data-urlencode cb=callbackdata$(random 7))
+              curlparams+=(--data-urlencode ut=7eea3edcaed734bea9cbfc24409ed989)
+              curlparams+=(--data-urlencode dpt=wz.ztzt)
+              curlparams+=(--data-urlencode Pageindex=$((${PAGE:-1} - 1)))
+              curlparams+=(--data-urlencode pagesize=${SIZE:-20})
+              curlparams+=(--data-urlencode sort=$sort)
+              curlparams+=(--data-urlencode date=$_last_trade_day)
+              curlparams+=(--data-urlencode _=$(timestamp))
+              # text=$(cat data/em.quote.ztgc/2022-11-29.12:06:16.json)
+              jsonFormat='data.pool|TABLE:(证券名称)n|${.c} {.n}$|red|bold,(板块)hybk|magenta,(连板数)lbc|${.lbc}连板$|yellow,(炸板次数)zbc|yellow,(涨停统计（板/天）)zttj|${.zttj.ct}/{.zttj.days}$,(换手率)hs|number(2)|format(%),(成交额（元）)amount|number(cn),(流通市值（元）)ltsz|number(cn),(涨跌幅)zdp|number(+)|format(%)|indicator,(首次封板时间)fbt|number(fixed,n=6)|date(time,from=%H%M%S),(最后封板时间)lbt|number(fixed,n=6)|date(time,from=%H%M%S)'
+              jsonp=OBJ
+            ;;
+            涨停板股池|ztgc) # http://quote.eastmoney.com/ztb/detail#type=ztgc
+              json_res eastmoney quote gc ${@:3}
+              return
+            ;;
+            昨日涨停股池|zrzt) # http://quote.eastmoney.com/ztb/detail#type=zrzt
+              json_res eastmoney quote gc ${@:3}
+              return
+            ;;
+            强势股池|qsgc) # https://quote.eastmoney.com/ztb/detail#type=qsgc
+              json_res eastmoney quote gc ${@:3}
+              return
+            ;;
+            次新股池|cxgc) # https://quote.eastmoney.com/ztb/detail#type=cxgc
+              json_res eastmoney quote gc ${@:3}
+              return
+            ;;
+            炸板股池|zbgc) # https://quote.eastmoney.com/ztb/detail#type=zbgc
+              json_res eastmoney quote gc ${@:3}
+              return
+            ;;
+            跌停股池|dtgc) # https://quote.eastmoney.com/ztb/detail#type=dtgc
+              json_res eastmoney quote gc ${@:3}
+              return
+            ;;
+            涨跌分布|zdfb) # 图表 http://quote.eastmoney.com/ztb/detail
+              url='http://push2ex.eastmoney.com/getTopicZDFenBu'
+              curlparams+=(--data-urlencode cb=callbackdata$(random 7))
+              curlparams+=(--data-urlencode ut=7eea3edcaed734bea9cbfc24409ed989)
+              curlparams+=(--data-urlencode dpt=wz.ztzt)
+              curlparams+=(--data-urlencode _=$(timestamp))
+              # text=$(cat data/em.quote.zdfb/2022-11-30.17:54:25.json)
+              jsonFormat='data.fenbu|plot(type=zdfb)'
+              jsonp=OBJ
+              export IMGCAT=${IMGCAT-1}
+            ;;
+            涨跌停对比|zdtdb) # 图表 http://quote.eastmoney.com/ztb/detail
+              url='http://push2ex.eastmoney.com/getTopicZDTCount'
+              curlparams+=(--data-urlencode cb=callbackdata$(random 7))
+              curlparams+=(--data-urlencode ut=7eea3edcaed734bea9cbfc24409ed989)
+              curlparams+=(--data-urlencode dpt=wz.ztzt)
+              curlparams+=(--data-urlencode time=0)
+              curlparams+=(--data-urlencode _=$(timestamp))
+              # text=$(cat data/em.quote.zdtdb/2022-11-30.18:03:23.json)
+              jsonFormat='data.zdtcount|plot(type=zdtdb)'
+              jsonp=OBJ
+              export IMGCAT=${IMGCAT-1}
+            ;;
+            封板未遂|fbws) # 图表 http://quote.eastmoney.com/ztb/detail
+              url='http://push2ex.eastmoney.com/getTopicFBFailed'
+              curlparams+=(--data-urlencode cb=callbackdata$(random 7))
+              curlparams+=(--data-urlencode ut=7eea3edcaed734bea9cbfc24409ed989)
+              curlparams+=(--data-urlencode dpt=wz.ztzt)
+              curlparams+=(--data-urlencode time=0)
+              curlparams+=(--data-urlencode _=$(timestamp))
+              # text=$(cat data/em.quote.fbws/2022-11-30.22:13:36.json)
+              jsonFormat='data.fbfailed|plot(type=fbws)'
+              jsonp=OBJ
+              export IMGCAT=${IMGCAT-1}
+            ;;
+            股吧情绪|gbqx) # 图表 http://quote.eastmoney.com/ztb/detail
+              url='http://quote.eastmoney.com/ztb/api/gbtrend'
+              curlparams+=(--data-urlencode type=3)
+              # text=$(cat data/em.quote.gbqx/2022-11-30.23:00:12.json)
+              jsonFormat='result.data|plot(type=gbqx)'
+              jsonp=OBJ
+              export IMGCAT=${IMGCAT-1}
             ;;
             *) unknown 3 "$@";;
           esac
@@ -941,7 +1463,7 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
               curlparams+=(--data-urlencode source=WEB)
               curlparams+=(--data-urlencode client=WEB)
               curlparams+=(--data-urlencode "filter=(TRADE_DATE<='${date_range[@]:1:1}')(TRADE_DATE>='${date_range[@]:0:1}')")
-              jsonFormat='result.data:(证券名称)SECURITY_NAME_ABBR|indicator(cmp={.CHANGE_RATE})|bold|index,(证券代码)SECURITY_CODE|red,(涨跌幅)CHANGE_RATE|number(+)|append(%)|indicator|SIMPLE,(其他)EXPLAIN|dim,(买入)BILLBOARD_BUY_AMT|number(cn),(卖出)BILLBOARD_SELL_AMT|number(cn),(净买入)BILLBOARD_NET_AMT|number(cn)|indicator|SIMPLE,(龙虎榜成交额)BILLBOARD_DEAL_AMT|number(cn),(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|append(%)|SIMPLE,(上榜原因)EXPLANATION|dim|SIMPLE,(交易日)TRADE_DATE|date(date),(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$'
+              jsonFormat='result.data|TABLE:(证券名称)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR}$|indicator(cmp={.CHANGE_RATE})|bold|index,(涨跌幅)CHANGE_RATE|number(+)|format(%)|indicator|SIMPLE,(买入)BILLBOARD_BUY_AMT|number(cn)|HIDE_IN_TABLE,(卖出)BILLBOARD_SELL_AMT|number(cn)|HIDE_IN_TABLE,(净买入)BILLBOARD_NET_AMT|number(cn)|indicator|SIMPLE,(龙虎榜成交额)BILLBOARD_DEAL_AMT|number(cn),(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|format(%)|SIMPLE,(交易日)TRADE_DATE|date(date)|HIDE_IN_TABLE,(上榜原因)EXPLANATION|dim|SIMPLE,(其他)EXPLAIN|dim|HIDE_IN_TABLE,(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$|HIDE_IN_TABLE'
               jsonp=OBJ
             ;;
             领涨概念|lzgn)
@@ -1219,7 +1741,7 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
               curlparams+=(--data-urlencode quoteType=0)
               curlparams+=(--data-urlencode filter="((APPLY_DATE>'2010-01-01')(|@APPLY_DATE=\"NULL\"))((LISTING_DATE>'2010-01-01')(|@LISTING_DATE=\"NULL\"))(TRADE_MARKET_CODE!=\"069001017\")")
 
-              jsonFormat='result.data:(证券名称)SECURITY_NAME|red|bold|index|SIMPLE,(证券代码)SECURITY_CODE,(开盘溢价)LD_OPEN_PREMIUM|true|number(+)|append(%)|indicator,(首日最高)LD_HIGH_CHANG|true|number(+)|append(%)|indicator|SIMPLE,(首日收盘)LD_CLOSE_CHANGE|true|number(+)|append(%)|indicator|SIMPLE,(上市日期)LISTING_DATE|date(date)|SIMPLE,(行业)INDUSTRY_NAME|white|dim|SIMPLE,(主营业务)MAIN_BUSINESS|white|dim|SIMPLE,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
+              jsonFormat='result.data:(证券名称)SECURITY_NAME|red|bold|index|SIMPLE,(证券代码)SECURITY_CODE,(开盘溢价)LD_OPEN_PREMIUM|true|number(+)|format(%)|indicator,(首日最高)LD_HIGH_CHANG|true|number(+)|format(%)|indicator|SIMPLE,(首日收盘)LD_CLOSE_CHANGE|true|number(+)|format(%)|indicator|SIMPLE,(上市日期)LISTING_DATE|date(date)|SIMPLE,(行业)INDUSTRY_NAME|white|dim|SIMPLE,(主营业务)MAIN_BUSINESS|white|dim|SIMPLE,(链接)SECURITY_CODE|$https://data.eastmoney.com/zcz/cyb/{.SECURITY_CODE}.html$|dim,(招股说明书)INFO_CODE|$https://pdf.dfcfw.com/pdf/H2_{.INFO_CODE}_1.pdf$|dim'
             ;;
             增发|qbzf) #
               curlparams+=(--data-urlencode sortColumns=ISSUE_DATE)
@@ -1404,20 +1926,22 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
       esac
     ;;
   esac
-  case $jsonp in
-    OBJ)
-      text=$(curl -s $url "${curlparams[@]}" | grep -o '{.*}')
+  if [[ ! $text ]]; then
+    case $jsonp in
+      OBJ)
+        text=$(curl -v $url "${curlparams[@]}" 2>curl.log | grep -o '{.*}')
+        ;;
+      ARR)
+        text=$(curl -v $url "${curlparams[@]}" 2>curl.log | grep -o '\[.*\]')
+        ;;
+      *)
       ;;
-    ARR)
-      text=$(curl -s $url "${curlparams[@]}" | grep -o '\[.*\]')
-      ;;
-    *)
-    ;;
-  esac
-  if [[ -z "$text" && -z "$url" ]]; then
-    echo "没有地址" 1>&2; exit 1;
+    esac
   fi
-  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "${curlparams[*]}" -o "$outputfile" -y "${filters[*]}"
+  if [[ -z "$text" && -z "$url" ]]; then
+    echo "没有地址或数据" 1>&2; exit 1;
+  fi
+  print_json -u "$url" -s "$text" -a "${aliases[*]}" -f "${fields[*]}" -p "${patterns[*]}" -i "${indexes[*]}" -t "${transformers[*]}" -j "$jsonFormat" -q "$(encode_array "${curlparams[@]}")" -o "$outputfile" -y "${filters[*]}"
 
   debug "$tailer"
   if [[ $tailer ]]; then
@@ -1425,33 +1949,14 @@ text=$(cat '/Users/longpeng/Documents/GitHub/scripts/shell/data/bilibili.search/
   fi
 }
 
-function help() {
-  if [[ "$*" =~ (^|[[:space:]])-h([[:space:]]|$) ]]; then
-    local help_msg="$(cat $0 | grep -oE '^\s*[^|)( ]+(\|[^|)( ]*)*\)\s*(#.*)?$' | sed 's/    / /g;')"
-    local stylish=(-e '/^ \S\+/i\ ' -e 's/^ \( \+\)/\1\1\1\1/;s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;s/\(\s*\)\([^ |)]\+\)\([|)]\)/\1\\033[31m\2\\033[0m\3/;s/\(|\)\([^ |)]\+\)/\1\\033[32m\2\\033[0m/g;/^\S/i\ ')
-    local endLevel=0
-    for i in $(seq 0 $#); do [[ ${@:$i:1} == '-h' ]] && endLevel=$i; done
-    [[ $endLevel == 1 ]] && echo -e "$(sed "${stylish[@]}" <<< "$help_msg")" && exit 0
-    echo -e "$(
-      nextLevel=1
-      while IFS= read line; do
-        lineLevel=$(grep -o '^\s*' <<< "$line")
-        lineLevel=${#lineLevel}
-        local pattern="${@:$lineLevel:1}"
-        # nextLevel至少为1
-        [[ $nextLevel < 1 ]] && nextLevel=1
-        # echo "$nextLevel,$lineLevel,$line"
-        # 回溯
-        [[ $lineLevel < $nextLevel ]] && { [[ $line =~ "$pattern" ]] &&  { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
-        # 打印全部子命令
-        [[ $lineLevel -ge $endLevel && $nextLevel -ge $endLevel ]] &&  echo -e "$line" && continue
-        # 匹配上nextLevel，打印
-        [[ $lineLevel = $nextLevel && $line =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((nextLevel + 1)) && continue; }
-      done <<< "$help_msg" | sed "${stylish[@]}"
-    )"
-  else
-    return 1
-  fi
+function check_trading_time() {
+  h=$(date +%H)
+  m=$(date +%M)
+  [[ $h > 9 && $h < 11 ]] && return 0
+  [[ $h > 12 && $h < 15 ]] && return 0
+  [[ $h = 9 && $m > 14 ]] && return 0
+  [[ $h = 11 && $m < 31 ]] && return 0
+  return 1
 }
 
 declare -a args=()
@@ -1460,6 +1965,21 @@ for op in "$@"; do
   [[ $op == '-t' ]] && TABLE=1 || [[ $op == '-s' ]] && SIMPLE=1 || args+=("$op")
 done
 
- help "${args[@]}" || json_res "${args[@]}"
+help "${args[@]}"
+
+if [[ $? -eq 1 ]]; then
+  json_res "${args[@]}"
+  echo -e "\033];{TRADING=$TRADING LOOP=$LOOP ${args[@]}}\007"
+  if [[ $LOOP ]]; then
+    while true; do
+      check_trading_time
+      [[ $TRADING && $? -eq 1 ]] && continue
+      output="$(json_res "${args[@]}" 2>/dev/null)"
+      echo -e '\033[2J\033[1;1H'
+      echo -e "$output"
+      sleep ${LOOP:-1}
+    done
+  fi
+fi
 
 # console.log([...new URL().searchParams.entries()].map(e => `curlparams+=(--data-urlencode ${e[0]}=${e[1]})`).join('\n'))

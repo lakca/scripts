@@ -3,6 +3,7 @@
 pythonInstalled=$(which python3 >/dev/null && echo 1 || echo 0)
 
 _dirname=$(dirname $0)
+_filename=$(realpath "$0" --relative-to "$_dirname")
 
 if [[ $pythonInstalled -eq 1 && -z $PURE ]]; then
   function jsonparser() {
@@ -49,7 +50,7 @@ function debug() {
       local args="${@:$OPTIND}"
       [[ $args ]] && printf '%s\n' "${args[*]}"
     } | while IFS=$'\n' read line; do
-      printf "\033[2;31m[DEBUG:$(realpath ${BASH_SOURCE[@]:1:1}):${BASH_LINENO[@]:0:1} \033[32m${funcname}\033[0m]\033[0m \033[2m%s\033[0m\n" "$line" 1>&2
+      printf "\033[2m[\033[31mDEBUG:$(realpath ${BASH_SOURCE[@]:1:1}):${BASH_LINENO[@]:0:1} \033[32m${funcname}\033[0m\033[2m]\033[0m \033[2m%s\033[0m\n" "$line" 1>&2
     done
   fi
 }
@@ -147,37 +148,6 @@ function timestamp() {
   echo $(date +%s)$(random 3)
 }
 
-function print_record() {
-  local -a fields=()
-  local -a values=()
-  local -a filters=()
-  local id=''
-  local OPTIND
-  while getopts ':a:v:n:y:' opt; do
-    case "$opt" in
-    a) fields+=($OPTARG) ;;
-    v) values+=($OPTARG) ;;
-    y) filters+=($OPTARG) ;;
-    n) id=$OPTARG ;;
-    esac
-  done
-  local primary=0
-  local value
-  for index in "${!fields[@]}"; do
-    value="${values[@]:$index:1}"
-    value="$(escapeUnicode $value)"
-    if [[ $primary -eq 0 ]]; then
-      echo -e "\033[33m${fields[@]:$index:1}\033[0m: 【"$id"】\033[1;31m$value\033[0m"
-    else
-      echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[32m$value\033[0m"
-      if [[ -n $ITERM_SESSION_ID && $IMGCAT && "${filters[@]:$index:1}" = *:image:* ]]; then
-        curl -s "${values[@]:$index:1}" | imgcat --height=5
-      fi
-    fi
-    primary=1
-  done
-}
-
 function select_columns() {
   local OPTIND
   local -a array=()
@@ -202,8 +172,52 @@ function select_columns() {
   echo "${selections[*]}"
 }
 
-function ensureFolder() {
-  [[ ! -d $1 ]] && mkdir -p $1
+function indexof() {
+  local value="$1"
+  local array=($2)
+  local revoke=$(shopt -p nocasematch)
+  local index=$_INDEXOF_NO_INDEX
+  unset _INDEXOF_NO_INDEX
+  debug 索引值：$value, 数组长度：${#array[@]}, 数组：${array[@]}
+  [[ $_INDEXOF_IGNORE_CASE ]] && shopt -s nocasematch
+  for i in ${!array[@]}; do
+    if [[ ${array[@]:$i:1} == $value ]]; then
+      index=$i
+      debug 返回索引：$index
+      break
+    fi
+  done
+  eval "$revoke"
+  echo $index
+}
+
+function indexesof() {
+  local values=($1)
+  for value in "${values[@]}"; do
+    _INDEXOF_NO_INDEX=-1 indexof "$value" "$2"
+  done
+}
+
+function get_indexes() {
+  if [[ $1 ]]; then
+    local arr=($1)
+    seq 0 $((${#arr[@]} - 1))
+  fi
+}
+
+# encode_array "${array[@]}"
+function encode_array() {
+  for e in "$@"; do
+    base64 <<<"$e"
+  done
+}
+
+# get_encoded_array_ele 5 "${encoded[@]}"
+function get_encoded_array_ele() {
+  local -i index=$1
+  local items=(${@:2})
+  local item=${items[@]:$index:1}
+  [[ $item ]] && base64 -d <<<"$item"
 }
 
 function resolveLink() {
@@ -213,6 +227,29 @@ function resolveLink() {
   link=${link//\\\#*/}
   local parts=($(echo $link | grep -oE '[^\/]+'))
   echo "${parts[*]}"
+}
+
+function ensureFolder() {
+  [[ ! -d $1 ]] && mkdir -p $1
+}
+
+function store() {
+  local op=$1
+  local key=$(base64 <<< "$2")
+  local val="$3"
+  local file=${_filename}.store
+  [[ ! ${file[@]:0:1} = '.' ]] && file=.$file
+  local filename="$_dirname/$file"
+  case $1 in
+    -g)
+      [[ -a $filename ]] && tac $filename | grep --max-count=1 --fixed-strings "$key:" | cut -d: -f2 | base64 -d
+    ;;
+    -s)
+      [[ -f /dev/stdin || -p /dev/stdin ]] && read val
+      val=$(base64 <<< "$val")
+      echo "$key:$val" >> "$filename"
+    ;;
+  esac
 }
 
 function ask() {
@@ -288,13 +325,14 @@ function ask2() {
   local multiple
   local defaultConst
   local OPTIND
-  local selectableArrayIndexes
+  local selectableArrayIndexes=()
+  local silent
   unset _ASK_INDEX
   unset _ASK_RESULT
   unset _ASK_RESULTS
   unset _ASK_MSG
   unset _ASK_MSG2
-  while getopts 'q:Q:a:A:N:i:d:D:e:01S:m' opt; do
+  while getopts 'q:Q:a:A:N:i:d:D:e:012S:ms' opt; do
     case $opt in
     q) # 问题内容
       question="$OPTARG" ;;
@@ -327,12 +365,24 @@ function ask2() {
       echoIndex=0 ;;
     1) # _ASK_RESULT（和输出结果）的数组索引为1
       echoIndex=1 ;;
+    2) # _ASK_RESULT（和输出结果）的数组索引为2
+      echoIndex=2 ;;
     S) # 选项中呈现的数组（索引）
-      selectableArrayIndexes=$OPTARG ;;
+      selectableArrayIndexes=($OPTARG) ;;
     m) # 接受多值
       multiple=1 ;;
+    s) # silent，不返回值
+      silent=1 ;;
     esac
   done
+
+  for i in $(get_indexes "${selectableArrayIndexes[*]}"); do
+    [[ ${selectableArrayIndexes[@]:$i:1} < 0 ]] && selectableArrayIndexes[$i]=$(($bigArraySize + ${selectableArrayIndexes[@]:$i:1}))
+  done
+
+  if [[ $echoIndex < 0 ]]; then
+    echoIndex=$(($bigArraySize + $echoIndex))
+  fi
 
   if [[ "$bigArray" ]]; then
     if [[ $bigArraySize ]]; then
@@ -355,7 +405,7 @@ function ask2() {
   #
   local selectableArraies=()
   for index in "${!comparingArraies[@]}"; do
-    [[ ! $selectableArrayIndexes || $(indexof $(($index - 1)) "$selectableArrayIndexes") ]] && selectableArraies+=("${comparingArraies[@]:$index:1}")
+    [[ ! $selectableArrayIndexes || $(indexof $(($index - 1)) "${selectableArrayIndexes[*]}") ]] && selectableArraies+=("${comparingArraies[@]:$index:1}")
   done
 
   [[ "$question_desc" ]] && question_desc="，${question_desc}"
@@ -370,12 +420,16 @@ function ask2() {
     local defaultIndexes
     for array in "${comparingArraies[@]}"; do
       if [[ $input ]]; then
-        local i=-1
-        for el in $(_INDEXOF_NO_INDEX=-1 indexesof "$input" "$array"); do
-          i=$((i + 1))
-          [[ ! ${inputIndexes[@]:$i:1} || ${inputIndexes[@]:$i:1} -eq -1 ]] && inputIndexes[$i]="$el"
-        done
-        unset i
+        if [[ $input = 'ALL' ]]; then
+          inputIndexes=(${!headArray[@]})
+        else
+          local i=-1
+          for el in $(_INDEXOF_NO_INDEX=-1 indexesof "$input" "$array"); do
+            i=$((i + 1))
+            [[ ! ${inputIndexes[@]:$i:1} || ${inputIndexes[@]:$i:1} -eq -1 ]] && inputIndexes[$i]="$el"
+          done
+          unset i
+        fi
       fi
       if [[ $default ]]; then
         local i=-1
@@ -431,7 +485,7 @@ function ask2() {
         done
       done
       [[ ! $_ASK_NO_VERBOSE ]] && echo -en '\033[33m【结果】\033[0m\033[2;3;37m您输入的结果为：\033[0m' >&2 && echo -e "\033[2;3;36m${_ASK_RESULT[*]}\033[0m" >&2
-      echo ${_ASK_RESULT[*]}
+      [[ ! $silent ]] && echo ${_ASK_RESULT[*]}
     fi
     [[ ! $_ASK_NO_VERBOSE ]] && printf '\n' >&2
     return
@@ -476,7 +530,7 @@ function ask2() {
         _ASK_RESULTS+=("${array[@]:$index:1}")
       done
       [[ ! $_ASK_NO_VERBOSE ]] && echo -en '\033[33m【结果】\033[0m\033[2;3;37m您输入的结果为：\033[0m' >&2 && echo -e "\033[2;3;36m${_ASK_RESULTS[*]}\033[0m" >&2
-      echo $_ASK_RESULT
+      [[ ! $silent ]] && echo $_ASK_RESULT
     fi
     [[ ! $_ASK_NO_VERBOSE ]] && printf '\n' >&2
   fi
@@ -551,14 +605,26 @@ function whether() {
   if [[ $required ]]; then
     while true; do
       answer=$(_ASK_NO_VERBOSE=1 question2 -q "是否${question}" -Q "\033[3;31m是\033[0m则输入\033[3;31my\033[0m，\033[3;32m否\033[0m则输入\033[3;32mn\033[0m")
-      [[ "$answer" == 'y' ]] && { echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m是\033[0m' >&2; echo $yes; } && break
-      [[ "$answer" == 'n' ]] && { echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m否\033[0m' >&2; echo $no; } && break
+      [[ "$answer" == 'y' ]] && {
+        echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m是\033[0m' >&2
+        echo $yes
+      } && break
+      [[ "$answer" == 'n' ]] && {
+        echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m否\033[0m' >&2
+        echo $no
+      } && break
     done
   else
     while true; do
       answer=$(_ASK_NO_VERBOSE=1 question2 -q "是否${question}" -Q "\033[3;31m是\033[0m则输入\033[3;31my\033[0m，\033[3;32m否\033[0m则\033[3;32m直接回车\033[0m或输入\033[3;32mn\033[0m")
-      [[ "$answer" == 'y' ]] && { echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m是\033[0m' >&2; echo $yes; } && break
-      [[ -z "$answer" || "$answer" == 'n' ]] && { echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m否\033[0m' >&2; echo $no; } && break
+      [[ "$answer" == 'y' ]] && {
+        echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m是\033[0m' >&2
+        echo $yes
+      } && break
+      [[ -z "$answer" || "$answer" == 'n' ]] && {
+        echo $'\033[33m【结果】\033[0m\033[2;3;37m您输入的结果是：\033[0m\033[2;3;36m否\033[0m' >&2
+        echo $no
+      } && break
     done
   fi
 }
@@ -573,45 +639,35 @@ function datafile() {
   echo "$folder/$(date '+%Y-%m-%d.%H:%M:%S').json"
 }
 
-function indexof() {
-  local value="$1"
-  local array=($2)
-  local revoke=$(shopt -p nocasematch)
-  local index=$_INDEXOF_NO_INDEX
-  unset _INDEXOF_NO_INDEX
-  debug 索引值：$value, 数组长度：${#array[@]}, 数组：${array[@]}
-  [[ $_INDEXOF_IGNORE_CASE ]] && shopt -s nocasematch
-  for i in ${!array[@]}; do
-    if [[ ${array[@]:$i:1} == $value ]]; then
-      index=$i
-      debug 返回索引：$index
-      break
+function print_record() {
+  local -a fields=()
+  local -a values=()
+  local -a filters=()
+  local id=''
+  local OPTIND
+  while getopts ':a:v:n:y:' opt; do
+    case "$opt" in
+    a) fields+=($OPTARG) ;;
+    v) values+=($OPTARG) ;;
+    y) filters+=($OPTARG) ;;
+    n) id=$OPTARG ;;
+    esac
+  done
+  local primary=0
+  local value
+  for index in "${!fields[@]}"; do
+    value="${values[@]:$index:1}"
+    value="$(escapeUnicode $value)"
+    if [[ $primary -eq 0 ]]; then
+      echo -e "\033[33m${fields[@]:$index:1}\033[0m: 【"$id"】\033[1;31m$value\033[0m"
+    else
+      echo -e "\033[33m${fields[@]:$index:1}\033[0m: \033[32m$value\033[0m"
+      if [[ -n $ITERM_SESSION_ID && $IMGCAT && "${filters[@]:$index:1}" = *:image:* ]]; then
+        curl -s "${values[@]:$index:1}" | imgcat --height=5
+      fi
     fi
+    primary=1
   done
-  eval "$revoke"
-  echo $index
-}
-
-function indexesof() {
-  local values=($1)
-  for value in "${values[@]}"; do
-    _INDEXOF_NO_INDEX=-1 indexof "$value" "$2"
-  done
-}
-
-# encode_array "${array[@]}"
-function encode_array() {
-  for e in "$@"; do
-    base64 <<<"$e"
-  done
-}
-
-# get_encoded_array_ele 5 "${encoded[@]}"
-function get_encoded_array_ele() {
-  local -i index=$1
-  local items=(${@:2})
-  local item=${items[@]:$index:1}
-  [[ $item ]] && base64 -d <<<"$item"
 }
 
 function print_json() {
@@ -623,6 +679,7 @@ function print_json() {
   local -a fieldKeys
   local -a filters
   local -a curlparams
+  local -a _curlparams
   local url=''
   local text=''
   local raw=$RAW
@@ -651,18 +708,30 @@ function print_json() {
       ;;
     esac
   done
+  for i in "${curlparams[@]}"; do
+    _curlparams+=("$(base64 -d <<< "$i")")
+  done
 
-  local cmd="curl -s "$url" "${curlparams[@]}" "${headers[@]}""
+  echo "curl -v "$url" "${_curlparams[@]}" "${headers[@]}"" >>resou.log
 
-  echo "$cmd" >>resou.log
+  # 使用本地数据
+  if [[ ${DEBUG_LOCAL+x} ]]; then
+    [[ ! $file ]] && echo '未设置$file' >&2 && exit 1
+    local local_file=$(ls $(dirname $(datafile $file))/* | tail -${DEBUG_LOCAL:-1} | head -1)
+    debug "local file: $local_file"
+    text=$(cat $local_file)
+  fi
 
-  [[ -z "$text" ]] && text="$($cmd)"
+  # 获取数据
+  if [[ ! "$text" ]]; then
+    text="$(curl -v "$url" "${_curlparams[@]}" "${headers[@]}" 2>curl.log)"
+  fi
+  # 保存数据
+  [[ ${DEBUG_LOCAL-x} && $SHOULD_STORE && $file ]] && printf %s "$text" >"$(datafile $file)"
 
-  [[ -n $file ]] && printf %s "$text" >"$(datafile $file)"
+  if [[ "$jsonFormat" && $(declare -f jsonparser) ]]; then
 
-  if [[ -n "$jsonFormat" && $(declare -f jsonparser) ]]; then
-
-    if [[ -n $raw ]]; then
+    if [[ $raw ]]; then
       printf '%s' "$text"
     else
       debug "$text"
@@ -673,7 +742,7 @@ function print_json() {
 
     text=$(escapeSpace "$text")
 
-    if [[ -n $raw || ! ${fieldPatterns[*]} ]]; then
+    if [[ $raw || ! ${fieldPatterns[*]} ]]; then
       printf '%s' "$text"
     else
       debug "$text"
@@ -734,5 +803,34 @@ function print_json() {
         echo
       done
     fi
+  fi
+}
+
+function help() {
+  if [[ "$*" =~ (^|[[:space:]])-h([[:space:]]|$) ]]; then
+    local help_msg="$(cat $0 | grep -oE '^\s*[^|)( ]+(\|[^|)( ]*)*\)\s*(#.*)?$' | sed 's/    / /g;')"
+    local stylish=(-e '/^ \S\+/i\ ' -e 's/^ \( \+\)/\1\1\1\1/;s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;s/\(\s*\)\([^ |)]\+\)\([|)]\)/\1\\033[31m\2\\033[0m\3/;s/\(|\)\([^ |)]\+\)/\1\\033[32m\2\\033[0m/g;/^\S/i\ ')
+    local endLevel=0
+    for i in $(seq 0 $#); do [[ ${@:$i:1} == '-h' ]] && endLevel=$i; done
+    [[ $endLevel == 1 ]] && echo -e "$(sed "${stylish[@]}" <<< "$help_msg")" && exit 0
+    echo -e "$(
+      nextLevel=1
+      while IFS= read line; do
+        lineLevel=$(grep -o '^\s*' <<< "$line")
+        lineLevel=${#lineLevel}
+        local pattern="${@:$lineLevel:1}"
+        # nextLevel至少为1
+        [[ $nextLevel < 1 ]] && nextLevel=1
+        # echo "$nextLevel,$lineLevel,$line"
+        # 回溯
+        [[ $lineLevel < $nextLevel ]] && { [[ $line =~ "$pattern" ]] &&  { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
+        # 打印全部子命令
+        [[ $lineLevel -ge $endLevel && $nextLevel -ge $endLevel ]] &&  echo -e "$line" && continue
+        # 匹配上nextLevel，打印
+        [[ $lineLevel = $nextLevel && $line =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((nextLevel + 1)) && continue; }
+      done <<< "$help_msg" | sed "${stylish[@]}"
+    )"
+  else
+    return 1
   fi
 }

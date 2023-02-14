@@ -722,6 +722,35 @@ function cache() {
   fi
 }
 
+function help() {
+  if [[ "$*" =~ (^|[[:space:]])-h([[:space:]]|$) ]]; then
+    local help_msg="$(cat $0 | grep -oE '^\s*[^|)( ]+(\|[^|)( ]*)*\)\s*(#.*)?$' | sed 's/    / /g;')"
+    local stylish=(-e '/^ \S\+/i\ ' -e 's/^ \( \+\)/\1\1\1\1/;s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;s/\(\s*\)\([^ |)]\+\)\([|)]\)/\1\\033[31m\2\\033[0m\3/;s/\(|\)\([^ |)]\+\)/\1\\033[32m\2\\033[0m/g;/^\S/i\ ')
+    local endLevel=0
+    for i in $(seq 0 $#); do [[ ${@:$i:1} == '-h' ]] && endLevel=$i; done
+    [[ $endLevel == 1 ]] && echo -e "$(sed "${stylish[@]}" <<< "$help_msg")" && exit 0
+    echo -e "$(
+      nextLevel=1
+      while IFS= read line; do
+        lineLevel=$(grep -o '^\s*' <<< "$line")
+        lineLevel=${#lineLevel}
+        local pattern="${@:$lineLevel:1}"
+        # nextLevel至少为1
+        [[ $nextLevel < 1 ]] && nextLevel=1
+        # echo "$nextLevel,$lineLevel,$line"
+        # 回溯
+        [[ $lineLevel < $nextLevel ]] && { [[ $line =~ "$pattern" ]] &&  { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
+        # 打印全部子命令
+        [[ $lineLevel -ge $endLevel && $nextLevel -ge $endLevel ]] &&  echo -e "$line" && continue
+        # 匹配上nextLevel，打印
+        [[ $lineLevel = $nextLevel && $line =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((nextLevel + 1)) && continue; }
+      done <<< "$help_msg" | sed "${stylish[@]}"
+    )"
+  else
+    return 1
+  fi
+}
+
 if [ $(basename $0) = 'prelude.sh' ]; then
   function parseCmds() {
     args="${@:2}"

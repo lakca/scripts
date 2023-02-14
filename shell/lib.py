@@ -1,38 +1,79 @@
 # coding=utf-8
 
+from time import mktime
 from datetime import datetime
-from functools import cmp_to_key
+from functools import cmp_to_key, reduce
+import inspect
+import io
 import json
+import random
 import sys
 import re
 import os
-import time
-from typing import MutableSequence, Sequence
+from typing import MutableSequence, Sequence, get_type_hints
 from urllib import request
 from urllib.parse import quote
 
-NUMBER_REG = r'-?([0-9]+\.?[0-9]*|\.[0-9]*)'
+NUMBER_REG = r"-?([0-9]+\.?[0-9]*|\.[0-9]*)"
 
+DEBUG = os.environ.get("DEBUG")
+DEBUG = "({})".format(DEBUG.replace(",", "|").replace("*", ".*")) if DEBUG else DEBUG
+SHOULD_STORE = bool(os.environ.get("SHOULD_STORE"))
 TABLE = bool(os.environ.get("TABLE"))
 NO_TABLE = bool(os.environ.get("NO_TABLE"))
-IMGCAT= bool(os.environ.get("IMGCAT"))
-SIMPLE= bool(os.environ.get("SIMPLE"))
-LINK= bool(os.environ.get("LINK"))
-TABLE_NO_HEADER= bool(os.environ.get("TABLE_NO_HEADER"))
-NO_EMPTY_DASH= bool(os.environ.get("NO_EMPTY_DASH"))
+IMGCAT = bool(os.environ.get("IMGCAT"))
+SIMPLE = bool(os.environ.get("SIMPLE"))
+LINK = bool(os.environ.get("LINK"))
+TABLE_NO_HEADER = bool(os.environ.get("TABLE_NO_HEADER"))
+NO_EMPTY_DASH = bool(os.environ.get("NO_EMPTY_DASH"))
+OFFSET = int(os.environ.get("OFFSET") or 0)
+
+ENABLED_PLOT = True
+STORAGE_FILE = None
 
 try:
     from imgcat import imgcat
 except:
     IMGCAT = False
 
-def noop(*args): return args[0] if len(args) else None
+try:
+    import matplotlib as mp
+    import matplotlib.pyplot as plt
+    import matplotlib.ticker as mpticker
+    import matplotlib.dates as mpdates
+    import mplfinance as mpf
+    import numpy as np
+    import pandas as pd
+
+    mp.rcParams["font.family"] = ["Heiti TC"]
+except:
+    ENABLED_PLOT = False
+
+
+def noop(*args):
+    return args[0] if len(args) else None
+
+
+def debug(*args):
+    if DEBUG:
+        frame = inspect.stack()[1]
+        if re.search(DEBUG, frame.function):
+            print(
+                f"\033[2m[\033[31mDEBUG:{frame.filename}:{frame.lineno} \033[32m{frame.function}\033[0m\033[2m]",
+                *args,
+                "\033[0m",
+            )
+
 
 class Node:
-    def __init__(self, parent=None):
+    def __init__(self, parent: "Node" = None):
         self.data = {}
+        # 当前分词（语法单元）
+        self._word = ""
         # 属性的绝对路径名（属性id）
-        self.data["key"] = parent.data["key"] + ":" if parent else ""
+        self._keyPrefix = parent.data["key"] + ":" if parent else ""
+        self.data["key"] = self._keyPrefix
+        self.data["key_or"] = []
         # 属性相对（语法支对象）路径
         self.data["keys"] = []
         # 修饰函数及参数
@@ -41,16 +82,36 @@ class Node:
         self.data["labels"] = []
         # 最新的（最后定义的）字段标签
         self.data["label"] = ""
-        # 当前分词（语法单元）
-        self._key = ""
-        self.usingPipe = False
-        self.usingLabel = False
-        self.usingArgs = False
-        self.usingList = False
-        self.usingKarg = False
 
+        self.usingKey = False
+
+        self.usingLabel = False
+
+        self.usingPipe = False
+        self.usingArgs = False
+        self.usingKarg = False
+        self.usingList = False
+
+        self.using = []
+
+        self.usingKeyOr = False
+        self.usingKey = False
+
+        self._parent = parent
         if parent:
             parent.append(self)
+
+    @property
+    def parent(self):
+        return self._parent
+
+    @property
+    def worded(self):
+        return len(self._word) > 0
+
+    @property
+    def keyed(self):
+        return self.data["key"] != self._keyPrefix
 
     def token(self, token, ignoreKeys=False):
         # 对于属性id（key）而言，所有token都是必须的；
@@ -58,11 +119,21 @@ class Node:
             self.data["key"] += token
         # 但对于属性路径（keys）而言，符号是需要去掉的
         if not ignoreKeys:
-            self._key += token
+            self._word += token
+        return self
+
+    def keyor(self):
+        self.usingKeyOr = not self.usingKeyOr
+        return self
+
+    def key(self):
+        self.usingKey = True
+        return self
 
     # 进出管道
     def pipe(self):
         self.usingPipe = not self.usingPipe
+        return self
 
     # 进出管道参数
     def args(self):
@@ -70,6 +141,7 @@ class Node:
         if self.usingArgs:
             pipe = self.data["pipes"].pop()
             self.data["pipes"].append([pipe])
+        return self
 
     # 进出管道数组类型参数
     def list(self):
@@ -80,46 +152,49 @@ class Node:
                 self.data["pipes"][-1][-1] = (prev[0], [])
             else:
                 self.data["pipes"][-1].append([])
+        return self
 
     def karg(self):
         self.usingKarg = not self.usingKarg
         if self.usingKarg:
             arg = self.data["pipes"][-1].pop()
             self.data["pipes"][-1].append((arg,))
+        return self
 
     # 进出字段标签
     def label(self):
         # 退出标签语法
         if self.usingLabel:
-            self.data["labels"].append(self._key)
-            self.data["label"] = self._key
+            self.data["labels"].append(self._word)
+            self.data["label"] = self._word
             # 重置语法单元内容
-            self._key = ""
+            self._word = ""
         # 进入标签语法
         else:
             # 结束上一个语法单元
-            self.keys()
+            self.word()
         self.usingLabel = not self.usingLabel
+        return self
 
     # 切割语法单元
-    def keys(self):
+    def word(self):
         # 如果在标签语法内
         if self.usingLabel:
-            return
+            return self
         # 如果在参数语法内
         elif self.usingArgs:
             # 列表
             if self.usingList:
                 if isinstance(self.data["pipes"][-1][-1], tuple):
-                    self.data["pipes"][-1][-1][-1].append(self._key)
+                    self.data["pipes"][-1][-1][-1].append(self._word)
                 else:
-                    self.data["pipes"][-1][-1].append(self._key)
+                    self.data["pipes"][-1][-1].append(self._word)
             elif self.usingKarg:
                 tup = self.data["pipes"][-1][-1]
                 arg = tup[0]
-                val = tup[1] if len(tup) > 1 else self._key
+                val = tup[1] if len(tup) > 1 else self._word
                 if not val:
-                    return
+                    return self
                 self.data["pipes"][-1].pop()
                 if isinstance(self.data["pipes"][-1][-1], dict):
                     self.data["pipes"][-1][-1][arg] = val
@@ -129,48 +204,60 @@ class Node:
                     self.data["pipes"][-1].append(obj)
                 self.karg()
             else:
-                self.data["pipes"][-1].append(self._key)
+                self.data["pipes"][-1].append(self._word)
         # 如果在管道语法内
         elif self.usingPipe:
-            self.data["pipes"].append(self._key)
+            self.data["pipes"].append(self._word)
             self.usingPipe = False
         # 如果在普通语法内（即处于最外层的属性定义语法）
-        elif self._key:
-            self.data["keys"].append(self._key)
+        elif self.worded:
+            if self.usingKeyOr and self.usingKey:
+                self.data["key_or"].append(
+                    [
+                        {
+                            "key": self.data["key"],
+                            "keys": self.data["keys"],
+                            "iterKey": self.data["iterKey"],
+                            "iterKeys": self.data["iterKeys"],
+                        }
+                    ]
+                )
+                self.data["key"] = ""
+                self.data["keys"] = []
+                self.data["iterKey"] = ""
+                self.data["iterKeys"] = []
+                self.usingKey = False
+            else:
+                self.data["keys"].append(self._word)
         # 重置语法单元内容
-        self._key = ""
+        self._word = ""
+        return self
 
     # 注明这之前的语法单元是一个遍历键，而不是属性相对路径
     # 数组类型的深度属性如：colors*.name, colors*.vectors.red
     def iter(self):
         if self.usingLabel or self.usingPipe:
-            return
+            return self
         self.data["iterKey"] = self.data["key"]
         self.data["iterKeys"] = self.data["keys"]
         self.data["keys"] = []
+        return self
 
-    def append(self, node=None):
-        if self.usingLabel:
-            return
+    def append(self, node: "Node" = None) -> "Node":
         if node:
             node._parent = self
             self.data["children"] = self.data.get("children") or []
             self.data["children"].append(node.data)
+            return node
         else:
-            node = Node(self)
-        return node
+            return Node(self)
 
-    def next(self, node=None):
-        if self.usingLabel:
-            return
+    def next(self, node: "Node" = None) -> "Node":
         if node:
-            self.parent().append(node)
+            self.parent.append(node)
+            return node
         else:
-            node = Node(self.parent())
-        return node
-
-    def parent(self):
-        return self._parent
+            return Node(self.parent)
 
 
 def tokenize(fmt):
@@ -182,96 +269,109 @@ def tokenize(fmt):
     length = len(fmt)
     while index < length:
         token = fmt[index]
-        # 魔术语法，纯字面量
+        # 开启或关闭纯字面量
         if token == "$" and not escaped:
             raw = not raw
+            if not raw and node.usingPipe:
+                node.word().pipe()
+        # 已开启字面量
         elif raw:
             node.token(token)
+        # 已开启转义
         elif escaped:
             node.token(token)
             escaped = False
-        # 转义
+        # 开启转义
         elif token == "\\":
             escaped = True
-        # 属性标签、管道参数
+        # 开启分组，如管道参数、数组类型参数值、及标签等
+        elif token == "[":
+            if not node.usingPipe and not node.usingLabel:
+                node.word().keyor()
+            else:
+                node.token(token)
+        elif token == "]":
+            if node.usingKeyOr:
+                node.key().word().keyor()
+            else:
+                node.token(token)
         elif token == "(":
-            # 管道参数
-            if node.usingPipe and not node.usingArgs:
-                node.keys()
-                node.args()
-            # 属性标签
+            # 开启管道参数
+            if node.usingPipe:
+                # 开启数组类型参数值
+                if node.usingArgs:
+                    if not node.worded:
+                        node.word().list()
+                # 开启参数列表
+                else:
+                    node.word().args()
+            # 开启标签
             elif not node.usingLabel:
-                node.keys()
-                node.label()
+                node.word().label()
+        # 关闭分组
         elif token == ")":
+            # 关闭管道参数
             if node.usingArgs:
-                node.keys()
-                node.args()
+                # 关闭数组类型参数值
+                if node.usingList:
+                    node.word().list()
+                # 关闭参数列表
+                else:
+                    node.word().args()
+            # 关闭标签
             elif node.usingLabel:
-                node.keys()
-                node.label()
+                node.word().label()
         # 命名参数
         elif token == "=":
             if node.usingArgs and not node.usingList:
-                node.keys()
-                node.karg()
+                node.word().karg()
             else:
                 node.token(token)
-        # 数组
-        elif token == "[" or token == "]":
-            if node.usingArgs:
-                node.keys()
-                node.list()
-            else:
-                node.token(token)
-        # 下级对象
-        elif token == ":":
-            if node.usingArgs:
-                node.token(token)
-            else:
-                node.keys()
-                node = node.append()
         # 属性路径
         elif token == ".":
             if node.usingArgs:
                 node.token(token)
             else:
-                node.token(token, True)
-                node.keys()
+                node.token(token, True).word()
+        # 下级对象
+        elif token == ":":
+            if node.usingArgs:
+                node.token(token)
+            else:
+                node = node.word().append()
         # 管道（函数）
         elif token == "|":
             if not node.usingArgs:
-                node.keys()
-                node.pipe()
+                node.word().pipe()
                 if fmt[index + 1] == "$":
                     index += 1
                     node.token("$")
                     raw = True
         # 分割同级（属性、参数...）
         elif token == ",":
-            node.keys()
-            if not node.usingArgs:
-                node = node.next()
+            if node.usingKeyOr:
+                node.key().word()
+            elif not node.usingArgs and not node.usingLabel:
+                node = node.word().next()
+            else:
+                node.word()
         # 分割父级（结束当前级别的分支对象）
         elif token == ";":
             if not node.usingArgs:
-                node.keys()
-                node = node.parent()
-                node = node.next()
+                node = node.word().parent.next()
         # 遍历键
         elif token == "*":
             if not node.usingArgs:
                 if fmt[index + 1] == ".":
                     index += 1
-                    node.keys()
-                    node.iter()
-                    node.token("*.", True)
+                    node.word().iter().token("*.", True)
                 else:
                     node.token(token)
+        # 其他
         else:
             node.token(token)
         index += 1
-    node.keys()
+    node.word()
     return root
 
 
@@ -385,22 +485,36 @@ class Pipe:
     }
 
     @classmethod
-    def apply(cls, v, pipes, data={}, **opts):
+    def apply(cls, v, pipes=[], data={}, interpolate=None, signed=None):
         for pipe in pipes:
             if pipe == "true" and not v:
                 return v
             args = []
             kwargs = {}
-            kwargs['__interpolate'] = lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
+            kwargs["__interpolate"] = (
+                lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
+            )
             if isinstance(pipe, list):
                 for e in pipe[1:]:
                     if isinstance(e, dict) and e["__kwarg"]:
-                        kwargs = e
+                        kwargs.update(e)
                     else:
                         args.append(e)
                 pipe = pipe[0]
 
-            if "interpolate" in opts and pipe.startswith(opts["interpolate"]):
+            if isinstance(signed, bool):
+                if signed:
+                    if not pipe.startswith("+"):
+                        continue
+                    pipe = pipe[1:]
+                elif pipe.startswith("+"):
+                    continue
+            elif isinstance(signed, str) and signed:
+                if not pipe.startswith(signed):
+                    continue
+                pipe = pipe[slice(len(signed))]
+
+            if interpolate is not None and pipe.startswith(interpolate):
                 v = cls._interpolate(pipe[1:], data)
             else:
                 attr = getattr(cls, pipe, None)
@@ -411,26 +525,37 @@ class Pipe:
 
     @classmethod
     def _interpolate(cls, template, data, *args, **kwargs):
+        debug("template:", template)
+
         def replacer(m):
             key = m.group(1)
             escaped = False
             index = -1
             token = None
+            debug("replace:", key)
             # 兼容定义中的绝对路径，如 data.band_list:word
             for (i, char) in enumerate(key):
                 if char == "\\":
                     escaped = True
                 elif char == "|" and not escaped:
                     index = i
+                    break
                 else:
                     escaped = False
             if index > -1:
                 token = tokenize(key[index:]).data
                 key = key[0:index]
-            if key.startswith("."):
+            if key.startswith("."):  # 所在对象的后代属性
                 value = str(retrieve(data.get("__", ""), key.split(".")[1:], ""))
-            else:
+            elif key.startswith("/"):  # 绝对路径
+                key_token = tokenize(key[1:]).data
+                value = str(Parser.retrieve(data, key_token, ""))
+            else:  # 无必要，仅作兼容用
                 value = str(retrieve(data, [key], ""))
+            debug("index:", index)
+            debug("key:", key)
+            debug("value:", value)
+            token and debug("pipes:", value, token["pipes"])
             return cls.apply(value, token["pipes"], data) if token else value
 
         return re.sub(r"\{([^\}]+)\}", replacer, template)
@@ -443,14 +568,16 @@ class Pipe:
         except:
             pass
         for case in (
+            # custom
+            lambda: datetime.strptime(sv, kwargs["from"]) if kwargs["from"] else 0 / 0,
             # timestamp 1667632623
             lambda: datetime.fromtimestamp(nv / 1000 if nv > 9999999999 else nv),
-            # ISO 2022-11-01T00:00:00, 2022-11-01 00:00:00 ...
-            lambda: datetime.fromisoformat(sv),
             # UTC "Tue, 18 Oct 2022 23:00:23 +0800"
             lambda: datetime.strptime(sv, "%a, %d %b %Y %H:%M:%S %z"),
             # Mon Jan 31 20:50:10 +0800 2022
             lambda: datetime.strptime(sv, "%a %b %d %H:%M:%S %z %Y"),
+            # ISO 2022-11-01T00:00:00, 2022-11-01 00:00:00 ...
+            lambda: datetime.fromisoformat(sv),
         ):
             try:
                 v = case()
@@ -475,61 +602,107 @@ class Pipe:
     @classmethod
     def string2Number(cls, v, *args, **kwargs):
         """v: str<int|float>"""
-        if isinstance(v, (float, int)): return v
-        return 0 if v == '.' else float(v) if "." in v else int(v) if re.match(NUMBER_REG + '$', str(v)) else None
+        if v is None:
+            return v
+        if isinstance(v, (float, int)):
+            return v
+        return (
+            0
+            if v == "."
+            else float(v)
+            if "." in v
+            else int(v)
+            if re.match(NUMBER_REG + "$", str(v))
+            else None
+        )
 
     @classmethod
     def seekNumber(cls, v, *args, **kwargs):
         """v: str<number + any>"""
-        if isinstance(v, (float, int)): return v
+        if isinstance(v, (float, int)):
+            return v
         match = re.search(NUMBER_REG, str(v))
         return match and cls.string2Number(match.group()) or 0
 
     @classmethod
     def number(cls, v, type=",", *args, **kwargs):
-        if v is None or not re.match(NUMBER_REG + '$', str(v)):
+        if v is None or not re.match(NUMBER_REG + "$", str(v)):
             return v
         v = cls.string2Number(v)
 
+        # 添加千位分隔符
         if type == ",":
             return "{:,}".format(v)
+        # 转换为百分比
         elif type == "%":
             return "{:.2%}".format(v)
+        # 转换为带正负号百分比
         elif type == "+%":
             return "{:+.2%}".format(v)
+        # 添加正负号
         elif type == "+":
             return "{:+.2f}".format(v)
+        # 固定小数位
+        elif type == "fixed":
+            return ("{:0" + str(kwargs["n"]) + "d}").format(v)
+        # 转换为中文单位
         elif type == "cn":
             for e in ["", "万", "亿", "兆"]:
                 if abs(v) > 10000:
                     v = v / 10000
                 else:
                     return str(v) + e if isinstance(v, int) else "{:.4f}".format(v) + e
+        # 四舍五入
+        elif type.isdecimal():
+            return round(v, int(type))
         else:
             return type.format(v)
 
     @classmethod
+    def format(cls, v, kind=",", *args, **kwargs):
+        if isinstance(kind, list):
+            return reduce(lambda r, e: cls.format(r, e, *args, **kwargs), v)
+        n = cls.string2Number(v)
+        if kind == "%":
+            return "{:}%".format(n) if n is not None else ""
+        elif kind == "+%":
+            return "{:+}%".format(n) if n is not None else ""
+        return ""
+
+    @classmethod
     def discount(cls, v, *args, **kwargs):
-        interpolate = kwargs.get('__interpolate', noop)
+        interpolate = kwargs.get("__interpolate", noop)
         if len(args) > 1:
             v = interpolate(args[1])
         if len(args) > 0:
             b = interpolate(args[0])
             b = cls.seekNumber(b)
             v = cls.seekNumber(v)
-            return '{:+.2%}'.format((v - b) / b) if b != 0 else ''
+            return "{:+.2%}".format((v - b) / b) if b != 0 else ""
+
+    @classmethod
+    def _exp(cls, v, *args, **kwargs):
+        basharr = cls._rsv_bash_args(**kwargs)
+        target = kwargs.get("target")
+        if kwargs["exp"] == "in":
+            return str(v) in (basharr["arr"] if basharr else target if target else "")
 
     @classmethod
     def indicator(cls, v, *args, **kwargs):
-        interpolate = kwargs.get('__interpolate', noop)
+        interpolate = kwargs.get("__interpolate", noop)
         ops = []
         if "cmp" in kwargs:
             ops = [cls.seekNumber(interpolate(kwargs["cmp"])), 0]
+        elif "exp" in kwargs:
+            return Pipe.red(v) if cls._exp(v, *args, **kwargs) else Pipe.green(v)
         elif len(args):
             if len(args) == 1:
                 ops = [cls.seekNumber(v), cls.seekNumber(interpolate(args[0]))]
             else:
-                ops = [cls.seekNumber(interpolate(args[0])), cls.seekNumber(interpolate(args[1]))]
+                ops = [
+                    cls.seekNumber(interpolate(args[0])),
+                    cls.seekNumber(interpolate(args[1])),
+                ]
         else:
             ops = [cls.seekNumber(v), 0]
         return (
@@ -662,13 +835,15 @@ class Pipe:
 
     @classmethod
     def reverse(cls, v, *args, **kwargs):
-        return v.reverse() if isinstance(v, MutableSequence) else v
+        if isinstance(v, MutableSequence):
+            v.reverse()
+        return v
 
     @classmethod
     def _getLeftStyleANSI(cls, text, *args, **kwargs):
         text = str(text)
         start = kwargs.get("start", 0)
-        end = kwargs.get("end", len(text) - 1)
+        end = kwargs.get("end", len(text))
         regStyle = re.compile(r"\033\[(?:\d;?)+m")
         regReset = re.compile(r"\033\[0m")
         resetMatch = None
@@ -702,16 +877,18 @@ class Pipe:
 
     @classmethod
     def tag(cls, text, *args, **kwargs):
-        if not isinstance(text, str): return
+        if not isinstance(text, str):
+            return
         regTag = re.compile(r"<(\w+)(\s+[^>]*)*>([\s\S]*?)</\1>")
         start = 0
+        ansi = []
         # print(text)
         # print(repr(text))
         def replacer(match):
             nonlocal start
-            nonlocal text
+            nonlocal ansi
             end = match.start()
-            ansi = cls._getLeftStyleANSI(text, start=start, end=end)
+            ansi = cls._getLeftStyleANSI("".join(ansi) + match.string[start:end])
             start = end
             return "\033[7m" + match.group(3) + "\033[0m" + "".join(ansi)
 
@@ -723,8 +900,35 @@ class Pipe:
 
     @classmethod
     def slice(cls, v, *args, **kwargs):
-        if not isinstance(v, Sequence): v = str(v)
+        if not isinstance(v, Sequence):
+            v = str(v)
         return v[slice(*list(map(lambda e, *argss: int(e), args)))]
+
+    @classmethod
+    def _rsv_bash_args(cls, **kwargs):
+        args = {}
+        for (k, v) in kwargs.items():
+            if k.startswith("bash:"):
+                args[k[5:]] = v
+        if "arr" in args:  # bash array
+            args["arr"] = args["arr"].split(args.get("arrsep", " "))
+        # int
+        for k in ("arrdim", "arridx"):
+            if k in args:
+                args[k] = int(args[k])
+        return args
+
+    @classmethod
+    def map(cls, v, *args, **kwargs):
+        bash_args = cls._rsv_bash_args(**kwargs)
+        arr = bash_args.get("arr")
+        arrdim = bash_args.get("arrdim", 1)
+        arridx = bash_args.get("arridx", 0)
+        if "arr" in bash_args:
+            for (i, e) in enumerate(bash_args["arr"]):
+                if e == str(v):
+                    return arr[i - i % arrdim + arridx]
+        return v
 
     @classmethod
     def urlencode(cls, v, *args, **kwargs):
@@ -732,7 +936,351 @@ class Pipe:
 
     @classmethod
     def dashempty(cls, v, *args, **kwargs):
-        return '-' if v is None or v == '' else v
+        return "-" if v is None or v == "" else v
+
+    @classmethod
+    def _em_a_stock_int_time(cls, t, *args, **kwargs):
+        """
+        Args:
+            t: int
+                e.g. 930, 1059, 1300 ...
+
+        Returns:
+            (t, seconds_diff_to_AStock_day_start_time)
+
+        Examples:
+            - 930 -> (930, 0)
+            - 1030 -> (930, 60)
+            - 1330 -> (930, 150)
+        """
+        t = "{:04d}".format(t)
+        tl = t[0:2] + ":" + t[2:4]
+        t = 60 * (int(t[0:2]) - 9) + int(t[2:4]) - 30
+        t = t if t <= 120 else t - 90
+        return (t, tl)
+
+    @classmethod
+    def _em_a_stock_time_axis(cls, ax, *args, **kwargs):
+        ax.set_xlim((0, 240))
+        ax.xaxis.set_ticks((0, 30, 60, 90, 120, 150, 180, 210, 240))
+        ax.xaxis.set_ticklabels(
+            (
+                "09:30",
+                "10:00",
+                "10:30",
+                "11:00",
+                "11:30/13:00",
+                "13:30",
+                "14:00",
+                "14:30",
+                "15:00",
+            )
+        )
+
+    @classmethod
+    def plot(cls, dt, *args, **kwargs):
+        interpolate = kwargs.get("__interpolate", noop)
+        meta = {}
+        for (k, v) in kwargs.items():
+            if k.startswith("m:"):
+                meta[k[2:]] = interpolate(kwargs.get(k))
+        debug(meta)
+        global ENABLED_PLOT
+        transparent = True
+        fig = None
+        ax: plt.Axes = None
+        ax2: plt.Axes = None
+        buf: io.BytesIO = None
+        texts: plt.Text = []
+        barLabels: list[plt.Text] = []
+        if not ENABLED_PLOT:
+            sys.stderr.write("matplotlib and numpy are not installed.")
+            return dt
+
+        if kwargs["type"] == "zdfb":  # 涨跌分布
+            fig = plt.figure(figsize=(11, 5.6), dpi=100)
+            ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
+            x = []
+            xt = []
+            y = []
+            for item in dt:
+                (k, v) = list(item.items())[0]
+                x.append(int(k))
+                y.append(v)
+                xt.append(
+                    "跌停"
+                    if k == "-11"
+                    else "涨停"
+                    if k == "11"
+                    else "平盘"
+                    if k == "0"
+                    else "<9%"
+                    if k == "-10"
+                    else ">9%"
+                    if k == "10"
+                    else k + "%"
+                )
+            bar = ax.bar(
+                x,
+                y,
+                tick_label=xt,
+                color=list(
+                    map(lambda e: "red" if e > 0 else "gray" if e == 0 else "green", x)
+                ),
+            )
+            barLabels = ax.bar_label(bar, padding=3)
+            texts.append(ax.set_title("涨跌分布"))
+
+        elif kwargs["type"] == "zdtdb":  # 涨跌停对比
+            fig = plt.figure(figsize=(11, 5.6), dpi=100)
+            ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
+            y1 = []
+            y2 = []
+            x = []
+            xt = []
+            for item in dt:
+                t, tl = cls._em_a_stock_int_time(item["t"])
+                xt.append(tl)
+                x.append(t)
+                y1.append(item["ztc"])
+                y2.append(item["dtc"])
+            cls._em_a_stock_time_axis(ax)
+            ax.plot(x, y1, "red")
+            ax.plot(x, y2, "green")
+            texts.append(ax.text(x[-1], y1[-1], y1[-1]))
+            texts.append(ax.text(x[-1], y2[-1], y2[-1]))
+            texts.append(ax.set_title(f"涨跌停对比\t{xt[-1]}"))
+
+        elif kwargs["type"] == "fbws":  # 封板未遂
+            fig = plt.figure(figsize=(11, 5.6), dpi=100)
+            ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
+            y1 = []
+            y2 = []
+            x = []
+            xt = []
+            for item in dt:
+                t, tl = cls._em_a_stock_int_time(item["t"])
+                xt.append(tl)
+                x.append(t)
+                y1.append(item["c"])  # 炸板数
+                y2.append(item["zbp"])  # 炸板率
+            cls._em_a_stock_time_axis(ax)
+            ax.plot(x, y1, "green")
+            texts.append(ax.set_ylabel("炸板数", loc="top"))
+            ax.text(x[-1], y1[-1], "炸板数{}".format(y1[-1]), color="green")
+            ax2 = ax.twinx()
+            ax2.plot(x, y2, "black")
+            texts.append(ax2.set_ylabel("炸板率", loc="top"))
+            ax2.text(x[-1], y2[-1], "炸板率{:.2f}%".format(y2[-1]), color="green")
+            texts.append(ax.set_title(f"封板未遂\t{xt[-1]}"))
+
+        elif kwargs["type"] == "gbqx":  # 股吧情绪
+            fig = plt.figure(figsize=(11, 5.6), dpi=100)
+            ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
+            x = []
+            y = []
+            for item in dt:
+                x.append(datetime.strptime(item["name"], "%H:%M"))
+                y.append(item["val"])
+            ax.plot(x, y, "gray")
+            now = datetime.now()
+            xticks = []
+            xtick_labels = []
+            if now.hour < 16:
+                xticks = list(
+                    map(
+                        lambda t: datetime.strptime(t, "%H:%M"),
+                        ["08:00", "10:00", "12:00", "14:00", "16:00"],
+                    )
+                )
+                xtick_labels = ["08:00", "10:00", "12:00", "14:00", "16:00"]
+            else:
+                xticks = list(
+                    map(
+                        lambda t: datetime.strptime(t, "%H:%M"),
+                        ["16:00", "18:00", "20:00", "22:00", "23:59"],
+                    )
+                )
+                xtick_labels = ["16:00", "18:00", "20:00", "22:00", "24:00"]
+            ax.xaxis.set_ticks(xticks)
+            ax.xaxis.set_ticklabels(xtick_labels)
+            ax.set_xlim(xticks[0], xticks[-1])
+            ax.set_ylim(-1, 1)
+            ax.fill_between([xticks[0], xticks[-1]], 0, 1, color="red", alpha=0.2)
+            ax.fill_between([xticks[0], xticks[-1]], -1, 0, color="green", alpha=0.2)
+            texts.append(ax.set_title(f"股吧情绪"))
+
+        elif kwargs["type"] == "yddb":  # 盘口异动数据对比
+            fig = plt.figure(figsize=(11, 5.6), dpi=100)
+            ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
+            up = "火箭发射 8201 快速反弹 8202 大笔买入 8193 封涨停板 4 打开跌停板 32 有大买盘 64 竞价上涨 8207 高开5日线 8209 向上缺口 8211 60日新高 8213 60日大幅上涨 8215"
+            down = "加速下跌 8204 高台跳水 8203 大笔卖出 8194 封跌停板 8 打开涨停板 16 有大卖盘 128 竞价下跌 8208 低开5日线 8210 向下缺口 8212 60日新低 8214 60日大幅下跌 8216"
+            xtick_labels = []
+            up_nums = []
+            down_nums = []
+            for (i, (a, b)) in enumerate(zip(up.split(" "), down.split(" "))):
+                if not (i % 2):
+                    xtick_labels.append(a + "\n" + b)
+                else:
+                    up_nums.append(a)
+                    down_nums.append(b)
+            x = [i for (i, _) in enumerate(up_nums)]
+            y_up = [0] * len(x)
+            y_down = [0] * len(x)
+            for item in dt:
+                t = str(item["t"])
+                if t in up_nums:
+                    y_up[up_nums.index(t)] = int(item["ct"])
+                elif t in down_nums:
+                    y_down[down_nums.index(t)] = int(item["ct"])
+            ax.set_xticks(x)
+            ax.set_xticklabels(xtick_labels)
+            ax.set_position((0.05, 0.1, 0.9, 0.8))
+            ax.set_ylim(0, np.max(np.add(y_up, y_down)) + 100)
+            bar_down = ax.bar(x, y_down, width=0.5, color="green")
+            ax.bar_label(bar_down, padding=3, color="white")
+            bar_up = ax.bar(x, y_up, width=0.5, color="red", bottom=y_down)
+            ax.bar_label(bar_up, labels=y_up, padding=16, color="red")
+            texts.append(ax.set_title("盘口异动对比（情绪指标）"))
+
+        elif kwargs["type"] == "fst":  # 分时图
+            x: list[datetime] = []
+            y_k = []
+            y_avg = []
+            y_pct = []
+            pre_close = float(meta["close"])
+            for item in dt:
+                [time, open, close, high, low, vol, amount, avg] = item.split(",")
+                x.append(datetime.strptime(time, "%Y-%m-%d %H:%M"))
+                y_k.append(
+                    [
+                        float(open),
+                        float(high),
+                        float(low),
+                        float(close),
+                        int(vol),
+                    ]
+                )
+                y_avg.append(float(avg))
+                y_pct.append(round((float(close) - pre_close) / pre_close, 4))
+            close = y_k[-1][3]
+            color = "red" if close > 0 else "green" if close < 0 else "white"
+            xlim = (
+                x[0].replace(hour=9, minute=30, second=0),
+                x[0].replace(hour=15, minute=0, second=0),
+            )
+            xtick_labels = (
+                x[0].replace(hour=9, minute=30, second=0),
+                x[0].replace(hour=10, minute=0, second=0),
+                x[0].replace(hour=10, minute=30, second=0),
+                x[0].replace(hour=11, minute=0, second=0),
+                x[0].replace(hour=11, minute=30, second=0),
+                x[0].replace(hour=13, minute=0, second=0),
+                x[0].replace(hour=13, minute=30, second=0),
+                x[0].replace(hour=14, minute=0, second=0),
+                x[0].replace(hour=14, minute=30, second=0),
+                x[0].replace(hour=15, minute=0, second=0),
+            )
+            xticks = (0, 30, 60, 90, 120, 120, 150, 180, 210, 240)
+            df = pd.DataFrame(
+                y_k,
+                index=x,
+                columns=["open", "high", "low", "close", "volume"],
+            )
+            average = mpf.make_addplot(
+                pd.DataFrame(
+                    y_avg,
+                    index=x,
+                    columns=["average"],
+                ),
+                color="#ffaa00",
+            )
+            fig, (ax, *_) = mpf.plot(
+                data=df,
+                type="line",
+                returnfig=True,
+                volume=True,
+                figsize=(11, 5.6),
+                addplot=average,
+                xlim=xlim,
+                tight_layout=True,
+                style="checkers",
+            )
+            ax.xaxis.set_ticks(
+                ticks=xticks,
+                labels=list(map(lambda e: e.strftime("%H:%M"), xtick_labels)),
+                minor=True,
+            )
+            ax.text(
+                x=0,
+                y=ax.get_ylim()[1],
+                s=y_k[-1][3],
+                verticalalignment="top",
+                color=color,
+            )
+            ax.text(
+                x=ax.get_xlim()[1],
+                y=ax.get_ylim()[1],
+                s="{:.2%}".format(y_pct[-1]),
+                verticalalignment="top",
+                horizontalalignment="right",
+                color=color,
+            )
+            ax.text(
+                x=df.index.get_loc(x[-1]),
+                y=y_k[-1][3],
+                s="{:.2%}".format(y_pct[-1]),
+                color=color,
+            )
+            transparent = False
+            # texts.append(ax.set_title(f"{meta.get('name', '')}分时图"))
+
+        else:
+            fig = None
+            ax = None
+
+        if fig:
+            global STORAGE_FILE
+            global SHOULD_STORE
+            if STORAGE_FILE and SHOULD_STORE:
+                fig.savefig(
+                    STORAGE_FILE
+                    + "."
+                    + kwargs["type"]
+                    + str(random.randint(101, 999))
+                    + ".png"
+                )
+
+            global IMGCAT
+            if IMGCAT:
+                if ax:
+                    transparent and ax.tick_params(labelcolor="white")
+                    transparent and ax.spines["left"].set_color("gray")
+                    transparent and ax.spines["bottom"].set_color("gray")
+                    transparent and ax.spines["top"].set_color("none")
+                    transparent and ax.spines["right"].set_color("none")
+                if ax2:
+                    transparent and ax2.tick_params(labelcolor="white")
+                    transparent and ax2.spines["right"].set_color("gray")
+                    transparent and ax2.spines["bottom"].set_color("gray")
+                    transparent and ax2.spines["top"].set_color("none")
+                    transparent and ax2.spines["left"].set_color("none")
+                if barLabels:
+                    for label in barLabels:
+                        transparent and label.set_color("white")
+                for text in texts:
+                    transparent and text.set_color("white")
+                if not buf:
+                    buf = io.BytesIO()
+                    savekargs = {}
+                    if transparent:
+                        savekargs["edgecolor"] = "white"
+                    fig.savefig(buf, transparent=transparent)
+                    buf.seek(0)
+                imgcat(io.BufferedReader(buf))
+            else:
+                plt.show()
+
 
 def trim_ansi(a):
     ESC = r"\x1b"
@@ -756,24 +1304,30 @@ class Parser:
         return tokenize(fmt).data
 
     @classmethod
-    def retrieve(cls, data, node):
-        return retrieve(data, node["keys"])
+    def retrieve(cls, data, node, default=None, iter=False):
+        key = "iterKeys" if iter else "keys"
+        if "key_or" in node and len(node["key_or"]):
+            for k in node["key_or"]:
+                r = retrieve(data, k[key], default)
+                if r is not None:
+                    return r
+        else:
+            return retrieve(data, node[key], default)
 
     @classmethod
     def getValue(cls, data, node):
         if "iterKeys" in node:
             if data:
-                items = retrieve(data, node["iterKeys"], [])
+                items = cls.retrieve(data, node, default=[], iter=True)
                 items = items.values() if isinstance(items, dict) else items
-                return [retrieve(item, node["keys"]) for item in items]
+                return [cls.retrieve(item, node) for item in items]
             else:
                 return []
 
         data = cls.retrieve(data, node)
 
-        results = []
-
         if "children" in node:
+            results = []
             if data:
                 if isinstance(data, list):
                     results = []
@@ -801,6 +1355,9 @@ class Parser:
 
             return results
 
+        else:
+            return data
+
     @classmethod
     def flatTokens(cls, tokens):
         flatted = {}
@@ -811,11 +1368,13 @@ class Parser:
         return flatted
 
     @classmethod
-    def applyPipes(cls, value, pipes, data):
+    def applyPipes(cls, value, pipes: list, data: dict, signed=None):
+        realPipes = pipes.copy()
         global NO_EMPTY_DASH
-        if not NO_EMPTY_DASH and 'dashempty' not in pipes:
-            pipes.append('dashempty')
-        return Pipe.apply(value, pipes, data, interpolate="$")
+        if not NO_EMPTY_DASH:
+            realPipes.append("dashempty")
+
+        return Pipe.apply(value, realPipes, data, interpolate="$", signed=signed)
 
     @classmethod
     def shouldHidden(cls, token, **kwargs):
@@ -825,7 +1384,7 @@ class Parser:
         global SIMPLE
         return "HIDE" in pipes or (
             SIMPLE
-            and ('index' in kwargs and kwargs['index'] != 0)
+            and ("index" in kwargs and kwargs["index"] != 0)
             and not (LINK and label in ["链接"])
             and "SIMPLE" not in pipes
         )
@@ -895,7 +1454,10 @@ class Parser:
         children = []
 
         for index, token in enumerate(tokens["children"]):
-            if not cls.shouldHidden(token, index=index):
+            if (
+                not cls.shouldHidden(token, index=index)
+                and not "HIDE_IN_TABLE" in token["pipes"]
+            ):
                 children.append(token)
 
         scopedStdout = lambda *args: sys.stdout.write(
@@ -921,14 +1483,15 @@ class Parser:
 
         maxWidths = widths[0].copy()
 
+        global OFFSET
         for i, record in enumerate(records):
-            bodies.append([Pipe.apply(str(i + 1), ["dim", "italic"])])
+            bodies.append([Pipe.apply(str(i + 1 + OFFSET), ["dim", "italic"])])
             widths.append([len(str(i + 1))])
             for j, child in enumerate(children):
                 "index" in child["pipes"] and child["pipes"].remove("index")
                 text = str(
                     cls.applyPipes(
-                        retrieve(record, [child["key"]], ""), child["pipes"], record
+                        cls.retrieve(record["__"], child, ""), child["pipes"], record
                     )
                 )
                 bodies[-1].append(text)
@@ -948,61 +1511,80 @@ class Parser:
         # print(json.dumps(tokens, indent=2))
         records = cls.getValue(data, tokens)
         # print(json.dumps(records, indent=2))
-        flatted = cls.flatTokens(tokens)
-
-        if file:
+        # flatted = cls.flatTokens(tokens)
+        global SHOULD_STORE
+        if file and SHOULD_STORE:
+            global STORAGE_FILE
+            STORAGE_FILE = file
             with open(file, "w") as f:
                 f.write(json.dumps(records))
 
         if not records:
             return print("没有数据")
 
-        records = Pipe.apply(records, tokens["pipes"])
+        records = Pipe.apply(records, pipes=tokens["pipes"], data=data)
+
+        if not records:
+            return
 
         global TABLE, NO_TABLE, TABLE_NO_HEADER
 
         if (TABLE or "TABLE" in tokens["pipes"]) and not NO_TABLE:
             cls.printTable(records, tokens, header=not TABLE_NO_HEADER)
         else:
+            # for record in records:
+            #     cls.printRecord(record, flatted)
+            #     sys.stdout.write("-" * 50 + "\n")
             for record in records:
-                cls.printRecord(record, flatted)
+                for token in tokens["children"]:
+                    Parser.printToken(record, token)
                 sys.stdout.write("-" * 50 + "\n")
 
     @classmethod
     def printToken(cls, data, token: dict, indent=0, INDENT=2):
-        key = token.get('key')
-        pipes = token.get('pipes')
-        label = token.get('label')
-        children = token.get('children')
+        key = token.get("key")
+        pipes = token.get("pipes")
+        label = token.get("label")
+        children = token.get("children")
         rawValue = data.get(key) if data else None
         useDowngrade = "DOWNGRADE" in pipes
         useTable = "TABLE" in pipes
-        value = cls.applyPipes(rawValue, pipes, data)
-        scopedStdout = lambda *args: sys.stdout.write(" " * indent + "".join(list(*args)))
-        scopedStdout("{}: ".format(Pipe.apply(label if label is not None else key, ["yellow", "italic"])))
+        value = cls.applyPipes(rawValue, pipes, data, signed=False)
+        scopedStdout = lambda *args: sys.stdout.write(
+            " " * indent + "".join(list(*args))
+        )
+        scopedStdout(
+            "{}: ".format(
+                Pipe.apply(label if label is not None else key, ["yellow", "italic"])
+            )
+        )
         if cls.shouldHidden(token):
             return
         if useDowngrade:
             indent -= max(indent, INDENT)
         if children:
             if isinstance(value, list):
-                scopedStdout('\n')
+                scopedStdout("\n")
                 if useTable:
                     cls.printTable(value, token, indent + INDENT)
                 else:
                     for val in value:
                         for child in children:
-                            cls.printToken(val, child, indent=indent + INDENT, INDENT=INDENT)
-                        scopedStdout(' ' * INDENT + '-' * 50 + '\n')
+                            cls.printToken(
+                                val, child, indent=indent + INDENT, INDENT=INDENT
+                            )
+                        scopedStdout(" " * INDENT + "-" * 50 + "\n")
             else:
                 for child in children:
                     cls.printToken(value, child, indent=indent + INDENT, INDENT=INDENT)
         elif isinstance(value, list):
             for item in value:
                 scopedStdout("\n")
-                scopedStdout("  {}\n".format(item))
+                scopedStdout("{}\n".format(item))
         else:
-            scopedStdout("  {}\n".format(value))
+            scopedStdout("{}\n".format(value))
+
+        scopedStdout(cls.applyPipes("", pipes, data, signed=True))
 
 
 if __name__ == "__main__":
