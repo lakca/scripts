@@ -1,0 +1,13 @@
+# !/usr/bin/env bash
+
+file=$1
+
+if [[ -f "$file.js" ]]; then
+  browserify -e $file.js -o dist/$file.js
+elif [[ -f "$file/index.js" ]]; then
+  browserify -e $file/index.js -o dist/$file.js
+fi
+
+cat tampermonkey.comment.txt >> dist/$file.js
+
+[[ $2 = 'copy' ]] && cat dist/$file.js | pbcopy

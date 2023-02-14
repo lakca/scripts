@@ -1,0 +1,38 @@
+* Uses proxy env variable http_proxy == 'http://127.0.0.1:7890'
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0*   Trying 127.0.0.1:7890...
+* Connected to 127.0.0.1 (127.0.0.1) port 7890 (#0)
+> GET http://push2ex.eastmoney.com/getAllStockChanges?type=8201,8202,8193,4,32,64,8207,8209,8211,8213,8215,8204,8203,8194,8,16,128,8208,8210,8212,8214,8216&cb=jQuery35109544115898056558_1670912714147&ut=7eea3edcaed734bea9cbfc24409ed989&pageindex=0&pagesize=30&dpt=wzchanges&_=1670912714165 HTTP/1.1
+> Host: push2ex.eastmoney.com
+> Accept: */*
+> Accept-Encoding: deflate, gzip
+> Proxy-Connection: Keep-Alive
+> cache-control: no-cache
+> pragma: no-cache
+> sec-ch-ua: "Google Chrome";v="107", "Chromium";v="107", "Not=A?Brand";v="24"
+> sec-ch-ua-mobile: ?0
+> sec-ch-ua-platform: "macOS"
+> sec-fetch-dest: empty
+> sec-fetch-mode: cors
+> sec-fetch-site: same-site
+> user-agent:Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36
+> 
+* Mark bundle as not supporting multiuse
+< HTTP/1.1 200 OK
+< Content-Length: 1027
+  0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0< Access-Control-Allow-Methods: GET, POST, OPTIONS
+< Access-Control-Allow-Origin: *
+< Cache-Control: no-cache
+< Connection: keep-alive
+< Content-Encoding: gzip
+< Content-Type: application/javascript; charset=UTF-8
+< Date: Tue, 13 Dec 2022 06:25:14 GMT
+< Expires: 0
+< Keep-Alive: timeout=4
+< Proxy-Connection: keep-alive
+< Server: Tengine
+< 
+{ [1027 bytes data]
+100  1027  100  1027    0     0   3702      0 --:--:-- --:--:-- --:--:--  3832
+* Connection #0 to host 127.0.0.1 left intact

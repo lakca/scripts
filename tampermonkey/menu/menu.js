@@ -225,9 +225,10 @@ class Menu extends context.Base {
       .id(this.uid)
       .class({ fold: Store.Toggle('menu_fold').get() })
       .nativeOn('click', this.bound('onclick'))
-        .down('li').class('pin').text('🧲')
-        .next('li')
+        .down('li').class('pin')
           .down('span')
+            .text('🧲')
+          .next('span')
             .data('action', 'TOGGLE_MENU')
             .style('font-weight: bold; margin-bottom: 8px')
             .text('收起/展开')
@@ -255,7 +256,6 @@ class Menu extends context.Base {
         .up()
       .start
     this.dNode= Object.assign(DNode.of(gMenu.el), { g: gMenu })
-    this.dNode.draggable('menu')
     setTimeout(() => this.dNode.draggable('menu', Store.Toggle('FIXED_RIGHT').get() ? 'right' : 'left'))
     this.dNode.mount(document.body)
     return this.dNode
