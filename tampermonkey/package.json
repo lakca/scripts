@@ -6,10 +6,7 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "help": "echo '\\033[0;31m build, build-copy, build2, build2-copy\\033[0m'",
-    "build": "browserify -e userscript.js -o dist/userscript.js && cat tampermonkey-comment.js >> dist/userscript.js",
-    "build-copy": "npm run build && cat dist/userscript.js | pbcopy",
-    "build-mini": "browserify -e userscript.js -p tinyify -o dist/userscript.min.js && cat tampermonkey-comment.js >> dist/userscript.min.js",
-    "build-mini-copy": "npm run build-mini && cat dist/userscript.min.js | pbcopy"
+    "build": "./build"
   },
   "author": "lakca",
   "license": "ISC",
