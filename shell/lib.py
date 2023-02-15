@@ -17,7 +17,8 @@ from urllib.parse import quote
 NUMBER_REG = r"-?([0-9]+\.?[0-9]*|\.[0-9]*)"
 
 DEBUG = os.environ.get("DEBUG")
-DEBUG = "({})".format(DEBUG.replace(",", "|").replace("*", ".*")) if DEBUG else DEBUG
+DEBUG = "({})".format(DEBUG.replace(
+    ",", "|").replace("*", ".*")) if DEBUG else DEBUG
 SHOULD_STORE = bool(os.environ.get("SHOULD_STORE"))
 TABLE = bool(os.environ.get("TABLE"))
 NO_TABLE = bool(os.environ.get("NO_TABLE"))
@@ -546,7 +547,8 @@ class Pipe:
                 token = tokenize(key[index:]).data
                 key = key[0:index]
             if key.startswith("."):  # 所在对象的后代属性
-                value = str(retrieve(data.get("__", ""), key.split(".")[1:], ""))
+                value = str(retrieve(data.get("__", ""),
+                            key.split(".")[1:], ""))
             elif key.startswith("/"):  # 绝对路径
                 key_token = tokenize(key[1:]).data
                 value = str(Parser.retrieve(data, key_token, ""))
@@ -569,9 +571,11 @@ class Pipe:
             pass
         for case in (
             # custom
-            lambda: datetime.strptime(sv, kwargs["from"]) if kwargs["from"] else 0 / 0,
+            lambda: datetime.strptime(
+                sv, kwargs["from"]) if kwargs["from"] else 0 / 0,
             # timestamp 1667632623
-            lambda: datetime.fromtimestamp(nv / 1000 if nv > 9999999999 else nv),
+            lambda: datetime.fromtimestamp(
+                nv / 1000 if nv > 9999999999 else nv),
             # UTC "Tue, 18 Oct 2022 23:00:23 +0800"
             lambda: datetime.strptime(sv, "%a, %d %b %Y %H:%M:%S %z"),
             # Mon Jan 31 20:50:10 +0800 2022
@@ -595,7 +599,8 @@ class Pipe:
         }
         return v.strftime(
             fmts.get(
-                kwargs.get("format") or (len(args) and args[0]), "%Y-%m-%d %H:%M:%S"
+                kwargs.get("format") or (
+                    len(args) and args[0]), "%Y-%m-%d %H:%M:%S"
             ),
         )
 
@@ -818,7 +823,7 @@ class Pipe:
             return v
         useKwargs = {}
         if kwargs["key"]:
-            getVal = lambda e: e[kwargs["key"]]
+            def getVal(e): return e[kwargs["key"]]
             if kwargs["sorts"]:
                 getIndex = (
                     lambda k: kwargs["sorts"].index(k)
@@ -884,11 +889,13 @@ class Pipe:
         ansi = []
         # print(text)
         # print(repr(text))
+
         def replacer(match):
             nonlocal start
             nonlocal ansi
             end = match.start()
-            ansi = cls._getLeftStyleANSI("".join(ansi) + match.string[start:end])
+            ansi = cls._getLeftStyleANSI(
+                "".join(ansi) + match.string[start:end])
             start = end
             return "\033[7m" + match.group(3) + "\033[0m" + "".join(ansi)
 
@@ -963,7 +970,7 @@ class Pipe:
     def _em_a_stock_time_axis(cls, ax, *args, **kwargs):
         ax.set_xlim((0, 240))
         ax.xaxis.set_ticks((0, 30, 60, 90, 120, 150, 180, 210, 240))
-        ax.xaxis.set_ticklabels(
+        kwargs.get('no_labels', False) and ax.set_xticklabels([]) or ax.xaxis.set_ticklabels(
             (
                 "09:30",
                 "10:00",
@@ -978,6 +985,23 @@ class Pipe:
         )
 
     @classmethod
+    def time_diff(cls, t, time_points):
+        delta = None
+        if not time_points:
+            time_points = [
+                t.replace(hour=9, minute=30, second=0),
+                t.replace(hour=11, minute=30, second=0),
+                t.replace(hour=13, minute=0, second=0),
+                t.replace(hour=15, minute=0, second=0),
+            ]
+        if t >= time_points[0] and t <= time_points[1]:
+            delta = t - time_points[0]
+        if t >= time_points[2] and t <= time_points[3]:
+            delta = t - time_points[2] + \
+                time_points[1] - time_points[0]
+        return (divmod(delta.seconds, 60)[0], time_points) if delta is not None else None
+
+    @classmethod
     def plot(cls, dt, *args, **kwargs):
         interpolate = kwargs.get("__interpolate", noop)
         meta = {}
@@ -986,7 +1010,7 @@ class Pipe:
                 meta[k[2:]] = interpolate(kwargs.get(k))
         debug(meta)
         global ENABLED_PLOT
-        transparent = True
+        transparent = not True
         fig = None
         ax: plt.Axes = None
         ax2: plt.Axes = None
@@ -996,6 +1020,9 @@ class Pipe:
         if not ENABLED_PLOT:
             sys.stderr.write("matplotlib and numpy are not installed.")
             return dt
+
+        def indicate(a, b):
+            return "red" if a > b else "green" if a < b else "white"
 
         if kwargs["type"] == "zdfb":  # 涨跌分布
             fig = plt.figure(figsize=(11, 5.6), dpi=100)
@@ -1025,7 +1052,8 @@ class Pipe:
                 y,
                 tick_label=xt,
                 color=list(
-                    map(lambda e: "red" if e > 0 else "gray" if e == 0 else "green", x)
+                    map(lambda e: "red" if e >
+                        0 else "gray" if e == 0 else "green", x)
                 ),
             )
             barLabels = ax.bar_label(bar, padding=3)
@@ -1106,8 +1134,10 @@ class Pipe:
             ax.xaxis.set_ticklabels(xtick_labels)
             ax.set_xlim(xticks[0], xticks[-1])
             ax.set_ylim(-1, 1)
-            ax.fill_between([xticks[0], xticks[-1]], 0, 1, color="red", alpha=0.2)
-            ax.fill_between([xticks[0], xticks[-1]], -1, 0, color="green", alpha=0.2)
+            ax.fill_between([xticks[0], xticks[-1]], 0,
+                            1, color="red", alpha=0.2)
+            ax.fill_between([xticks[0], xticks[-1]], -1,
+                            0, color="green", alpha=0.2)
             texts.append(ax.set_title(f"股吧情绪"))
 
         elif kwargs["type"] == "yddb":  # 盘口异动数据对比
@@ -1144,96 +1174,58 @@ class Pipe:
             texts.append(ax.set_title("盘口异动对比（情绪指标）"))
 
         elif kwargs["type"] == "fst":  # 分时图
-            x: list[datetime] = []
-            y_k = []
-            y_avg = []
-            y_pct = []
+            fig = plt.figure(figsize=(11, 5.6), dpi=100)
+            ax: list[plt.Axes] = (fig.add_axes((0.06, 0.35, 0.88, 0.6)),
+                                  fig.add_axes((0.06, 0.05, 0.88, 0.25)))
+            x_data_n: list[int] = []
+            y_close = []
+            y_volume = []
+            y_average = []
+            y_percent = []
             pre_close = float(meta["close"])
+            time_points = None
+
             for item in dt:
-                [time, open, close, high, low, vol, amount, avg] = item.split(",")
-                x.append(datetime.strptime(time, "%Y-%m-%d %H:%M"))
-                y_k.append(
-                    [
-                        float(open),
-                        float(high),
-                        float(low),
-                        float(close),
-                        int(vol),
-                    ]
-                )
-                y_avg.append(float(avg))
-                y_pct.append(round((float(close) - pre_close) / pre_close, 4))
-            close = y_k[-1][3]
-            color = "red" if close > 0 else "green" if close < 0 else "white"
-            xlim = (
-                x[0].replace(hour=9, minute=30, second=0),
-                x[0].replace(hour=15, minute=0, second=0),
-            )
-            xtick_labels = (
-                x[0].replace(hour=9, minute=30, second=0),
-                x[0].replace(hour=10, minute=0, second=0),
-                x[0].replace(hour=10, minute=30, second=0),
-                x[0].replace(hour=11, minute=0, second=0),
-                x[0].replace(hour=11, minute=30, second=0),
-                x[0].replace(hour=13, minute=0, second=0),
-                x[0].replace(hour=13, minute=30, second=0),
-                x[0].replace(hour=14, minute=0, second=0),
-                x[0].replace(hour=14, minute=30, second=0),
-                x[0].replace(hour=15, minute=0, second=0),
-            )
-            xticks = (0, 30, 60, 90, 120, 120, 150, 180, 210, 240)
-            df = pd.DataFrame(
-                y_k,
-                index=x,
-                columns=["open", "high", "low", "close", "volume"],
-            )
-            average = mpf.make_addplot(
-                pd.DataFrame(
-                    y_avg,
-                    index=x,
-                    columns=["average"],
-                ),
-                color="#ffaa00",
-            )
-            fig, (ax, *_) = mpf.plot(
-                data=df,
-                type="line",
-                returnfig=True,
-                volume=True,
-                figsize=(11, 5.6),
-                addplot=average,
-                xlim=xlim,
-                tight_layout=True,
-                style="checkers",
-            )
-            ax.xaxis.set_ticks(
-                ticks=xticks,
-                labels=list(map(lambda e: e.strftime("%H:%M"), xtick_labels)),
-                minor=True,
-            )
-            ax.text(
-                x=0,
-                y=ax.get_ylim()[1],
-                s=y_k[-1][3],
-                verticalalignment="top",
-                color=color,
-            )
-            ax.text(
-                x=ax.get_xlim()[1],
-                y=ax.get_ylim()[1],
-                s="{:.2%}".format(y_pct[-1]),
-                verticalalignment="top",
-                horizontalalignment="right",
-                color=color,
-            )
-            ax.text(
-                x=df.index.get_loc(x[-1]),
-                y=y_k[-1][3],
-                s="{:.2%}".format(y_pct[-1]),
-                color=color,
-            )
-            transparent = False
-            # texts.append(ax.set_title(f"{meta.get('name', '')}分时图"))
+                [time, open, close, high, low, vol,
+                    amount, avg] = item.split(",")
+                diff, time_points = cls.time_diff(
+                    datetime.strptime(time, "%Y-%m-%d %H:%M"), time_points)
+                x_data_n.append(diff)
+                y_close.append(float(close))
+                y_volume.append(int(vol))
+                y_average.append(float(avg))
+                y_percent.append(
+                    round((float(close) - pre_close) / pre_close, 4))
+
+            cls._em_a_stock_time_axis(ax[0])
+            ax[0].plot(x_data_n, y_close, color="red")
+            ax[0].plot(x_data_n, y_average, color="orange")
+
+            texts.append(ax[0].text(0, ax[0].get_ylim()[
+                         1], f"{meta.get('code', '')}", horizontalalignment="left", verticalalignment="bottom"))
+
+            ax[0].text(ax[0].get_xlim()[1], ax[0].get_ylim()[1], cls.number(y_percent[-1], '+%'), color=indicate(
+                y_percent[-1], 0), horizontalalignment="right", verticalalignment="bottom", fontsize="x-large", fontweight="bold")
+
+            ax[0].annotate(y_close[-1], (x_data_n[-1], y_close[-1]),
+                           color=indicate(y_close[-1], y_close[-2]), fontsize="large")
+
+            cls._em_a_stock_time_axis(ax[1], no_labels=True)
+            ax[1].bar(x_data_n, y_volume, color=["red" if y_close[i] > y_close[i-1]
+                      else "lightgray" if y_close[i] == y_close[i-1] else "green" for (i, e) in enumerate(y_volume)])
+
+            ax2 = ax[0].twinx()
+            ax2.set_ylim(ax[0].get_ylim())
+            ax2.set_yticks(ax[0].get_yticks())
+
+            for tick in ax[0].yaxis.get_major_ticks():
+                tick.label1.set_color(indicate(tick, pre_close))
+
+            ax2.yaxis.set_major_formatter(
+                lambda e, pos: cls.discount(e, pre_close))
+
+            texts.append(ax[0].set_title(
+                f"{meta.get('name', '')}-分时图"))
 
         else:
             fig = None
@@ -1254,17 +1246,21 @@ class Pipe:
             global IMGCAT
             if IMGCAT:
                 if ax:
-                    transparent and ax.tick_params(labelcolor="white")
-                    transparent and ax.spines["left"].set_color("gray")
-                    transparent and ax.spines["bottom"].set_color("gray")
-                    transparent and ax.spines["top"].set_color("none")
-                    transparent and ax.spines["right"].set_color("none")
+                    ax = ax if isinstance(ax, list) else [ax]
+                    for a in ax:
+                        transparent and a.tick_params(labelcolor="white")
+                        transparent and a.spines["left"].set_color("gray")
+                        transparent and a.spines["bottom"].set_color("gray")
+                        transparent and a.spines["top"].set_color("none")
+                        transparent and a.spines["right"].set_color("none")
                 if ax2:
-                    transparent and ax2.tick_params(labelcolor="white")
-                    transparent and ax2.spines["right"].set_color("gray")
-                    transparent and ax2.spines["bottom"].set_color("gray")
-                    transparent and ax2.spines["top"].set_color("none")
-                    transparent and ax2.spines["left"].set_color("none")
+                    ax2 = ax2 if isinstance(ax2, list) else [ax2]
+                    for a in ax:
+                        transparent and a.tick_params(labelcolor="white")
+                        transparent and a.spines["right"].set_color("gray")
+                        transparent and a.spines["bottom"].set_color("gray")
+                        transparent and a.spines["top"].set_color("none")
+                        transparent and a.spines["left"].set_color("none")
                 if barLabels:
                     for label in barLabels:
                         transparent and label.set_color("white")
@@ -1290,7 +1286,8 @@ def trim_ansi(a):
     ST = ESC + r"\\"
     BEL = r"\x07"
     pattern = (
-        "(" + CSI + ".*?" + CMD + "|" + OSC + ".*?" + "(" + ST + "|" + BEL + ")" + ")"
+        "(" + CSI + ".*?" + CMD + "|" + OSC +
+        ".*?" + "(" + ST + "|" + BEL + ")" + ")"
     )
     return re.sub(pattern, "", a)
 
@@ -1299,11 +1296,11 @@ xxx = False
 
 
 class Parser:
-    @classmethod
+    @ classmethod
     def getTokens(cls, fmt):
         return tokenize(fmt).data
 
-    @classmethod
+    @ classmethod
     def retrieve(cls, data, node, default=None, iter=False):
         key = "iterKeys" if iter else "keys"
         if "key_or" in node and len(node["key_or"]):
@@ -1314,7 +1311,7 @@ class Parser:
         else:
             return retrieve(data, node[key], default)
 
-    @classmethod
+    @ classmethod
     def getValue(cls, data, node):
         if "iterKeys" in node:
             if data:
@@ -1358,7 +1355,7 @@ class Parser:
         else:
             return data
 
-    @classmethod
+    @ classmethod
     def flatTokens(cls, tokens):
         flatted = {}
         flatted[tokens["key"]] = tokens
@@ -1367,7 +1364,7 @@ class Parser:
                 flatted.update(cls.flatTokens(child))
         return flatted
 
-    @classmethod
+    @ classmethod
     def applyPipes(cls, value, pipes: list, data: dict, signed=None):
         realPipes = pipes.copy()
         global NO_EMPTY_DASH
@@ -1376,7 +1373,7 @@ class Parser:
 
         return Pipe.apply(value, realPipes, data, interpolate="$", signed=signed)
 
-    @classmethod
+    @ classmethod
     def shouldHidden(cls, token, **kwargs):
         key = token.get("key", "")
         pipes = token.get("pipes", [])
@@ -1389,7 +1386,7 @@ class Parser:
             and "SIMPLE" not in pipes
         )
 
-    @classmethod
+    @ classmethod
     def printRecord(cls, record, meta, indent=0):
         INDENT = 2
         _indent = indent
@@ -1416,7 +1413,8 @@ class Parser:
                 indent -= INDENT
 
             if labeled:
-                scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
+                scopedStdout("{}: ".format(
+                    Pipe.apply(label, ["yellow", "italic"])))
 
             if isinstance(val, dict):
                 cls.printRecord(val, meta, indent + INDENT)
@@ -1448,7 +1446,7 @@ class Parser:
                     "{}\n".format(cls.applyPipes(val or "", pipes, record))
                 )
 
-    @classmethod
+    @ classmethod
     def printTable(cls, records, tokens, indent=0, header=True):
 
         children = []
@@ -1472,14 +1470,16 @@ class Parser:
                     map(
                         lambda child: str(
                             Pipe.apply(
-                                child.get("label", child["key"]), ["yellow", "italic"]
+                                child.get("label", child["key"]), [
+                                    "yellow", "italic"]
                             )
                         ),
                         children,
                     )
                 )
             ]
-            widths = [list(map(lambda e: Unicode.simpleWidth(trim_ansi(e)), bodies[0]))]
+            widths = [
+                list(map(lambda e: Unicode.simpleWidth(trim_ansi(e)), bodies[0]))]
 
         maxWidths = widths[0].copy()
 
@@ -1491,7 +1491,8 @@ class Parser:
                 "index" in child["pipes"] and child["pipes"].remove("index")
                 text = str(
                     cls.applyPipes(
-                        cls.retrieve(record["__"], child, ""), child["pipes"], record
+                        cls.retrieve(record["__"], child,
+                                     ""), child["pipes"], record
                     )
                 )
                 bodies[-1].append(text)
@@ -1502,7 +1503,7 @@ class Parser:
                 scopedStdout(text + " " * (maxWidths[j] - widths[i][j] + 4))
             sys.stdout.write("\n")
 
-    @classmethod
+    @ classmethod
     def output(cls, fmt, data, file=None):
         # print(data)
         if fmt.startswith(":") and not isinstance(data, list):
@@ -1540,7 +1541,7 @@ class Parser:
                     Parser.printToken(record, token)
                 sys.stdout.write("-" * 50 + "\n")
 
-    @classmethod
+    @ classmethod
     def printToken(cls, data, token: dict, indent=0, INDENT=2):
         key = token.get("key")
         pipes = token.get("pipes")
@@ -1555,7 +1556,8 @@ class Parser:
         )
         scopedStdout(
             "{}: ".format(
-                Pipe.apply(label if label is not None else key, ["yellow", "italic"])
+                Pipe.apply(label if label is not None else key,
+                           ["yellow", "italic"])
             )
         )
         if cls.shouldHidden(token):
@@ -1576,7 +1578,8 @@ class Parser:
                         scopedStdout(" " * INDENT + "-" * 50 + "\n")
             else:
                 for child in children:
-                    cls.printToken(value, child, indent=indent + INDENT, INDENT=INDENT)
+                    cls.printToken(value, child, indent=indent +
+                                   INDENT, INDENT=INDENT)
         elif isinstance(value, list):
             for item in value:
                 scopedStdout("\n")
