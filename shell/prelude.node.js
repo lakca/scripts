@@ -19,6 +19,12 @@ const FILTERS = {
   blue(s) {
     return '\033[33m' + s + '\033[0m'
   },
+  dim(s) {
+    return '\033[2m' + s + '\033[0m'
+  },
+  bold(s) {
+    return '\033[1m' + s + '\033[0m'
+  },
   align(rows, colKey) {
     const colMaxLengthList = []
     for (const row of rows) {

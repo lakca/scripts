@@ -4,8 +4,10 @@ source `dirname $0`/lib.sh
 
 function indicate() {
   local v=7
-  [[ $2 > $3 ]] && v=1
-  [[ $2 < $3 ]] && v=2
+  if [[ $2 && $3 ]]; then
+    [[ $(bc <<< "$2 > $3") -eq 1 ]] && v=1
+    [[ $(bc <<< "$2 < $3") -eq 1 ]] && v=2
+  fi
   echo -e "\033[3${v}m$1\033[0m"
 }
 
@@ -50,6 +52,10 @@ function quote() {
         c)
           codes+=("$OPTARG")
           [[ $index ]] && index=$((index + 1)) || index=0
+          alertLowPrices[$index]='-'
+          alertHighPrices[$index]='-'
+          alertLowPercents[$index]='-'
+          alertHighPercents[$index]='-'
           ;;
         v) alertLowPrices[$index]="$OPTARG" ;;
         V) alertHighPrices[$index]="$OPTARG" ;;
@@ -78,8 +84,9 @@ function quote() {
 
   if [[ ${#list[@]} -gt 0 ]]; then
     local result=''
+    local title=''
     [[ ${#prices[@]} -gt 0 ]] && result=$result"\033[$((1 + ${#prices[@]}))A\033[2K"
-    result=$result'\033[2;37m名称 最低 幅度 最高 价格 成交额 时间\033[0m\n'
+    result=$result'\033[2;37m名称 幅度 价格 成交额 时间 最低 最高\033[0m\n'
     for i in ${!list[@]}; do
       local fields=($(sed "s/,/ /g" <<< "${list[@]:$i:1}"))
       local name=${fields[@]:0:1}
@@ -94,7 +101,7 @@ function quote() {
       local percentText=$(printf "%+.2f" $percent)%
       local highPercentText=$(printf "%+.2f" $(bc <<< "scale=2;100*($high-$close)/$close"))%
       local lowPercentText=$(printf "%+.2f" $(bc <<< "scale=2;100*($low-$close)/$close"))%
-      local result=$result"$(indicate $name $open $close) \033[2m$(indicate $lowPercentText $low $close) $(indicate $percentText $price $close) \033[2m$(indicate $highPercentText $high $close) $(indicate $price $price ${prices[@]:$i:1}) $(prettyAmount $amount) \033[2m$time\033[0m\n"
+      local result=$result"$(indicate $name $price ${prices[@]:$i:1}) $(indicate $percentText $price $close) $(indicate $price $price ${prices[@]:$i:1}) $(prettyAmount $amount) \033[2m$time \033[2m$(indicate $lowPercentText $low $close) \033[2m$(indicate $highPercentText $high $close)\n"
       [[ $i == 0 ]] && echo -en "\033];$percentText\007"
 
       local alertHighPrice=${alertHighPrices[@]:$i:1}
@@ -103,22 +110,23 @@ function quote() {
       local alertLowPercent=${alertLowPercents[@]:$i:1}
       local script=''
       [[ $price = ${prices[@]:$i:1} ]] && continue
-      if [[ $alertHighPrice && 1 -eq $(bc <<< "$price >= $alertHighPrice") ]]; then
+      if [[ $alertHighPrice != '-' && 1 -eq $(bc <<< "$price >= $alertHighPrice") ]]; then
         script="display notification (\"涨幅 $percentText\" as Unicode text) with title (\"🔥 $name $price\" as Unicode text) subtitle (\"-\" as Unicode text)"
       fi
-      if [[ $alertLowPrice && 1 -eq $(bc <<< "$price <= $alertLowPrice") ]]; then
+      if [[ $alertLowPrice != '-' && 1 -eq $(bc <<< "$price <= $alertLowPrice") ]]; then
         script="display notification (\"涨幅 $percentText\" as Unicode text) with title (\"💚 $name $price\" as Unicode text) subtitle (\"-\" as Unicode text)"
       fi
-      if [[ $alertHighPercent && 1 -eq $(bc <<< "$percent >= $alertHighPercent") ]]; then
+      if [[ $alertHighPercent != '-' && 1 -eq $(bc <<< "$percent >= $alertHighPercent") ]]; then
         script="display notification (\"涨幅 $percentText\" as Unicode text) with title (\"🔥 $name $price\" as Unicode text) subtitle (\"-\" as Unicode text)"
       fi
-      if [[ $alertLowPercent && 1 -eq $(bc <<< "$percent <= $alertLowPercent") ]]; then
+      if [[ $alertLowPercent != '-' && 1 -eq $(bc <<< "$percent <= $alertLowPercent") ]]; then
         script="display notification (\"涨幅 $percentText\" as Unicode text) with title (\"💚 $name $price\" as Unicode text) subtitle (\"-\" as Unicode text)"
       fi
       [[ $script ]] && osascript -e "$script"
       prices[$i]=$price
     done
-    echo -en $result | tabulate -f plain
+    echo -en $result | tabulate -f plain | tee -a em.log
+    echo -en "\033];$title\007"
   else
     echo "$url" >> debug
     echo "${#}:${@}" >> debug
@@ -127,9 +135,22 @@ function quote() {
   PRICES="${prices[*]}" quote "$@"
 }
 
+function search() {
+  local q=$1
+  local url="https://suggest3.sinajs.cn/suggest/type=&key=$q&name=suggestdata_$(date +%s)${RANDOM[@]:0:3}"
+  local list=($(curl -s "$url" -H 'Referer:http://finance.sina.com.cn/' | iconv -f gb18030 -t utf8 | cut -d '"' -f2 | tr ' ' '\u0020' | tr ';' ' '))
+  for i in ${!list[@]}; do
+    local fields=($(sed "s/,/ /g" <<< "${list[@]:$i:1}"))
+    local name=${fields[@]:0:1}
+    local code=${fields[@]:3:1}
+    echo -e "\033[31m$code\033[0m $name"
+  done | tabulate -f plain
+}
+
 # QUOTE_ALERT_LOW_PRICES=",17.22,8.90,5.11" quote sh000001,sz300556,sh600352,sh600678
 # em.sh quote sh000001,sz300556,sh600352,sh600678 -v ",17.22,8.90,5.11" +v '3000'
 
 case $1 in
   quote) quote "${@:2}";;
+  search) search "${@:2}";;
 esac

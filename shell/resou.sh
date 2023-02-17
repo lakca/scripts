@@ -887,7 +887,7 @@ function json_res() {
               fi
             ;;
             首页推流|feed) # 首页推流 https://www.bilibili.com/
-              local index=$(question2 -a '页面' -i $4)
+              local index=$(question2 -a '页面' -i "$4")
               local fresh_idx_1h=$index
               local fetch_row=$(($index * 3 + 1))
               local fresh_idx=$index
@@ -1273,7 +1273,7 @@ function json_res() {
             分时图|fst) #
               url='http://push2.eastmoney.com/api/qt/stock/trends2/get'
               local cb=cb_$(timestamp)_$(random 8)
-              local code=$(question2 -q '代码' -i $4)
+              local code=$(question2 -q '代码' -i "$4")
               curlparams+=(--data-urlencode secid=$code)
               curlparams+=(--data-urlencode fields1=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13)
               curlparams+=(--data-urlencode fields2=f51,f52,f53,f54,f55,f56,f57,f58)
@@ -1286,8 +1286,14 @@ function json_res() {
               jsonp=OBJ
               export IMGCAT=${IMGCAT-1}
             ;;
+            # kline http://56.push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery35108905987798741108_1676431200477&secid=0.300250&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61&klt=103&fqt=1&beg=0&end=20500101&smplmt=460&lmt=1000000&_=1676431200584
             盘口异动|pkyd) # http://quote.eastmoney.com/changes/
-              local type=$(ask2 -1 -m -i "$4" -D 'ALL' -q '异动类型' -Q '默认包含所有类型' -A "${yd_types[*]}" -N 2 | tr ' ' ,)
+              local input="$4"
+              case "$input" in
+                up) input="8201 8213 8202 8193 32 8";;
+                down) input="8204 8214 8203 8194 16 4";;
+              esac
+              local type=$(ask2 -1 -m -i "$input" -D 'ALL' -q '异动类型' -Q '默认包含所有类型' -A "${yd_types[*]}" -N 2 | tr ' ' ,)
               url='http://push2ex.eastmoney.com/getAllStockChanges'
               curlparams+=(-d type=$type)
               curlparams+=(--data-urlencode cb=jQuery35109544115898056558_$(timestamp))
@@ -1296,7 +1302,7 @@ function json_res() {
               curlparams+=(--data-urlencode pagesize=${SIZE:-30})
               curlparams+=(--data-urlencode dpt=wzchanges)
               curlparams+=(--data-urlencode _=$(timestamp))
-              jsonFormat='data.allstock|TABLE:(证券名称)n|red|bold,(代码)c|dim,(类型)t|map(bash:arr='${yd_types[*]}',bash:arrdim=2,bash:arridx=0)|indicator(exp=in,bash:arr='${yd_types[@]:0:22}'),(时间)tm|date(time,from=%H%M%S)|cyan,(链接)url|$http://quote.eastmoney.com/unify/r/{.m}.{.c}$|dim'
+              jsonFormat='data.allstock|TABLE:(证券名称)n|red|bold|SIMPLE,(代码)c|dim|SIMPLE,(类型)t|map(bash:arr='${yd_types[*]}',bash:arrdim=2,bash:arridx=0)|cond(handler=red,cond=exp,exp=in,vi=0,bash:arr=8201)|cond(handler=magenta,cond=exp,exp=in,vi=0,bash:arr=8213 8202 8193 32 8211)|SIMPLE,(时间)tm|date(time,from=%H%M%S)|dim|SIMPLE,(链接)url|$http://quote.eastmoney.com/unify/r/{.m}.{.c}$|dim'
               jsonp=OBJ
             ;;
             板块异动|bkyd) # http://quote.eastmoney.com/changes/boardlist.html
@@ -1361,7 +1367,7 @@ function json_res() {
                 炸板股池 zbgc getTopicZBPool fbt:asc #
                 跌停股池 dtgc getTopicDTPool fund:asc # 封单资金
               )
-              ask2 -s -i $4 -S '0' -N 4 -A "${types[*]}"
+              ask2 -s -i "$4" -S '0' -N 4 -A "${types[*]}"
               name=${_ASK_RESULTS[@]:1:1}
               sort=${_ASK_RESULTS[@]:3:1}
               url=http://push2ex.eastmoney.com/${_ASK_RESULTS[@]:2:1}
@@ -1975,7 +1981,7 @@ if [[ $? -eq 1 ]]; then
       check_trading_time
       [[ $TRADING && $? -eq 1 ]] && continue
       output="$(json_res "${args[@]}" 2>/dev/null)"
-      echo -e '\033[2J\033[1;1H'
+      echo -e '\033[2J\033[3J\033[1;1H'
       echo -e "$output"
       sleep ${LOOP:-1}
     done

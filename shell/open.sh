@@ -2,9 +2,9 @@
 
 source $(dirname $0)/prelude.sh
 
-cmd=$1
-name=$2
-count=${3:-1}
+cmd="$1"
+name="$2"
+filter="$3"
 
 zy=(
   'http://www.a-hospital.com/w/{name}'
@@ -23,6 +23,7 @@ case $cmd in
   中药|zy|cm)
     params='name'
     var='zy'
+    filter=${3:-1}
   ;;
   行情|quote|hq)
     code=$(grep -o '[0-9]\{6\}' <<< $name)
@@ -31,6 +32,16 @@ case $cmd in
     [[ $code = [84]* ]] && market='bj'
     params='code market'
     var='hq'
+    filter=${3:-1}
+  ;;
+  rust|rs)
+    folder=$(realpath ~/.rustup/toolchains/stable-x86_64-apple-darwin/share/doc/rust/html)
+    _cmd="find $folder -name *$name*.html"
+    [[ $filter ]] && _cmd+=" -path **/*$filter*/**"
+    items=($($_cmd))
+    [[ 1 -eq ${#items[@]} ]] && open ${items[*]}
+    for i in "${items[@]}"; do echo $i; done
+    exit 0
   ;;
 esac
 
@@ -42,11 +53,11 @@ for i in "${!items[@]}"; do
   for j in $params; do
     url=${url/\{$j\}/${!j}}
   done
-  grep '^[0-9]\+$' <<< $count >/dev/null
+  grep '^[0-9]\+$' <<< $filter >/dev/null
   if [[ $? = 0 ]]; then
-    [[ $count -ge $((i + 1)) ]] && open "$url"
-  elif [[ "$item" = *$count* ]]; then
-    open "$url"
+    [[ $filter -ge $((i + 1)) ]] && open -a '/Applications/Safari.app' "$url"
+  elif [[ "$item" = *$filter* ]]; then
+    open -a '/Applications/Safari.app' "$url"
   fi
 done
 

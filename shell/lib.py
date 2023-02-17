@@ -487,14 +487,16 @@ class Pipe:
 
     @classmethod
     def apply(cls, v, pipes=[], data={}, interpolate=None, signed=None):
+        __stack = [v]
+        __interpolate = (
+                lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
+            )
         for pipe in pipes:
             if pipe == "true" and not v:
                 return v
             args = []
             kwargs = {}
-            kwargs["__interpolate"] = (
-                lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
-            )
+
             if isinstance(pipe, list):
                 for e in pipe[1:]:
                     if isinstance(e, dict) and e["__kwarg"]:
@@ -503,26 +505,40 @@ class Pipe:
                         args.append(e)
                 pipe = pipe[0]
 
+            kwargs["__stack"] = tuple(__stack)
+            kwargs["__interpolate"] = __interpolate
+            kwargs["v0"] = __stack[0]
+
             if isinstance(signed, bool):
                 if signed:
                     if not pipe.startswith("+"):
+                        __stack.append(v)
                         continue
                     pipe = pipe[1:]
                 elif pipe.startswith("+"):
+                    __stack.append(v)
                     continue
+
             elif isinstance(signed, str) and signed:
                 if not pipe.startswith(signed):
+                    __stack.append(v)
                     continue
                 pipe = pipe[slice(len(signed))]
 
+            # 处理值
+            method = getattr(cls, pipe, None)
             if interpolate is not None and pipe.startswith(interpolate):
                 v = cls._interpolate(pipe[1:], data)
-            else:
-                attr = getattr(cls, pipe, None)
-                if attr:
-                    v = attr(v, *args, data=data, **kwargs)
+            elif method:
+                v = method(v, *args, **kwargs, data=data, vx=cls._get_v(v, **kwargs))
+            __stack.append(v)
 
         return v
+
+    @classmethod
+    def _get_v(cls, v, **kwargs):
+        vindex = kwargs.get('vi', None)
+        return v if vindex is None else kwargs['__stack'][int(vindex)]
 
     @classmethod
     def _interpolate(cls, template, data, *args, **kwargs):
@@ -691,6 +707,16 @@ class Pipe:
         target = kwargs.get("target")
         if kwargs["exp"] == "in":
             return str(v) in (basharr["arr"] if basharr else target if target else "")
+
+    @classmethod
+    def conditional(cls, v, cond, handler, *args, **kwargs):
+        condition = kwargs.get('condition') or cond
+        _condition = lambda e, **kws: cls._exp(e, **kws) if condition == 'exp' else getattr(cls, condition) if hasattr(cls, condition) else None
+        _handler = getattr(cls, handler) if hasattr(cls, handler) else lambda e: handler.format(e)
+        return _handler(v) if _condition(kwargs['vx'], **kwargs) else v
+    @classmethod
+    def cond(cls, *args, **kwargs):
+        return cls.conditional(*args, **kwargs)
 
     @classmethod
     def indicator(cls, v, *args, **kwargs):
@@ -1218,8 +1244,8 @@ class Pipe:
             ax2.set_ylim(ax[0].get_ylim())
             ax2.set_yticks(ax[0].get_yticks())
 
-            for tick in ax[0].yaxis.get_major_ticks():
-                tick.label1.set_color(indicate(tick, pre_close))
+#            for tick in ax[0].yaxis.get_major_ticks():
+#                tick.label1.set_color(indicate(tick, pre_close))
 
             ax2.yaxis.set_major_formatter(
                 lambda e, pos: cls.discount(e, pre_close))

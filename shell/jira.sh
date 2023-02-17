@@ -14,7 +14,9 @@ JIRA_USERNAME=${JIRA_USERNAME:-}
 JIRA_PASSWORD=${JIRA_PASSWORD:-}
 
 DEFAULT_STATUS_FILTER='待排期,开发中,待开发'
-ISSUE_FORMAT="fields.issuetype.name,key,fields.status.name,fields.reporter.displayName,fields.created|date,fields.updated|date,self,key|jiraUrl,fields.summary|trim"
+ISSUE_FORMAT=${ISSUE_FORMAT:-fields.issuetype.name,key,fields.status.name,fields.reporter.displayName,fields.created|date,fields.updated|date,self,key|jiraUrl,fields.summary|trim}
+
+# ISSUE_FORMAT='fields.issuetype.name,key,fields.status.name,fields.reporter.displayName,fields.created|date,fields.summary|trim' jira.sh issues -j "Created >= startOfYear(-1)" -s ''
 
 GS_NODE_HELPERS="$GS_NODE_HELPERS;
 Object.assign(FILTERS, {
@@ -69,13 +71,15 @@ function issues() {
   local assignee='currentuser()'
   local tableType="$GS_TABLE_TYPE"
   local moreOpts=()
+  local _jql=()
 
-  while getopts ':hs:S:a:t:' opt; do
+  while getopts ':hs:S:a:t:j:' opt; do
     case $opt in
     s) status=$OPTARG ;;
     S) start=$OPTARG ;;
     a) assignee=$OPTARG ;;
     t) tableType=$OPTARG ;;
+    j) _jql+=($OPTARG) ;;
     h)
       echo "Usage: $0 issues [options]"
       echo "  -s status, default: $status"
@@ -93,6 +97,7 @@ function issues() {
   if (status) {
     jql += ' and status in (' + status + ')'
   }
+  jql += 'AND ${_jql[*]}'
   console.log(encodeURIComponent(jql))
   ")
   local data=$(invoke 'issues' -j "$jql" -s "$start" -S 10 -R "${moreOpts[@]}")
@@ -102,7 +107,7 @@ function issues() {
   local total=$(sprintf -i "$data" | jsone "data.total")
   local next=$(sprintf -i "$data" | jsone "data.startAt + data.maxResults")
   [[ $next -lt $total ]] && {
-    issues -s "$status" -S "$next" -a "$assignee" -t $([ "$tableType" == 'th' ] && echo 'table' || echo "$tableType")
+    issues -s "$status" -S "$next" -a "$assignee" -j "${_jql[*]}" -t $([ "$tableType" == 'th' ] && echo 'table' || echo "$tableType")
   } || {
     echo "total: $total"
   }
