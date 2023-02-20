@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="/vue.global.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/naive-ui@2.34.3/dist/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sprintf-js@1.1.2/src/sprintf.min.js"></script>
+  <title>Document</title>
+  <style>
+    a:-webkit-any-link {
+      color: unset;
+      text-decoration: none;
+    }
+    .price-up .price,
+    .change-up .percent,
+    .open-up .name,
+    .open-up .open-percent,
+    .open-up .open-price,
+    .low-up .low-percent,
+    .low-up .low-price,
+    .high-up .high-percent,
+    .high-up .high-price {
+      color: red;
+    }
+    .price-down .price,
+    .change-down .percent,
+    .open-down .name,
+    .open-down .open-percent,
+    .open-down .open-price,
+    .low-down .low-percent,
+    .low-down .low-price,
+    .high-down .high-percent,
+    .high-down .high-price {
+      color: green;
+    }
+    .price, .percent {
+      font-size: 1.2em;
+      font-weight: bold;
+    }
+    .row {
+      transition: .3s;
+    }
+    .row td {
+      font-style: italic;
+    }
+    .price-up.row td {
+      background-color: rgba(255,0,0,.05);
+    }
+    .price-down.row td {
+      background-color: rgba(0,255,0,.05);
+    }
+    .price-equal.row td {
+      /* background-color: rgba(0,0,0,.05); */
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <n-select
+      v-model:value="selectedCodes"
+      multiple
+      filterable
+      placeholder="搜索证券"
+      :options="selectOptions"
+      :loading="loadingSearch"
+      clearable
+      remote
+      :clear-filter-after-select="false"
+      @search="handleSearch"
+    ></n-select>
+    <n-data-table
+      ref="table"
+      :columns="columns"
+      :data="data"
+      :row-class-name="rowClassName"
+      bordered
+      :single-line="false"
+      ></n-data-table>
+  </div>
+</body>
+
+<script>
+  function sign(number) {
+    number = `${number}`
+    return !number.startsWith('-') ? '+' + number : number
+  }
+  function compare(v1, v2) {
+    return v1 > v2 ? 1 : v1 < v2 ? -1 : 0
+  }
+  function percentText(v, base) {
+    if (base) v = (v - base) / base
+    return sign((v * 100).toFixed(2)) + '%'
+  }
+  const app = Vue.createApp({
+    data() {
+      return {
+        ws: null,
+        loadingSearch: false,
+        selectOptions: [],
+        selectedCodes: [],
+        message: 'naive',
+        codes: [
+          'sh000001',
+          'sh600352',
+          'sz002671',
+          'sh603706',
+          'sh512480',
+        ],
+        oldData: [],
+        data: [],
+        columns: [
+          { key: 'symbol', className: 'symbol', title: '代码', render(rowData) { return rowData.symbol.toUpperCase() } },
+          { key: 'name', className: 'name', title: '证券', render(rowData) {
+            return Vue.createVNode('a', {
+              href: `https://www.xueqiu.com/S/${rowData.symbol}`,
+              target: 'blank',
+            }, rowData.name)
+          } },
+          { key: 'percent_', className: 'percent_', align: 'center', title: '涨幅', children: [
+            { key: 'openPercent', className: 'open-percent', title: '开盘' },
+            { key: 'lowPercent', className: 'low-percent', title: '最低' },
+            { key: 'percent', className: 'percent', title: '当前', defaultSortOrder: 'descend', sorter: 'default' },
+            { key: 'highPercent', className: 'high-percent', title: '最高' },
+          ] },
+          { key: 'price_', className: 'price_', align: 'center', title: '价格', children: [
+            { key: 'open', className: 'open-price', title: '开盘' },
+            { key: 'low', className: 'low-price', title: '最低' },
+            { key: 'price', className: 'price', title: '当前' },
+            { key: 'high', className: 'high-price', title: '最高' },
+          ] },
+          { key: 'time', className: 'time', title: '时间', },
+        ],
+      }
+    },
+    methods: {
+      rowClassName(rowData) {
+        const cls = ['row']
+        cls.push(['high-down', 'high-equal', 'high-up'][compare(rowData.high, rowData.close) + 1])
+        cls.push(['low-down', 'low-equal', 'low-up'][compare(rowData.low, rowData.close) + 1])
+        cls.push(['open-down', 'open-equal', 'open-up'][compare(rowData.open, rowData.close) + 1])
+        cls.push(['change-down', 'change-equal', 'change-up'][compare(rowData.price, rowData.close) + 1])
+        cls.push(['price-down', 'price-equal', 'price-up'][compare(rowData.price, this.oldData?.[rowData.symbol]?.close) + 1])
+        return cls.join(' ')
+      },
+      async handleSearch(q) {
+        this.loadingSearch = true
+        try {
+          const res = await fetch(`/s/search?q=${q}`).then(res => res.json())
+          this.selectOptions = res.map(e => ({
+            label: e.name,
+            value: e.symbol,
+          }))
+        } finally {
+          this.loadingSearch = false
+        }
+      },
+    },
+    watch: {
+      selectedCodes(val) {
+        this.codes.push(...val)
+      },
+      codes: {
+        deep: true,
+        handler(val) {
+          this.ws && this.ws.send(JSON.stringify({type: 'begin', action: 'quote', code: this.codes}))
+        },
+      },
+    },
+    mounted() {
+      const ws = this.ws = new WebSocket(`ws://${location.host}/ws`)
+      ws.addEventListener('open', () => {
+        ws.send(JSON.stringify({type: 'begin', action: 'quote', code: this.codes}))
+      })
+      ws.addEventListener('message', (msg) => {
+        const data = JSON.parse(msg.data)
+        data.forEach(e => {
+          e.current = e.price
+          e.ratio = (e.price - e.close) / e.price
+          e.percent = percentText(e.ratio)
+          e.openPercent = percentText(e.open, e.close)
+          e.lowPercent = percentText(e.low, e.close)
+          e.highPercent = percentText(e.high, e.close)
+        })
+        this.data = data
+      })
+    },
+  })
+  app.use(naive)
+  app.mount('#app')
+</script>
+</html>
