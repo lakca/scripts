@@ -44,44 +44,62 @@
     }
     .row td {
       font-style: italic;
+      transition: .5s ease-in-out!important;
     }
     .price-up.row td {
-      background-color: rgba(255,0,0,.05);
+      background-color: rgba(255,0,0,.1);
     }
     .price-down.row td {
-      background-color: rgba(0,255,0,.05);
+      background-color: rgba(0,255,0,.1);
     }
     .price-equal.row td {
-      /* background-color: rgba(0,0,0,.05); */
+      /* background-color: rgba(0,0,0,.1); */
     }
   </style>
 </head>
 <body>
   <div id="app">
     <n-select
-      v-model:value="selectedCodes"
-      multiple
+      remote
+      clearable
       filterable
       placeholder="搜索证券"
+      :clear-filter-after-select="false"
       :options="selectOptions"
       :loading="loadingSearch"
-      clearable
-      remote
-      :clear-filter-after-select="false"
       @search="handleSearch"
+      @input="handleSelectInput"
     ></n-select>
     <n-data-table
-      ref="table"
-      :columns="columns"
-      :data="data"
-      :row-class-name="rowClassName"
       bordered
+      :columns="columns"
+      :data="rows"
+      :row-class-name="getRowClassName"
       :single-line="false"
+      :row-props="handleRowProps"
       ></n-data-table>
+      <n-dropdown
+        placement="bottom-start"
+        trigger="manual"
+        :x="cursor[0]"
+        :y="cursor[1]"
+        :options="dropdownOptions"
+        :on-clickOutside="() => shownDropdown = false"
+        :show="shownDropdown"
+        @select="handleClickContextmenu"
+      ></n-dropdown>
   </div>
 </body>
 
 <script>
+  const { createApp, createVNode, nextTick } = Vue
+  function h(comp, options, children) {
+    if (typeof options === 'function') {
+      children = { default: options }
+      options = null
+    }
+    return createVNode(naive[comp] || comp, options, children)
+  }
   function sign(number) {
     number = `${number}`
     return !number.startsWith('-') ? '+' + number : number
@@ -93,27 +111,32 @@
     if (base) v = (v - base) / base
     return sign((v * 100).toFixed(2)) + '%'
   }
-  const app = Vue.createApp({
+  function arr2obj(arr, key) {
+    const obj = {}
+    for (const e of arr) {
+      obj[e[key]] = e
+    } return obj
+  }
+  const app = createApp({
     data() {
       return {
         ws: null,
         loadingSearch: false,
         selectOptions: [],
-        selectedCodes: [],
         message: 'naive',
-        codes: [
+        symbols: [
           'sh000001',
           'sh600352',
           'sz002671',
           'sh603706',
           'sh512480',
         ],
-        oldData: [],
-        data: [],
+        oldData: null,
+        data: null,
         columns: [
           { key: 'symbol', className: 'symbol', title: '代码', render(rowData) { return rowData.symbol.toUpperCase() } },
           { key: 'name', className: 'name', title: '证券', render(rowData) {
-            return Vue.createVNode('a', {
+            return h('a', {
               href: `https://www.xueqiu.com/S/${rowData.symbol}`,
               target: 'blank',
             }, rowData.name)
@@ -121,7 +144,7 @@
           { key: 'percent_', className: 'percent_', align: 'center', title: '涨幅', children: [
             { key: 'openPercent', className: 'open-percent', title: '开盘' },
             { key: 'lowPercent', className: 'low-percent', title: '最低' },
-            { key: 'percent', className: 'percent', title: '当前', defaultSortOrder: 'descend', sorter: 'default' },
+            { key: 'percent', className: 'percent', title: '当前', defaultSortOrder: 'descend' },
             { key: 'highPercent', className: 'high-percent', title: '最高' },
           ] },
           { key: 'price_', className: 'price_', align: 'center', title: '价格', children: [
@@ -131,18 +154,79 @@
             { key: 'high', className: 'high-price', title: '最高' },
           ] },
           { key: 'time', className: 'time', title: '时间', },
+          { key: 'action', className: 'action', title: '操作', render(rowData) {
+            return h('NButton', { type: 'error' }, () => '删除')
+          } },
         ],
+        dropdownOptions: [
+          { label: '编辑', key: 'edit' },
+          { label: '删除', key: 'delete' }
+        ],
+        shownDropdown: false,
+        cursor: [0, 0],
+        row: null,
       }
     },
+    computed: {
+      rows() {
+        return this.data ? this.symbols.map(symbol => this.data[symbol]) : []
+      },
+    },
     methods: {
-      rowClassName(rowData) {
+      createWs() {
+        const ws = this.ws = new WebSocket(`ws://${location.host}/ws`)
+        window.ws = ws
+        ws.onclose = () => {
+          console.log('close')
+          setTimeout(() => this.createWs(), 3000)
+        }
+        ws.onopen = () => {
+          console.log('open')
+          ws.send(JSON.stringify({type: 'begin', action: 'quote', data: { symbol: this.symbols }}))
+        }
+        ws.onmessage = (msg) => {
+          const data = JSON.parse(msg.data)
+          data.forEach(e => {
+            e.current = e.price
+            e.ratio = (e.price - e.close) / e.price
+            e.percent = percentText(e.ratio)
+            e.openPercent = percentText(e.open, e.close)
+            e.lowPercent = percentText(e.low, e.close)
+            e.highPercent = percentText(e.high, e.close)
+          })
+          this.data = arr2obj(data, 'symbol')
+        }
+      },
+      getRowClassName(rowData) {
         const cls = ['row']
         cls.push(['high-down', 'high-equal', 'high-up'][compare(rowData.high, rowData.close) + 1])
         cls.push(['low-down', 'low-equal', 'low-up'][compare(rowData.low, rowData.close) + 1])
         cls.push(['open-down', 'open-equal', 'open-up'][compare(rowData.open, rowData.close) + 1])
         cls.push(['change-down', 'change-equal', 'change-up'][compare(rowData.price, rowData.close) + 1])
-        cls.push(['price-down', 'price-equal', 'price-up'][compare(rowData.price, this.oldData?.[rowData.symbol]?.close) + 1])
+        cls.push(['price-down', 'price-equal', 'price-up'][compare(rowData.price, this.oldData?.[rowData.symbol]?.price) + 1])
         return cls.join(' ')
+      },
+      handleRowProps(row) {
+        return {
+          onContextmenu: e => {
+            e.preventDefault()
+            this.row = row
+            this.shownDropdown = false
+            nextTick().then(() => {
+              this.shownDropdown = true
+              this.cursor = [e.clientX, e.clientY]
+            })
+          },
+        }
+      },
+      handleClickContextmenu(key) {
+        if (key === 'delete') {
+          if (this.row) this.symbols = this.symbols.filter(e => e !== this.row.symbol)
+        }
+        this.shownDropdown = false
+      },
+      handleSelectInput(v) {
+        !this.symbols.includes(v) && this.symbols.push(v)
       },
       async handleSearch(q) {
         this.loadingSearch = true
@@ -158,33 +242,21 @@
       },
     },
     watch: {
-      selectedCodes(val) {
-        this.codes.push(...val)
+      data(val, oldVal) {
+        this.oldData = oldVal
       },
-      codes: {
+      symbols: {
         deep: true,
         handler(val) {
-          this.ws && this.ws.send(JSON.stringify({type: 'begin', action: 'quote', code: this.codes}))
+          localStorage.setItem('quote:symbols', JSON.stringify(this.symbols))
+          this.ws && this.ws.readyState === this.ws.OPEN && this.ws.send(JSON.stringify({type: 'begin', action: 'quote', data: { symbol: this.symbols }}))
         },
       },
     },
     mounted() {
-      const ws = this.ws = new WebSocket(`ws://${location.host}/ws`)
-      ws.addEventListener('open', () => {
-        ws.send(JSON.stringify({type: 'begin', action: 'quote', code: this.codes}))
-      })
-      ws.addEventListener('message', (msg) => {
-        const data = JSON.parse(msg.data)
-        data.forEach(e => {
-          e.current = e.price
-          e.ratio = (e.price - e.close) / e.price
-          e.percent = percentText(e.ratio)
-          e.openPercent = percentText(e.open, e.close)
-          e.lowPercent = percentText(e.low, e.close)
-          e.highPercent = percentText(e.high, e.close)
-        })
-        this.data = data
-      })
+      this.createWs()
+      const symbols = JSON.parse(localStorage.getItem('quote:symbols'))
+      if (symbols) this.symbols = symbols
     },
   })
   app.use(naive)
