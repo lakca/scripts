@@ -26,16 +26,17 @@ wss.on('connection', ws => {
 })
 
 function polling(options, fn, ...args) {
+  const id = Date.now()
   if (typeof options === 'number') options = { interval: options }
   const data = { options, fn, args }
   let t = null
   function handler() {
     t = setTimeout(async () => {
-      const r = data.fn(...data.args)
+      const r = data.fn(id, ...data.args)
       if (data.options.wait && r.then) {
         await r
       }
-      handler()
+      t !== null && handler()
     }, data.options.interval)
   }
   handler()
@@ -44,31 +45,37 @@ function polling(options, fn, ...args) {
       Object.assign(data.options, updateOptions)
     } else {
       clearTimeout(t)
+      t = null
     }
   }
 }
 
 store.on('begin::record', record => {
   if (record.scope === 'ws::client' && record.key === 'quote' && record.tag == null) {
-    console.log('begin')
     const stop = store.scope('polling').key('quote').value
     if (stop) {
       stop()
-      console.log('renew')
+      store.scope('polling').key('quote').unset()
+      console.log('renew', record.id)
+    } else {
+      console.log('begin', record.id)
     }
-    const newStop = polling(3000, async function() {
-      console.log('polling')
+    const newStop = polling(3000, async function(id) {
+      console.log(id, new Date().toLocaleString())
       const symbols = store.scope('ws::client').key('quote').tag('symbol').values
-      if (symbols && symbols.length) {
+      const clients = store.scope('ws::client').key('quote').values
+      if (symbols && symbols.length && clients && clients.length) {
         const data = await em.getQuote(symbols)
-        const clients = store.scope('ws::client').key('quote').values
         clients && clients.forEach(ws => {
           ws.send(JSON.stringify(data))
         })
       } else {
         const stop = store.scope('polling').key('quote').value
-        stop && stop()
-        store.scope('polling').key('quote').unset()
+        if (stop) {
+          stop()
+          store.scope('polling').key('quote').unset()
+          console.log('end')
+        }
       }
     })
     store.scope('polling').key('quote').set(newStop)

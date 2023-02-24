@@ -9,6 +9,9 @@ class Record {
     this.scope = data.scope
     this.tag = data.tag
   }
+  get id() {
+    return `${this.scope}_${this.key}_${this.tag}`
+  }
 }
 
 class Store extends EventEmitter {

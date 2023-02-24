@@ -4,7 +4,7 @@ const crypto = require('crypto')
 const http = require('http')
 const path = require('path')
 const fs = require('fs')
-const { colorful } = require('./utils')
+const { colorful } = require('./lib')
 
 function getfd(fd) {
   return fd % 1 === 0 ? +fd : null
