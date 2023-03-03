@@ -1,0 +1,43 @@
+a:-webkit-any-link {
+  color: unset;
+  text-decoration: none;
+}
+.price-up .price,
+.change-up .percent,
+.open-up .name,
+.open-up .open-percent,
+.open-up .open-price,
+.low-up .low-percent,
+.low-up .low-price,
+.high-up .high-percent,
+.high-up .high-price {
+  color: #f00;
+}
+.price-down .price,
+.change-down .percent,
+.open-down .name,
+.open-down .open-percent,
+.open-down .open-price,
+.low-down .low-percent,
+.low-down .low-price,
+.high-down .high-percent,
+.high-down .high-price {
+  color: #008000;
+}
+.price,
+.percent {
+  font-size: 1.2em;
+  font-weight: bold;
+}
+.row {
+  transition: 0.3s;
+}
+.row td {
+  transition: 0.5s ease-in-out !important;
+}
+.row.price-up td {
+  background-color: rgba(255,0,0,0.1);
+}
+.row.price-down td {
+  background-color: rgba(0,255,0,0.1);
+}
