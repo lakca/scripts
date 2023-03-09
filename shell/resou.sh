@@ -132,7 +132,7 @@ function json_res() {
           patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
           indexes=(4 4 4 4 4 4 4);
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
-          jsonFormat='statuses:(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{statuses:user.idstr}$,(链接)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
+          jsonFormat='statuses:(内容)text_raw|red|bold|index|newline(-1),(来源)source|dim,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{statuses:user.idstr}$|dim,(链接)mblogid|$https://weibo.com/{statuses:user.idstr}/{statuses:mblogid}$|dim,(地区)region_name|dim,(视频封面)page_info.page_pic|image|dim,(视频)page_info.media_info.mp4_sd_url|dim,(图片)pic_infos*.original.url|image|dim'
         ;;
         用户微博|userpost|up) # 用户微博 https://weibo.com/u/2209943702
           uid=$(question2 -q '微博用户ID' -i "$3")
@@ -159,7 +159,7 @@ function json_res() {
           patterns=('"topic":"[^"]*"' '"summary":"[^"]*"'  '"category":"[^"]*"' '"read":[^,]*,' '"mention":[^,]*,' '"mid":"[^"]"*')
           indexes=(4 4 4 3 3 4)
           transformers=('_' '_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-          jsonFormat='data.statuses:(标签)topic|red|bold|index,(内容)summary|white|dim,(分类)category|magenta,(阅读量)read|number,(讨论数)mention|number,(链接)mid|$https://s.weibo.com/weibo?q=%23{data.statuses:mid}%23$,(图片)images_url|image'
+          jsonFormat='data.statuses:(标签)topic|red|bold|index,(内容)summary|white|dim,(分类)category|magenta,(阅读量)read|number,(讨论数)mention|number,(链接)mid|$https://s.weibo.com/weibo?q=%23{data.statuses:mid}%23$|dim,(图片)images_url|image|dim'
         ;;
         热搜榜|hotsearch|hs)
           url="$WEIBO_HOT_SEARCH_URL";
@@ -168,7 +168,7 @@ function json_res() {
           patterns=('_' '"(category|ad_type)":"[^"]*"' '"num":[^,]*,' '"raw_hot":[^,]*,' '_')
           indexes=(4 4 3 3 4)
           transformers=('_' '_' '_' '_' 'https://s.weibo.com/weibo?q=%23${values[@]:0:1}%23')
-          jsonFormat='data.band_list|TABLE:(标题)word|red|bold|index,(分类)category|magenta,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word|urlencode}%23$'
+          jsonFormat='data.band_list|TABLE:(标题)word|red|bold|index,(分类)category|magenta|dim,(热度)num|number,(原始热度)raw_hot|number,(链接)note|$https://s.weibo.com/weibo?q=%23{data.band_list:word|urlencode}%23$|dim'
         ;;
         微博|post|ps)
           local postid="$3" # M7OL9bpQP
@@ -183,7 +183,7 @@ function json_res() {
           patterns=('"text_raw":"[^"]*"' '"source":"[^"]*","favorited"' '"screen_name":"[^"]*"' '"idstr":"[^"]*","pc_new"' '"mid":"[^"]*","mblogid"' '"mblogid":"[^"]*"' '("region_name":"[^"]*",)?"customIcons"');
           indexes=(4 4 4 4 4 4 4);
           transformers=('_' '_' '_' 'https://weibo.com/u/${values[@]:3:1}' '_' 'https://weibo.com/${values[@]:3:1}/${values[@]:5:1}' '_')
-          jsonFormat=':(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{:user.idstr}$,(链接)mblogid|$https://weibo.com/{:user.idstr}/{:mblogid}$,(地区)region_name,(视频封面)page_info.page_pic|image,(视频)page_info.media_info.mp4_sd_url,(图片)pic_infos*.original.url|image'
+          jsonFormat=':(内容)text_raw|red|bold|index|newline(-1),(来源)source,(博主)user.screen_name,(空间)user.idstr|$https://weibo.com/u/{:user.idstr}$|dim,(链接)mblogid|$https://weibo.com/{:user.idstr}/{:mblogid}$|dim,(地区)region_name|dim,(视频封面)page_info.page_pic|image|dim,(视频)page_info.media_info.mp4_sd_url|dim,(图片)pic_infos*.original.url|image|dim'
         ;;
         微博评论|comment|cm)
           local count=${4:-10}
@@ -294,7 +294,7 @@ function json_res() {
           aliases=(标题 链接)
           patterns=('"title":"[^"]*"' '"url":"[^"]*"')
           indexes=(4 4)
-          jsonFormat='data:(标题)question.title|red|bold|index,(链接)question.url,(时间)question.created|date,(标签)question.topics*.name|join'
+          jsonFormat='data:(标题)question.title|red|bold|index,(链接)question.url|dim,(时间)question.created|date|dim,(标签)question.topics*.name|join|dim'
           outputfile="$outputfile.$3"
           case ${3:-hour} in
             日榜|day)
@@ -324,12 +324,12 @@ function json_res() {
           fields=('title' 'excerpt' 'metricsArea' 'link' 'image')
           patterns=('"titleArea":{"text":"[^"]*"' '"excerptArea":{"text":"[^"]*"' '"metricsArea":{"text":"[^"]*"' '"link":{"url":"[^"]*"' '"imageArea":{"url":"[^"]*"')
           indexes=(6 6 6 6 6)
-          jsonFormat="initialState.topstory.hotList:(标题)target.titleArea.text|red|bold|index,(描述)target.excerptArea.text|white|dim,(热度)target.metricsArea.text|magenta,(链接)target.link.url,(图片)target.imageArea.url|image"
+          jsonFormat="initialState.topstory.hotList:(标题)target.titleArea.text|red|bold|index,(描述)target.excerptArea.text|white|dim,(热度)target.metricsArea.text|magenta,(链接)target.link.url|dim,(图片)target.imageArea.url|dim|image"
         ;;
         搜索建议|searchsuggest|ss)
           local query="$3"
           url="https://www.zhihu.com/api/v4/search/suggest?q=$query"
-          jsonFormat='suggest:(关键词)query|red|bold,(链接)id|$https://www.zhihu.com/search?type=content&q={suggest:query}$'
+          jsonFormat='suggest:(关键词)query|red|bold,(链接)id|$https://www.zhihu.com/search?type=content&q={suggest:query}$|dim'
         ;;
         搜索|search)
           _ASK_MSG='请输入搜索类别（默认为综合）：' ask '综合 用户 话题 视频 学术 专栏 盐选内容 电子书' $4
@@ -352,7 +352,7 @@ function json_res() {
           curlparams+=(-H 'x-zse-93:101_3_3.0')
           curlparams+=(-H 'x-zse-96:2.0_GvwwUMkek8=4IKMpxb4X6Vrgz1NcrMLbce=W7rcoQC+TxG0p5vlhR8ariWgX8JxX')
           curlparams+=(-H 'x-zst-81:3_2.0aR_sn77yn6O92wOB8hPZnQr0EMYxc4f18wNBUgpTQ6nxERFZsRY0-4Lm-h3_tufIwJS8gcxTgJS_AuPZNcXCTwxI78YxEM20s4PGDwN8gGcYAupMWufIoLVqr4gxrRPOI0cY7HL8qun9g93mFukyigcmebS_FwOYPRP0E4rZUrN9DDom3hnynAUMnAVPF_PhaueTF03CcUeB0BgBf9LMwq3BggpKe8pmYUOLSbUfEUgKn9HLUrNMCvHLjwCOYcSTVMO9fG7C6qO_agXqAbSLSicLb_LmrbxLZBFqBUX0pCNVSBxLEwC9Fho1WbO_SqLq_UC0huOqkqY99cLZnwgC8rc8AucVwDe9mbXfoeoLkiNYrCH_kGO0Vg_z3bOVxwe_PcLZ3h9KfgYYSwYqQgeYUwS_cwLpcgXyfceMb0Vm9gSKrekV0UXY20c9gcOYeQH9Y7p1cqXqouCpuh3mZrLYzuN9sqV1o4XC8gNmwJxBorSs')
-          jsonFormat='data:(标题)object.title|red|bold|index,(摘录)object.excerpt|red|bold,(结果类型)object.type,(内容)object.content|white|dim,(作者)object.author.name|${data:object.author.name} https://www.zhihu.com/people/{.object.author.url_token}$,(时间)object.created_at|date,(链接)url|dim,(视频)object.video_url|dim,(图片)object.cover_url|image|dim'
+          jsonFormat='data:(标题)object.title|red|bold|index,(摘录)object.excerpt|red|bold,(结果类型)object.type|dim,(内容)object.content|white|dim,(作者)object.author.name|${data:object.author.name} https://www.zhihu.com/people/{.object.author.url_token}$,(时间)object.created_at|date,(链接)url|dim,(视频)object.video_url|dim,(图片)object.cover_url|image|dim'
         ;;
         问题回答|answer)
           local id=$3
@@ -365,7 +365,7 @@ function json_res() {
           patterns=(_ '"title":"[^"]*","type":"question"' _ _ '"url":"[^"]*","visible_only_to_author":')
           indexes=(4 4 3 3 4)
           filters=(_ _ :number: :number:timestamp: _)
-          jsonFormat="data:(内容)target.excerpt|red|index(${INDEX_OFFSET:-0}),(问题)target.question.title|white|dim,(作者)target.author.name,(点赞数)target.voteup_count|number|magenta,(评论数)target.comment_count|number|magenta,(发布时间)target.created_time|date,(链接)target.url|dim"
+          jsonFormat="data:(内容)target.excerpt|red|index(${INDEX_OFFSET:-0}),(问题)target.question.title|white|dim,(作者)target.author.name,(点赞数)target.voteup_count|number|magenta,(评论数)target.comment_count|number|magenta,(发布时间)target.created_time|date|dim,(链接)target.url|dim"
 
           next=$(echo -e $(escapeUnicode $(grep -oE '"next":"[^"]*"' <<< $text | cut -d'"' -f4)))
           [[ $next && ${SIZE:-10} > 0 ]] && tailer="INDEX_OFFSET=$((5 + ${INDEX_OFFSET:-0})) SIZE=$((${SIZE:-10} - 5)) json_res zhihu question '$next'"
@@ -422,7 +422,7 @@ function json_res() {
           fields=(query desc rawUrl img)
           patterns=('_' '_' '_' '_')
           indexes=(4 4 4 4)
-          jsonFormat='data.cards.0.content:(关键词)word|red|bold|index,(描述)desc|white|dim,(链接)rawUrl,(图片)img|image'
+          jsonFormat='data.cards.0.content:(关键词)word|red|bold|index,(描述)desc|white|dim,(链接)rawUrl|dim,(图片)img|image'
         ;;
       esac
     ;;
@@ -434,14 +434,14 @@ function json_res() {
           url='https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc';
           patterns=('"Title":"[^"]*"' '"Url":"[^"]*"');
           indexes=(4 4)
-          jsonFormat='data:(标题)Title|red|bold|index,(链接)Url,(图片)Image.url_list*.url|image'
+          jsonFormat='data:(标题)Title|red|bold|index,(链接)Url|dim,(图片)Image.url_list*.url|image|dim'
         ;;
         热搜|hotsearch|hs)
           url='https://tsearch.snssdk.com/search/suggest/hot_words/';
           patterns=('"query":"[^"]*"' '"query":"[^"]*"');
           indexes=(4 4);
           transformers=('$title' 'https://so.toutiao.com/search?dvpf=pc\&source=trending_card\&keyword=$title')
-          jsonFormat='data:(标题)query|red|bold|index,(链接)query|$https://so.toutiao.com/search?dvpf=pc&source=trending_card&keyword={data:query}$'
+          jsonFormat='data:(标题)query|red|bold|index,(链接)query|$https://so.toutiao.com/search?dvpf=pc&source=trending_card&keyword={data:query}$|dim'
         ;;
       esac
     ;;
@@ -1036,7 +1036,7 @@ function json_res() {
           fields=(title media url)
           patterns=(_ _ _)
           indexes=(4 4 4)
-          jsonFormat='data:(标题)title|red|bold|index,(媒体)media|cyan,(链接)url,(时间)time|date'
+          jsonFormat='data:(标题)title|red|bold|index,(媒体)media|cyan,(链接)url|dim,(时间)time|date|dim'
         ;;
         滚动新闻|roll) # https://news.sina.com.cn/roll
           url="https://feed.mix.sina.com.cn/api/roll/get?pageid=153&lid=2509&k=&num=50&page=1&r=$(date +%s)&callback=jQuery111205718232756906676_$(date +%s)&_=$(date +%s)"
@@ -1045,7 +1045,7 @@ function json_res() {
           fields=(title intro media_name url)
           patterns=(_ _ _ _)
           indexes=(4 4 4 4)
-          jsonFormat='result.data:(标题)title|red|bold|index,(简介)intro|white|dim,(媒体)media_name|cyan,(链接)url,(时间)ctime|date,(图片)images*.u'
+          jsonFormat='result.data:(标题)title|red|bold|index,(简介)intro|white|dim,(媒体)media_name|cyan|dim,(链接)url|dim,(时间)ctime|date|dim,(图片)images*.u|dim'
         ;;
         热榜|hot) # https://sinanews.sina.cn/h5/top_news_list.d.html
           local categories=(top trend ent video baby car fashion trip)
@@ -1061,31 +1061,31 @@ function json_res() {
             ;;
             潮流热榜|trend)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-trend&localCityCode=&wm='
-              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(热度)info.hotValue,(图片)info.pic*.url|image|dim,(链接)base.base.url'
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(热度)info.hotValue,(图片)info.pic*.url|image|dim,(链接)base.base.url|dim'
             ;;
             娱乐热榜|ent)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-ent&localCityCode=&wm='
-              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(图片)info.pic*.url|image|dim,(链接)base.base.url'
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag|dim,(热度)info.hotValue|dim,(图片)info.pic*.url|image|dim,(链接)base.base.url|dim'
             ;;
             视频热榜|video)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-minivideo&localCityCode=&wm='
-              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(热度)info.intro,(媒体)media_info.name,(视频)stream:(链接)playUrl,(清晰度)definitionType'
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(热度)info.intro|dim,(媒体)media_info.name|dim,(视频)stream:(链接)playUrl|dim,(清晰度)definitionType|dim'
             ;;
             汽车热榜|car)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-auto&localCityCode=&wm='
-              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag|dim,(热度)info.hotValue|dim,(链接)base.base.url|dim'
             ;;
             育儿热榜|baby)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-mother&localCityCode=&wm='
-              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag|dim,(热度)info.hotValue|dim,(链接)base.base.url|dim'
             ;;
             时尚热榜|fashion)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-fashion&localCityCode=&wm='
-              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag|dim,(热度)info.hotValue|dim,(链接)base.base.url|dim'
             ;;
             旅游热榜|trip)
               url='https://newsapp.sina.cn/api/hotlist?newsId=HB-1-snhs%2Ftop_news_list-travel&localCityCode=&wm='
-              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag,(热度)info.hotValue,(链接)base.base.url'
+              jsonFormat='data.hotList:(标题)info.title|red|bold|index,(标签)info.showTag|dim,(热度)info.hotValue|dim,(链接)base.base.url|dim'
             ;;
           esac
         ;;
@@ -1486,7 +1486,8 @@ function json_res() {
               curlparams+=(--data-urlencode fields=f1,f2,f3,f4,f14,f12,f13,f62,f128,f136,f1520e76d4e)
               curlparams+=(--data-urlencode cb=jQuery3510780095733559149_$(timestamp))
               curlparams+=(--data-urlencode _=$(timestamp))
-
+              jsonFormat='data.diff|TABLE:(证券名称)f128|${.SECURITY_CODE} {.SECURITY_NAME_ABBR}$|indicator(cmp={.CHANGE_RATE})|bold|index,(涨跌幅)CHANGE_RATE|number(+)|format(%)|indicator|SIMPLE,(买入)BILLBOARD_BUY_AMT|number(cn)|HIDE_IN_TABLE,(卖出)BILLBOARD_SELL_AMT|number(cn)|HIDE_IN_TABLE,(净买入)BILLBOARD_NET_AMT|number(cn)|indicator|SIMPLE,(龙虎榜成交额)BILLBOARD_DEAL_AMT|number(cn),(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|format(%)|SIMPLE,(交易日)TRADE_DATE|date(date)|HIDE_IN_TABLE,(上榜原因)EXPLANATION|dim|SIMPLE,(其他)EXPLAIN|dim|HIDE_IN_TABLE,(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$|HIDE_IN_TABLE'
+              jsonp=OBJ
             ;;
             机构调研) # https://data.eastmoney.com/jgdy/
             ;;

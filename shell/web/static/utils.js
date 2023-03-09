@@ -10,7 +10,7 @@
     number = `${number}`
     return !number.startsWith('-') ? '+' + number : number
   }
-  function compare(v1, v2) {
+  function compare(v1, v2 = 0) {
     return v1 > v2 ? 1 : v1 < v2 ? -1 : 0
   }
   function percentText(v, base) {
@@ -28,14 +28,15 @@
       if (permission === 'granted') new Notification(msg)
     })
   }
-  function alert(data, rules) {
+  function alert(data, rules, oldData) {
     if (!data || !rules) return
+    const equal = oldData && (data.price === oldData.price)
     for (const rule of rules) {
       if (!rule || !rule.checked) continue
-      if ((rule.type === 'hc' && rule.value <= data.price)
-        || (rule.type === 'lc' && rule.value >= data.price)
-        || (rule.type === 'hp' && parseFloat(rule.value) <= data.ratio * 100)
-        || (rule.type === 'lp' && parseFloat(rule.value) >= data.ratio * 100)
+      if ((rule.type === 'hc' && rule.value <= data.price && !equal)
+        || (rule.type === 'lc' && rule.value >= data.price && !equal)
+        || (rule.type === 'hp' && parseFloat(rule.value) <= data.ratio * 100 && !equal)
+        || (rule.type === 'lp' && parseFloat(rule.value) >= data.ratio * 100 && !equal)
       ) {
         notify(`${data.name} ${data.percent} ${data.price}`)
         return true
@@ -51,4 +52,24 @@ function setStorage(key, value) {
 }
 function copy(v) {
   return JSON.parse(JSON.stringify(v))
+}
+function isTrading(force) {
+  const date = new Date()
+  const hour = date.getHours()
+  const minute = date.getMinutes()
+  return force || (hour > 9 && hour < 11) || (hour > 12 && hour < 15) || (hour === 9 && minute > 14) || (hour === 11 && minute < 32) || (hour === 15 && minute < 2)
+}
+function getFlowText(flow, offset = 0) {
+  let unit = ''
+  let sign = flow < 0 ? '-' : '+'
+  let value = Math.abs(flow)
+  ;['万', '亿'].slice(offset).some((e, i) => {
+    if (value < (i + 1) * 10000) {
+      return true
+    } else {
+      value /= 10000
+      unit = e
+    }
+  })
+  return sign + value.toFixed(2) + unit
 }

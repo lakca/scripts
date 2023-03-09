@@ -1563,12 +1563,12 @@ class Parser:
             #     cls.printRecord(record, flatted)
             #     sys.stdout.write("-" * 50 + "\n")
             for record in records:
-                for token in tokens["children"]:
-                    Parser.printToken(record, token)
+                for index, token in enumerate(tokens["children"]):
+                    Parser.printToken(record, token, index=index)
                 sys.stdout.write("-" * 50 + "\n")
 
     @ classmethod
-    def printToken(cls, data, token: dict, indent=0, INDENT=2):
+    def printToken(cls, data, token: dict, indent=0, INDENT=2, **kwargs):
         key = token.get("key")
         pipes = token.get("pipes")
         label = token.get("label")
@@ -1580,14 +1580,16 @@ class Parser:
         scopedStdout = lambda *args: sys.stdout.write(
             " " * indent + "".join(list(*args))
         )
+        if cls.shouldHidden(token, index=kwargs.get('index')):
+            return
+
         scopedStdout(
             "{}: ".format(
                 Pipe.apply(label if label is not None else key,
                            ["yellow", "italic"])
             )
         )
-        if cls.shouldHidden(token):
-            return
+
         if useDowngrade:
             indent -= max(indent, INDENT)
         if children:

@@ -1,9 +1,13 @@
+html
+  font-size: 14px
+
 a:-webkit-any-link
   color: unset
   text-decoration: none
 
 .price-up .price,
 .change-up .percent,
+.flow-up .flow,
 .open-up .name,
 .open-up .open-percent,
 .open-up .open-price,
@@ -15,6 +19,7 @@ a:-webkit-any-link
 
 .price-down .price,
 .change-down .percent,
+.flow-down .flow,
 .open-down .name,
 .open-down .open-percent,
 .open-down .open-price,
@@ -35,8 +40,10 @@ a:-webkit-any-link
     transition: 0.5s ease-in-out !important
 
 .row
-  &.price-up td
+  &.price-up td,
+  &.highlight-up
     background-color: rgba(255,0,0,0.1)
-  &.price-down td
+  &.price-down td,
+  &.highlight-down
     background-color: rgba(0,255,0,0.1)
 
