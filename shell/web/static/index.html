@@ -9,6 +9,7 @@
   <script src="/vue.global.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/naive-ui@2.34.3/dist/index.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/sprintf-js@1.1.2/src/sprintf.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
   <script src="./utils.js"></script>
   <script>
     tailwind.config = {
@@ -23,8 +24,33 @@
     <n-message-provider>
       <n-notification-provider>
         <n-dialog-provider>
+          <n-checkbox v-model:checked="feature.quote" @update:checked="(checked) => toggleFeature('quote', checked)">行情</n-checkbox>
+          <n-checkbox v-model:checked="feature.highlight" @update:checked="(checked) => toggleFeature('highlight', checked)">异动</n-checkbox>
+          <n-checkbox v-model:checked="feature.highlightBK" @update:checked="(checked) => toggleFeature('highlightBK', checked)">异动</n-checkbox>
+          <n-slider v-model:value="opacity" :step="1"></n-slider>
           <n-select remote clearable filterable placeholder="搜索证券" v-model:value="selection" :options="selectOptions" :loading="loadingSearch" @search="handleSearch"></n-select>
-          <n-data-table bordered :columns="columns" :data="rows" :row-class-name="getRowClassName" :single-line="false" :row-props="handleRowProps"></n-data-table>
+          <n-data-table ref="table" :row-key="row => row.symbol" bordered :columns="columns" :data="rows" :row-class-name="getRowClassName" :single-line="false" :row-props="handleRowProps"></n-data-table>
+          <div class="flex justify-around text-xs">
+            <div class="flex flex-col" v-for="(list, i) in highlightDataList">
+              <div v-for="(item, j) in list" :key="j" class="p-2" :class="getItemClassName(item)">
+                <span class="inline-block	name mr-2 w-5" style="min-width: 60px"><a target="_blank" :href="`https://www.xueqiu.com/S/${item.symbol}`">{{item.name}}</a></span>
+                <span class="inline-block	type mr-2" style="min-width: 80px">{{item.type}}</span>
+                <span class="inline-block	percent mr-2" style="min-width: 80px">{{item.text}}</span>
+                <span class="inline-block	time">{{item.time}}</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex justify-around text-xs">
+            <div class="flex flex-col">
+              <div v-for="(item, j) in highlightBKData" :key="j" class="p-2" :class="getBKItemClassName(item)">
+                <span class="inline-block	name mr-2 w-5" style="min-width: 60px"><a target="_blank" :href="`https://www.xueqiu.com/S/${item.symbol}`">{{item.name}}</a></span>
+                <span class="inline-block	percent mr-2" style="min-width: 60px">{{item.percent}}</span>
+                <span class="inline-block	flow mr-2" style="min-width: 80px">{{item.inflowText}}</span>
+                <span class="inline-block	mr-2" style="min-width: 80px">{{item.times}}</span>
+                <span class="inline-block"><a target="_blank" :href="`https://www.xueqiu.com/S/${item.main.symbol}`">{{item.main.name}}</a> {{item.main.type}}</span>
+              </div>
+            </div>
+          </div>
           <n-dropdown placement="bottom-start" trigger="manual" :x="cursor[0]" :y="cursor[1]" :options="dropdownOptions" :on-clickOutside="() => shownDropdown = false" :show="shownDropdown" @select="handleClickContextmenu"></n-dropdown>
           <n-modal v-model:show="shownEditAlertRulesModal" preset="dialog" :on-close="hideEditAlertRulesModal" :on-negative-click="hideEditAlertRulesModal" :on-positive-click="editAlertRules" positive-text="确认" title="编辑告警规则" class="mt-:" style="width:600px">
             <n-form :model="formEditAlertRulesModel" label-placement="left" class="mt-4">

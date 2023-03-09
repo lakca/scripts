@@ -1,9 +1,13 @@
+html {
+  font-size: 14px;
+}
 a:-webkit-any-link {
   color: unset;
   text-decoration: none;
 }
 .price-up .price,
 .change-up .percent,
+.flow-up .flow,
 .open-up .name,
 .open-up .open-percent,
 .open-up .open-price,
@@ -15,6 +19,7 @@ a:-webkit-any-link {
 }
 .price-down .price,
 .change-down .percent,
+.flow-down .flow,
 .open-down .name,
 .open-down .open-percent,
 .open-down .open-price,
@@ -35,9 +40,11 @@ a:-webkit-any-link {
 .row td {
   transition: 0.5s ease-in-out !important;
 }
-.row.price-up td {
+.row.price-up td,
+.row.highlight-up {
   background-color: rgba(255,0,0,0.1);
 }
-.row.price-down td {
+.row.price-down td,
+.row.highlight-down {
   background-color: rgba(0,255,0,0.1);
 }
