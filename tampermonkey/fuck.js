@@ -1,9 +1,10 @@
 // ==UserScript==
-// @name         New Userscript
+// @name         Fuck
 // @namespace    http://tampermonkey.net/
 // @version      0.1
 // @description  try to take over the world!
 // @author       You
+// @noframes
 // @match        *://*/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=zhihu.com
 // @grant        unsafeWindow
@@ -12,7 +13,7 @@
 // @grant        GM_download
 // @grant        GM_getResourceText
 // @grant        GM_getResourceURL
-// @grant        GM_inf
+// @grant        GM_info
 // @grant        GM_log
 // @grant        GM_notification
 // @grant        GM_openInTab
@@ -128,6 +129,22 @@
             },
         }
     }
+    function query(selector, all=false) {
+        const single = (typeof selector === 'string' && !all) || !Array.isArray(selector)
+        const elements = typeof selector === 'string' ? all ? Array.from(document.body.querySelectorAll(selector) || []) : [document.body.querySelector(selector)] : Array.isArray(selector) ? selector : [selector]
+        return {
+            remove() {
+                elements.forEach(e => e?.remove())
+            },
+            style(name, value, ...more) {
+                if (arguments.length < 2) {
+                    const data = elements.map(e => window.getComputedStyle(e).getPropertyValue(name))
+                    return single ? data[0] : data
+                }
+                elements.forEach(e => e?.style?.setProperty(name, value, ...more))
+            },
+        }
+    }
     GM_addStyle(`
         .${cls('hidden')} {
             display: none!important;
@@ -228,6 +245,17 @@
             observe(document.body).addChild(function(node) {
                 node.classList.contains('passport-login-container') && node.remove()
             })
+            query('#csdn-toolbar').remove()
+            query('#toolBarBox').remove()
+            query('#blogColumnPayAdvert').remove()
+            query('#blogExtensionBox').remove()
+            query('#treeSkill').remove()
+            query('#recommendNps').remove()
+            query('.blog-footer-bottom').remove()
+            query(document.body).style('background', query('.blog-content-box').style('background-color'), 'important')
+            Array.from(document.body.querySelector('.blog_container_aside')?.children || []).forEach(e => e.id !== 'asidedirectory' && e?.remove())
+        } else if (checkHref('.baidu.com')) {
+            Array.from(document.getElementById('content_left')?.children || []).forEach(e => e.classList.contains('result') || e?.remove())
         }
     }
     window.fuck = fuck
@@ -283,6 +311,5 @@
     menu('设置').register(function() {
         document.body.appendChild(renderSettings().el)
     })
-    console.log(111, data().keys())
     // Your code here...
 })();
