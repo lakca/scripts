@@ -1351,7 +1351,7 @@ function json_res() {
               curlparams+=(--data-urlencode "fs=$market")
               curlparams+=(--data-urlencode 'fields=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f22,f11,f62,f128,f136,f115,f152')
               curlparams+=(--data-urlencode _=$(timestamp))
-              jsonFormat='data.diff|TABLE:(证券名称)f14|${.f12} {.f14}$|indicator({.f17},{.f18}),(涨速)f22|format(%)|indicator,(5分钟)f11|format(%)|indicator,(涨跌幅)f3|format(%)|indicator,(量比)f10|cyan,(振幅)f7|format(%),(换手率)f8|format(%),(最新价)f2|indicator(cmp={.f18}),(PE)f9,(流通市值)f21|number(cn),(链接)url|$http://quote.eastmoney.com/unify/r/{.f13}.{.f12}$|dim$'
+              jsonFormat='data.diff|TABLE:(证券名称)f14|${.f12} {.f14}$|indicator({.f17},{.f18}),(涨速)f22|format(%)|indicator|SIMPLE,(5分钟)f11|format(%)|indicator|SIMPLE,(涨跌幅)f3|format(%)|indicator|SIMPLE,(量比)f10|cyan,(振幅)f7|format(%)|SIMPLE,(换手率)f8|format(%),(最新价)f2|indicator(cmp={.f18}),(PE)f9,(流通市值)f21|number(cn),(链接)url|$http://quote.eastmoney.com/unify/r/{.f13}.{.f12}$|dim$'
               jsonp=OBJ
               local pages=${PAGES:-1}
               local offset=$(($page * 20))
@@ -1457,7 +1457,8 @@ function json_res() {
           outputfile=$outputfile.$3
           case $3 in
             龙虎榜|lhb) # https://data.eastmoney.com/stock/tradedetail.html
-              local date_range=($(ask_date_range "$_today" "$_today"))
+              local date_start=($(question2 -q '开始时间' -d $_today -i $4))
+              local date_end=($(question2 -q '结束时间' -d $_today -i $5))
               url='https://datacenter-web.eastmoney.com/api/data/v1/get'
               curlparams+=(--data-urlencode callback=jQuery112307241680021281278_$(timestamp))
               curlparams+=(--data-urlencode sortColumns=SECURITY_CODE,TRADE_DATE)
@@ -1468,14 +1469,14 @@ function json_res() {
               curlparams+=(--data-urlencode columns=SECURITY_CODE,SECUCODE,SECURITY_NAME_ABBR,TRADE_DATE,EXPLAIN,CLOSE_PRICE,CHANGE_RATE,BILLBOARD_NET_AMT,BILLBOARD_BUY_AMT,BILLBOARD_SELL_AMT,BILLBOARD_DEAL_AMT,ACCUM_AMOUNT,DEAL_NET_RATIO,DEAL_AMOUNT_RATIO,TURNOVERRATE,FREE_MARKET_CAP,EXPLANATION,D1_CLOSE_ADJCHRATE,D2_CLOSE_ADJCHRATE,D5_CLOSE_ADJCHRATE,D10_CLOSE_ADJCHRATE,SECURITY_TYPE_CODE)
               curlparams+=(--data-urlencode source=WEB)
               curlparams+=(--data-urlencode client=WEB)
-              curlparams+=(--data-urlencode "filter=(TRADE_DATE<='${date_range[@]:1:1}')(TRADE_DATE>='${date_range[@]:0:1}')")
+              curlparams+=(--data-urlencode "filter=(TRADE_DATE<='${date_start}')(TRADE_DATE>='${date_end}')")
               jsonFormat='result.data|TABLE:(证券名称)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR}$|indicator(cmp={.CHANGE_RATE})|bold|index,(涨跌幅)CHANGE_RATE|number(+)|format(%)|indicator|SIMPLE,(买入)BILLBOARD_BUY_AMT|number(cn)|HIDE_IN_TABLE,(卖出)BILLBOARD_SELL_AMT|number(cn)|HIDE_IN_TABLE,(净买入)BILLBOARD_NET_AMT|number(cn)|indicator|SIMPLE,(龙虎榜成交额)BILLBOARD_DEAL_AMT|number(cn),(总成交额)ACCUM_AMOUNT|number(cn),(换手率)TURNOVERRATE|format(%)|SIMPLE,(交易日)TRADE_DATE|date(date)|HIDE_IN_TABLE,(上榜原因)EXPLANATION|dim|SIMPLE,(其他)EXPLAIN|dim|HIDE_IN_TABLE,(链接)url|$https://data.eastmoney.com/stock/lhb,{.TRADE_DATE|slice(0,10)},{.SECURITY_CODE}.html$|HIDE_IN_TABLE'
               jsonp=OBJ
             ;;
             领涨概念|lzgn)
               url='https://push2.eastmoney.com/api/qt/clist/get'
-              curlparams+=(--data-urlencode pn=1)
-              curlparams+=(--data-urlencode pz=10)
+              curlparams+=(--data-urlencode pn=$PAGE)
+              curlparams+=(--data-urlencode pz=$SIZE)
               curlparams+=(--data-urlencode po=1)
               curlparams+=(--data-urlencode np=1)
               curlparams+=(--data-urlencode ut=fa5fd1943c7b386f172d6893dbfba10b)
@@ -1496,6 +1497,116 @@ function json_res() {
             公告大全) # https://data.eastmoney.com/notices/
             ;;
             大宗交易) # https://data.eastmoney.com/dzjy/
+            ;;
+            个股北向资金持仓明细|bxcg) # https://data.eastmoney.com/hsgtcg/StockHdDetail/002460.html
+              #   {
+              #     "SECUCODE": "002460.SZ",
+              #     "SECURITY_CODE": "002460",
+              #     "SECURITY_INNER_CODE": "1000009062",
+              #     "SECURITY_NAME_ABBR": "赣锋锂业",
+              #     "HOLD_DATE": "2023-06-05 00:00:00",
+              #     "ORG_CODE": "10088542",
+              #     "ORG_NAME": "奕丰证券(香港)有限公司",
+              #     "HOLD_NUM": 1640,
+              #     "MARKET_CODE": "003",
+              #     "HOLD_SHARES_RATIO": 0,
+              #     "HOLD_MARKET_CAP": 106042.4,
+              #     "CLOSE_PRICE": 64.66,
+              #     "CHANGE_RATE": 0.7165,
+              #     "HOLD_MARKET_CAPONE": 754.4,
+              #     "HOLD_MARKET_CAPFIVE": 5412,
+              #     "HOLD_MARKET_CAPTEN": -3854,
+              #     "PARTICIPANT_CODE": "B01459"
+              # }
+              local columns=(
+                "SECUCODE"            "002460.SZ"
+                "SECURITY_CODE"       "002460"
+                "SECURITY_INNER_CODE" "1000009062"
+                "SECURITY_NAME_ABBR"  "赣锋锂业"
+                "HOLD_DATE"           "2023-06-05,00:00:00"
+                "ORG_CODE"            "10088542"
+                "ORG_NAME"            "奕丰证券(香港)有限公司"
+                "HOLD_NUM"            1640
+                "MARKET_CODE"         "003"
+                "HOLD_SHARES_RATIO"   0
+                "HOLD_MARKET_CAP"     106042.4
+                "CLOSE_PRICE"         64.66
+                "CHANGE_RATE"         0.7165
+                "HOLD_MARKET_CAPONE"  1日持仓变化
+                "HOLD_MARKET_CAPFIVE" 5日持仓变化
+                "HOLD_MARKET_CAPTEN"  10日持仓变化
+                "PARTICIPANT_CODE"    "B01459"
+              )
+              local sortTypes=(
+                -1 倒序
+                1  顺序
+              )
+              local code=$(question2 -q '证券代码' -i "$4")
+              local market=$(ask2 -q '交易市场' -i "$5" -0 -N 3 -A "001 沪市 sh 003 深市 sz")
+              local date="$(question2 -q '日期' -d "$_today" -i "$6")"
+              local sortColumn=$(ask2 -q '排序字段' -d 'HOLD_MARKET_CAPONE' -i $7 -0 -N 2 -A "${columns[*]}")
+              local sortType=$(ask2 -q '排序方式' -d '-1' -i $8 -0 -N 2 -A "${sortTypes[*]}")
+
+              tailer="echo 页面地址 https://data.eastmoney.com/hsgtcg/StockHdDetail/$code/$date.html >&2"
+
+              url='https://datacenter-web.eastmoney.com/api/data/v1/get'
+              curlparams+=(--data-urlencode callback=jQuery112307241680021281278_$(timestamp))
+              curlparams+=(--data-urlencode sortColumns=$sortColumn)
+              curlparams+=(--data-urlencode sortTypes=$sortType)
+              curlparams+=(--data-urlencode pageSize=${SIZE:-50})
+              curlparams+=(--data-urlencode pageNumber=${PAGE:-1})
+              curlparams+=(--data-urlencode reportName=RPT_MUTUAL_HOLD_DET)
+              curlparams+=(--data-urlencode columns=ALL)
+              curlparams+=(--data-urlencode source=WEB)
+              curlparams+=(--data-urlencode client=WEB)
+              curlparams+=(--data-urlencode filter="(SECURITY_CODE=\"$code\")(MARKET_CODE=\"$market\")(HOLD_DATE='$date')")
+              jsonFormat='result.data|TABLE:(证券名称)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR} {.CHANGE_RATE|number(+)|format(%)}$|indicator(cmp={.CHANGE_RATE})|bold|index,(机构名称)f128|${.PARTICIPANT_CODE} {.ORG_NAME}$|indicator(cmp={.HOLD_MARKET_CAPONE}),(持仓变化)HOLD_MARKET_CAPONE|number(cn)|indicator(cmp={.HOLD_MARKET_CAPONE}),(持股市值)HOLD_MARKET_CAP|number(cn),(链接)url|$https://data.eastmoney.com/hsgtcg/InstitutionHdStatistics/{.PARTICIPANT_CODE}.html$|HIDE_IN_TABLE'
+              jsonp=OBJ
+            ;;
+            北向资金历史|bxls)
+              local columns=(
+                "SECURITY_INNER_CODE"  "1000009062"
+                "SECUCODE"             "002460.SZ"
+                "TRADE_DATE"           "2023-05-15,00:00:00"
+                "SECURITY_CODE"        "002460"
+                "SECURITY_NAME"        "赣锋锂业"
+                "MUTUAL_TYPE"          "003"
+                "CHANGE_RATE"          8.668730650155
+                "CLOSE_PRICE"          70.2
+                "HOLD_SHARES"          113688049
+                "HOLD_MARKET_CAP"      7980901039.8
+                "A_SHARES_RATIO"       7.05
+                "HOLD_SHARES_RATIO"    7.04
+                "FREE_SHARES_RATIO"    9.416
+                "TOTAL_SHARES_RATIO"   5.6362
+                "HOLD_MARKETCAP_CHG1"  903135180.4
+                "HOLD_MARKETCAP_CHG5"  1050883183.8
+                "HOLD_MARKETCAP_CHG10" 1791118169.84
+              )
+              local sortTypes=(
+                -1 倒序
+                1  顺序
+              )
+              local code=$(question2 -q '证券代码' -i "$4")
+              local date="$(question2 -q '起始日期' -d "$_today" -i "$5")"
+              local sortColumn=$(ask2 -q '排序字段' -d 'TRADE_DATE' -i $6 -0 -N 2 -A "${columns[*]}")
+              local sortType=$(ask2 -q '排序方式' -d '-1' -i $7 -0 -N 2 -A "${sortTypes[*]}")
+              url='https://datacenter-web.eastmoney.com/api/data/v1/get'
+              curlparams+=(--data-urlencode callback=jQuery112307241680021281278_$(timestamp))
+
+              tailer="echo 页面地址 https://data.eastmoney.com/hsgtcg/StockHdStatistics/$code.html >&2"
+
+              curlparams+=(--data-urlencode sortColumns=$sortColumn)
+              curlparams+=(--data-urlencode sortTypes=$sortType)
+              curlparams+=(--data-urlencode pageSize=${SIZE:-50})
+              curlparams+=(--data-urlencode pageNumber=${PAGE:-1})
+              curlparams+=(--data-urlencode reportName=RPT_MUTUAL_HOLDSTOCKNORTH_STA)
+              curlparams+=(--data-urlencode columns=ALL)
+              curlparams+=(--data-urlencode source=WEB)
+              curlparams+=(--data-urlencode client=WEB)
+              curlparams+=(--data-urlencode filter="(SECURITY_CODE=\"$code\")(TRADE_DATE>='$date')")
+              jsonFormat='result.data|TABLE:(证券名称)SECURITY_NAME|${.SECURITY_CODE} {.SECURITY_NAME} {.CHANGE_RATE|number(+)|format(%)}$|indicator(cmp={.CHANGE_RATE})|bold|index,(持仓变化)HOLD_MARKETCAP_CHG1|number(cn)|indicator(cmp={.HOLD_MARKETCAP_CHG1}),(持股市值)HOLD_MARKET_CAP|number(cn),(持仓比例)HOLD_SHARES_RATIO|format(%),(交易日期)TRADE_DATE|slice(0,10),(链接)url|$https://data.eastmoney.com/hsgtcg/StockHdDetail/{.SECURITY_CODE}/{.TRADE_DATE|slice(0,10)}.html$|HIDE_IN_TABLE'
+              jsonp=OBJ
             ;;
           esac
         ;;
@@ -1970,6 +2081,17 @@ declare -a args=()
 
 for op in "$@"; do
   [[ $op == '-t' ]] && TABLE=1 || [[ $op == '-s' ]] && SIMPLE=1 || args+=("$op")
+
+  if [[ $op == '-h' ]]; then
+  echo -e '\033[32;2m环境参数: \033[0m\033[2mSIMPLE, TABLE, TRADING, LOOP, SIZE, PAGE, SHOULD_STORE, DEBUG_LOCAL\033[0m'
+  echo -e '\033[32;2m概念排行: \033[0m\033[2mSIMPLE=1 resou.sh em quote rank f3 27 n\033[0m'
+  echo -e '\033[32;2m个股异动: \033[0m\033[2mLOOP=5 SIMPLE=1 resou.sh em quote pkyd ALL\033[0m'
+  echo -e '\033[32;2m板块异动: \033[0m\033[2mLOOP=5 SIMPLE=1 resou.sh em quote bkyd ALL\033[0m'
+  echo -e '\033[32;2m强势股池: \033[0m\033[2mresou.sh em quote qsgc\033[0m'
+  echo -e '\033[32;2m涨停股池: \033[0m\033[2mresou.sh em quote ztgc\033[0m'
+  echo -e '\033[32;2m炸板股池: \033[0m\033[2mresou.sh em quote zbgc\033[0m'
+  echo -e '\033[32;2m次新股池: \033[0m\033[2mresou.sh em quote cxgc\033[0m'
+  fi
 done
 
 help "${args[@]}"

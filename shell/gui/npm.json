@@ -1,0 +1,663 @@
+{
+    "analyzedAt": "2023-01-13T08:02:20.173Z",
+    "collected": {
+        "metadata": {
+            "name": "react",
+            "scope": "unscoped",
+            "version": "18.2.0",
+            "description": "React is a JavaScript library for building user interfaces.",
+            "keywords": [
+                "react"
+            ],
+            "date": "2022-06-14T19:46:38.369Z",
+            "publisher": {
+                "username": "gnoff",
+                "email": "jcs.gnoff@gmail.com"
+            },
+            "maintainers": [
+                {
+                    "username": "gaearon",
+                    "email": "dan.abramov@gmail.com"
+                },
+                {
+                    "username": "acdlite",
+                    "email": "npm@andrewclark.io"
+                },
+                {
+                    "username": "gnoff",
+                    "email": "jcs.gnoff@gmail.com"
+                },
+                {
+                    "username": "fb",
+                    "email": "opensource+npm@fb.com"
+                },
+                {
+                    "username": "trueadm",
+                    "email": "dg@domgan.com"
+                },
+                {
+                    "username": "sophiebits",
+                    "email": "npm@sophiebits.com"
+                }
+            ],
+            "repository": {
+                "type": "git",
+                "url": "git+https://github.com/facebook/react.git",
+                "directory": "packages/react"
+            },
+            "links": {
+                "npm": "https://www.npmjs.com/package/react",
+                "homepage": "https://reactjs.org/",
+                "repository": "https://github.com/facebook/react",
+                "bugs": "https://github.com/facebook/react/issues"
+            },
+            "license": "MIT",
+            "dependencies": {
+                "loose-envify": "^1.1.0"
+            },
+            "releases": [
+                {
+                    "from": "2022-12-14T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 25
+                },
+                {
+                    "from": "2022-10-15T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 101
+                },
+                {
+                    "from": "2022-07-17T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 209
+                },
+                {
+                    "from": "2022-01-13T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 434
+                },
+                {
+                    "from": "2021-01-13T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 885
+                }
+            ],
+            "hasSelectiveFiles": true
+        },
+        "npm": {
+            "downloads": [
+                {
+                    "from": "2023-01-12T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 3385837
+                },
+                {
+                    "from": "2023-01-06T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 17547077
+                },
+                {
+                    "from": "2022-12-14T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 63819506
+                },
+                {
+                    "from": "2022-10-15T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 217736453
+                },
+                {
+                    "from": "2022-07-17T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 426593162
+                },
+                {
+                    "from": "2022-01-13T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 828606518
+                }
+            ],
+            "starsCount": 793
+        },
+        "github": {
+            "homepage": "https://reactjs.org",
+            "starsCount": 200439,
+            "forksCount": 41607,
+            "subscribersCount": 6643,
+            "issues": {
+                "count": 25023,
+                "openCount": 1139,
+                "distribution": {
+                    "3600": 5150,
+                    "10800": 2435,
+                    "32400": 2438,
+                    "97200": 3183,
+                    "291600": 2278,
+                    "874800": 2182,
+                    "2624400": 1716,
+                    "7873200": 1445,
+                    "23619600": 1852,
+                    "70858800": 1705,
+                    "212576400": 639
+                },
+                "isDisabled": false
+            },
+            "contributors": [
+                {
+                    "username": "sammy-SC",
+                    "commitsCount": 22
+                },
+                {
+                    "username": "salazarm",
+                    "commitsCount": 24
+                },
+                {
+                    "username": "wincent",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "bvaughn",
+                    "commitsCount": 301
+                },
+                {
+                    "username": "bgw",
+                    "commitsCount": 14
+                },
+                {
+                    "username": "kassens",
+                    "commitsCount": 72
+                },
+                {
+                    "username": "SanderSpies",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "trueadm",
+                    "commitsCount": 429
+                },
+                {
+                    "username": "keyz",
+                    "commitsCount": 26
+                },
+                {
+                    "username": "aickin",
+                    "commitsCount": 18
+                },
+                {
+                    "username": "acdlite",
+                    "commitsCount": 1144
+                },
+                {
+                    "username": "yangshun",
+                    "commitsCount": 10
+                },
+                {
+                    "username": "raphamorim",
+                    "commitsCount": 15
+                },
+                {
+                    "username": "jgebhardt",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "Simek",
+                    "commitsCount": 15
+                },
+                {
+                    "username": "motiz88",
+                    "commitsCount": 10
+                },
+                {
+                    "username": "elas7",
+                    "commitsCount": 13
+                },
+                {
+                    "username": "DarkScorpion",
+                    "commitsCount": 10
+                },
+                {
+                    "username": "SimenB",
+                    "commitsCount": 19
+                },
+                {
+                    "username": "hristo-kanchev",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "rbalicki2",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "sophiebits",
+                    "commitsCount": 875
+                },
+                {
+                    "username": "cpojer",
+                    "commitsCount": 56
+                },
+                {
+                    "username": "iamdustan",
+                    "commitsCount": 17
+                },
+                {
+                    "username": "joshduck",
+                    "commitsCount": 21
+                },
+                {
+                    "username": "sebmarkbage",
+                    "commitsCount": 905
+                },
+                {
+                    "username": "poteto",
+                    "commitsCount": 21
+                },
+                {
+                    "username": "lunaruan",
+                    "commitsCount": 118
+                },
+                {
+                    "username": "jeffmo",
+                    "commitsCount": 111
+                },
+                {
+                    "username": "eps1lon",
+                    "commitsCount": 60
+                },
+                {
+                    "username": "philipp-spiess",
+                    "commitsCount": 18
+                },
+                {
+                    "username": "petehunt",
+                    "commitsCount": 205
+                },
+                {
+                    "username": "zpao",
+                    "commitsCount": 822
+                },
+                {
+                    "username": "jquense",
+                    "commitsCount": 18
+                },
+                {
+                    "username": "koba04",
+                    "commitsCount": 67
+                },
+                {
+                    "username": "josephsavona",
+                    "commitsCount": 13
+                },
+                {
+                    "username": "tyao1",
+                    "commitsCount": 19
+                },
+                {
+                    "username": "KonstHardy",
+                    "commitsCount": 7
+                },
+                {
+                    "username": "arkist",
+                    "commitsCount": 14
+                },
+                {
+                    "username": "sompylasar",
+                    "commitsCount": 15
+                },
+                {
+                    "username": "sun1one",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "mondaychen",
+                    "commitsCount": 27
+                },
+                {
+                    "username": "yiminghe",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "benjamn",
+                    "commitsCount": 68
+                },
+                {
+                    "username": "subtleGradient",
+                    "commitsCount": 110
+                },
+                {
+                    "username": "mroch",
+                    "commitsCount": 12
+                },
+                {
+                    "username": "Daniel15",
+                    "commitsCount": 18
+                },
+                {
+                    "username": "zertosh",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "RaitoBezarius",
+                    "commitsCount": 7
+                },
+                {
+                    "username": "hramos",
+                    "commitsCount": 7
+                },
+                {
+                    "username": "bhamodi",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "syranide",
+                    "commitsCount": 69
+                },
+                {
+                    "username": "fabiomcosta",
+                    "commitsCount": 15
+                },
+                {
+                    "username": "raunofreiberg",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "necolas",
+                    "commitsCount": 92
+                },
+                {
+                    "username": "taneliang",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "gaearon",
+                    "commitsCount": 1574
+                },
+                {
+                    "username": "DenrizSusam",
+                    "commitsCount": 7
+                },
+                {
+                    "username": "nhunzaker",
+                    "commitsCount": 94
+                },
+                {
+                    "username": "fxxkscript",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "iamchenxin",
+                    "commitsCount": 13
+                },
+                {
+                    "username": "rickhanlonii",
+                    "commitsCount": 90
+                },
+                {
+                    "username": "jimfb",
+                    "commitsCount": 116
+                },
+                {
+                    "username": "yungsters",
+                    "commitsCount": 93
+                },
+                {
+                    "username": "gnoff",
+                    "commitsCount": 48
+                },
+                {
+                    "username": "lucasecdb",
+                    "commitsCount": 10
+                },
+                {
+                    "username": "kmeht",
+                    "commitsCount": 10
+                },
+                {
+                    "username": "andreypopp",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "behnammodi",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "flarnie",
+                    "commitsCount": 67
+                },
+                {
+                    "username": "ianobermiller",
+                    "commitsCount": 7
+                },
+                {
+                    "username": "jaredly",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "fisherwebdev",
+                    "commitsCount": 10
+                },
+                {
+                    "username": "onionymous",
+                    "commitsCount": 7
+                },
+                {
+                    "username": "marocchino",
+                    "commitsCount": 45
+                },
+                {
+                    "username": "camsong",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "dependabot[bot]",
+                    "commitsCount": 48
+                },
+                {
+                    "username": "aweary",
+                    "commitsCount": 61
+                },
+                {
+                    "username": "NE-SmallTown",
+                    "commitsCount": 22
+                },
+                {
+                    "username": "JoshuaGross",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "bl00mber",
+                    "commitsCount": 14
+                },
+                {
+                    "username": "rickbeerendonk",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "vjeux",
+                    "commitsCount": 140
+                },
+                {
+                    "username": "waldreiter",
+                    "commitsCount": 14
+                },
+                {
+                    "username": "Andarist",
+                    "commitsCount": 10
+                },
+                {
+                    "username": "tomocchino",
+                    "commitsCount": 13
+                },
+                {
+                    "username": "chenglou",
+                    "commitsCount": 126
+                },
+                {
+                    "username": "TheSavior",
+                    "commitsCount": 30
+                },
+                {
+                    "username": "Biki-das",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "andrewdavey",
+                    "commitsCount": 7
+                },
+                {
+                    "username": "RReverser",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "chicoxyzzy",
+                    "commitsCount": 29
+                },
+                {
+                    "username": "kohei-takata",
+                    "commitsCount": 39
+                },
+                {
+                    "username": "ivanzotov",
+                    "commitsCount": 11
+                },
+                {
+                    "username": "hzoo",
+                    "commitsCount": 8
+                },
+                {
+                    "username": "clemmy",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "mcsheffrey",
+                    "commitsCount": 21
+                },
+                {
+                    "username": "joecritch",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "jddxf",
+                    "commitsCount": 9
+                },
+                {
+                    "username": "threepointone",
+                    "commitsCount": 16
+                }
+            ],
+            "commits": [
+                {
+                    "from": "2023-01-06T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 12
+                },
+                {
+                    "from": "2022-12-14T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 25
+                },
+                {
+                    "from": "2022-10-15T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 161
+                },
+                {
+                    "from": "2022-07-17T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 356
+                },
+                {
+                    "from": "2022-01-13T00:00:00.000Z",
+                    "to": "2023-01-13T00:00:00.000Z",
+                    "count": 721
+                }
+            ],
+            "statuses": [
+                {
+                    "context": "ci/circleci: test_fuzz",
+                    "state": "success"
+                },
+                {
+                    "context": "ci/circleci: setup",
+                    "state": "success"
+                },
+                {
+                    "context": "ci/circleci: Publish to Experimental channel",
+                    "state": "success"
+                },
+                {
+                    "context": "ci/circleci: Publish to Next channel",
+                    "state": "success"
+                }
+            ]
+        },
+        "source": {
+            "files": {
+                "readmeSize": 1162,
+                "testsSize": 381150,
+                "hasChangelog": true
+            },
+            "badges": [
+                {
+                    "urls": {
+                        "original": "https://img.shields.io/npm/v/react.svg?style=flat",
+                        "shields": "https://img.shields.io/npm/v/react.svg",
+                        "content": "https://img.shields.io/npm/v/react.json"
+                    },
+                    "info": {
+                        "service": "npm",
+                        "type": "version",
+                        "modifiers": {
+                            "type": "v"
+                        }
+                    }
+                },
+                {
+                    "urls": {
+                        "original": "https://circleci.com/gh/facebook/react.svg?circle-token=:circle-token",
+                        "service": "https://circleci.com/gh/facebook/react.svg",
+                        "shields": "https://img.shields.io/circleci/project/github/facebook/react.svg",
+                        "content": "https://img.shields.io/circleci/project/github/facebook/react.json"
+                    },
+                    "info": {
+                        "service": "circleci",
+                        "type": "build"
+                    }
+                }
+            ],
+            "linters": [
+                "editorconfig",
+                "eslint",
+                "prettier"
+            ],
+            "coverage": 0.86
+        }
+    },
+    "evaluation": {
+        "quality": {
+            "carefulness": 0.9999999999999999,
+            "tests": 0.679,
+            "health": 1,
+            "branding": 0.7
+        },
+        "popularity": {
+            "communityInterest": 249582,
+            "downloadsCount": 72578817.66666667,
+            "downloadsAcceleration": -10757.702473363839,
+            "dependentsCount": 0
+        },
+        "maintenance": {
+            "releasesFrequency": 1,
+            "commitsFrequency": 1,
+            "openIssues": 1,
+            "issuesDistribution": 0.32312146312608314
+        }
+    },
+    "score": {
+        "final": 0.9296215002155315,
+        "detail": {
+            "quality": 0.902269335310431,
+            "popularity": 0.9158908847875538,
+            "maintenance": 0.9667968284193095
+        }
+    }
+}

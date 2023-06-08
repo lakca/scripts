@@ -86,7 +86,7 @@ function sendMsg(ws, action, data) {
 store.on('begin::record', record => {
   if (record.scope === 'ws::client' && record.key === 'quote' && record.tag == null) {
     makePolling('quote', { interval: 3000, wait: true, immediate: true }, async function(checker, id) {
-      const data = await em.get_quote(checker.symbols)
+      const data = await em.get_quote(checker.symbols).catch(e => e.message)
       checker.clients.forEach(ws => sendMsg(ws, 'quote', data))
     }, function check() {
       const symbols = store.scope('ws::client').key('quote').tag('symbol').values
@@ -95,7 +95,7 @@ store.on('begin::record', record => {
     })
   } else if (record.scope === 'ws::client' && record.key === 'highlight' && record.tag === null) {
     makePolling('highlight', { interval: 5000, wait: true, immediate: true }, async function callback(checker, id) {
-      const data = await em.get_highlight(em.ALL_CHANGE_TYPES)
+      const data = await em.get_highlight(em.ALL_CHANGE_TYPES).catch(e => e.message)
       checker.clients.forEach(ws => sendMsg(ws, 'highlight', data))
     }, function check() {
       const clients = store.scope('ws::client').key('highlight').values
@@ -103,7 +103,7 @@ store.on('begin::record', record => {
     })
   } else if (record.scope === 'ws::client' && record.key === 'highlightBK' && record.tag === null) {
     makePolling('highlightBK', { interval: 10000, wait: true, immediate: true }, async function callback(checker, id) {
-      const data = await em.get_highlight_bk(em.ALL_CHANGE_TYPES)
+      const data = await em.get_highlight_bk(em.ALL_CHANGE_TYPES).catch(e => e.message)
       checker.clients.forEach(ws => sendMsg(ws, 'highlightBK', data))
     }, function check() {
       const clients = store.scope('ws::client').key('highlightBK').values

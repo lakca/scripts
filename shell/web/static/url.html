@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.prod.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@2.51.4/dist/full.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      }
+    }
+  </script>
+</head>
+
+<body class="flex flex-col items-center justify-center">
+  <textarea class="opacity-0" disabled id="hidden-input" ></textarea>
+  <div class="flex items-center">
+    <input type="text" placeholder="Type here" class="input input-bordered  w-full" id="paste-input" v-model="url" />
+    <button class="btn btn-primary" @click="paste">粘贴</button>
+  </div>
+  <div class="flex items-center">
+    <div class="form-control">
+      <label class="cursor-pointer label">
+        <span class="label-text">反选</span>
+        <input type="checkbox" checked="checked" class="checkbox checkbox-secondary" v-model="reverseChecked" />
+      </label>
+    </div>
+    <input type="text" placeholder="Type here" class="input input-bordered  w-full" id="copy-input" v-model="newUrl"
+      disabled />
+    <button class="btn btn-primary" @click="copy">复制</button>
+    <button class="btn btn-primary" @click="copy2">结构化复制</button>
+  </div>
+  <div type="text" contenteditable placeholder="info@site.com" class="w-96 my-0.5 px-2 py-1 border border-gray-200 outline-none" @input="e => this.urlpath = e.target.textContent">{{this.urlpath}}</div>
+  <div class="flex items-center" v-for="(k, i) in Object.keys(this.params)" :key="i">
+    <input type="checkbox" class="checkbox checkbox-primary" v-model="this.checked[k]" />
+    <label class="input-group">
+      <span class="w-56">{{k}}</span>
+      <div type="text" contenteditable placeholder="info@site.com" class="w-96 my-0.5 px-2 py-1 border border-gray-200 outline-none" @input="e => this.params[k] = e.target.textContent">{{this.params[k]}}</div>
+    </label>
+  </div>
+</body>
+<script>
+  const vue = Vue.createApp({
+    el: 'body',
+    data() {
+      return {
+        url: '',
+        params: {},
+        checked: {},
+        reverseChecked: false,
+        urlpath: '',
+      }
+    },
+    watch: {
+      urlObj: {
+        immediate: true,
+        handler(url) {
+          if (url) {
+            this.urlpath = url.origin + url.pathname
+            this.params = Object.fromEntries(url.searchParams.entries())
+            this.checked = Object.fromEntries([...url.searchParams.entries()].map(e => [e[0], true]))
+          }
+        }
+      },
+      reverseChecked() {
+        Object.keys(this.checked).forEach(k => this.checked[k] = !this.checked[k])
+      },
+    },
+    computed: {
+      urlObj() {
+        try {
+          return new URL(this.url)
+        } catch (e) {
+          return ''
+        }
+      },
+      newUrl() {
+        if (!this.urlObj) return ''
+        const search = new URLSearchParams(Object.fromEntries([...Object.entries(this.params)].filter((e) => this.checked[e[0]])))
+        return this.urlpath + '?' + search.toString()
+      },
+      structured() {
+        if (this.urlObj) {
+          const url = new URL(this.urlObj)
+          const params = Object.fromEntries([...Object.entries(this.params)].filter((e) => this.checked[e[0]]))
+          url.search = ''
+          return {
+            url: url.toString(),
+            params,
+          }
+        }
+      }
+    },
+    methods: {
+      copy() {
+        const dom = document.getElementById('copy-input')
+        dom.removeAttribute('disabled')
+        dom.focus()
+        dom.select()
+        document.execCommand('copy')
+        dom.setAttribute('disabled', true)
+      },
+      copy2() {
+        const dom = document.getElementById('hidden-input')
+        dom.value = JSON.stringify(this.structured, null, 2)
+        dom.removeAttribute('disabled')
+        dom.focus()
+        dom.select()
+        document.execCommand('copy')
+        dom.setAttribute('disabled', true)
+      },
+      async paste() {
+        const text = await navigator.clipboard.readText();
+        this.url = text;
+      }
+    }
+  }).mount(document.body)
+</script>
+
+</html>

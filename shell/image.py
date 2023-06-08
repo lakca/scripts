@@ -91,7 +91,7 @@ if op == 'paste':
     img = ImageGrab.grabclipboard()
     img.save(file)
     if args and 'open' in args:
-        subprocess.Popen(f"open '{file}'")
+        subprocess.Popen(['open', file])
     print('保存', file)
 
 elif op == 'shot':
