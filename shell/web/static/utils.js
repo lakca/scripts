@@ -23,24 +23,56 @@
       obj[e[key]] = e
     } return obj
   }
-  function notify(msg) {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') new Notification(msg)
-    })
+  function notify(msg, voice) {
+    window.__notify__ = msg
+    window.__voice__ = voice
+    let btn = document.querySelector('#btn')
+    if (!btn) {
+      btn = document.createElement('button')
+      document.body.appendChild(btn)
+      btn.style.width = '10px'
+      btn.style.height = '10px'
+      btn.id = 'btn'
+      btn.addEventListener('click', function () {
+        console.log('click')
+        window.__voice__ && fetch('/say', {
+          method: 'POST',
+          body: window.__voice__,
+        })
+        window.__notify__ && Notification.requestPermission().then(permission => {
+          console.log(permission)
+          if (permission === 'granted') new Notification(window.__notify__)
+        })
+      })
+    }
+    if (window.__notify__) {
+      btn.click()
+    }
   }
   function alert(data, rules, oldData) {
     if (!data || !rules) return
     const equal = oldData && (data.price === oldData.price)
+    const equalRatio = oldData && (Math.abs(data.ratio - oldData.ratio) < 0.0001)
     for (const rule of rules) {
       if (!rule || !rule.checked) continue
-      if ((rule.type === 'hc' && rule.value <= data.price && !equal)
-        || (rule.type === 'lc' && rule.value >= data.price && !equal)
-        || (rule.type === 'hp' && parseFloat(rule.value) <= data.ratio * 100 && !equal)
-        || (rule.type === 'lp' && parseFloat(rule.value) >= data.ratio * 100 && !equal)
-      ) {
-        notify(`${data.name} ${data.percent} ${data.price}`)
-        return true
+      const msg = `${data.name} ${data.percent} ${data.price}`
+      let voice
+      let percentVoice = (data.ratio > 0 ? '当前涨幅' : data.ratio < 0 ? '当前跌幅' : '') + `${data.percent.replace(/[+-]/, '')}`
+      if ((rule.type === 'hc' && rule.value <= data.price && !equal)) {
+        voice = `价格涨至${data.price} ${percentVoice}`
       }
+      if ((rule.type === 'lc' && rule.value >= data.price && !equal)) {
+        voice = `价格跌至${data.price} ${percentVoice}`
+      }
+      if ((rule.type === 'hp' && parseFloat(rule.value) <= data.ratio * 100 && !equalRatio)) {
+        voice = `价格涨至${percentVoice}`
+      }
+      if ((rule.type === 'lp' && parseFloat(rule.value) >= data.ratio * 100 && !equalRatio)) {
+        voice = `价格跌至${percentVoice}`
+      }
+      console.log(data.percent, data.ratio, equalRatio)
+      voice && notify(msg, data.name + voice)
+      return true
     }
   }
 function getStorage(key) {

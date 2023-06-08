@@ -235,19 +235,19 @@ function ensureFolder() {
 
 function store() {
   local op=$1
-  local key=$(base64 <<< "$2")
+  local key=$(base64 <<<"$2")
   local val="$3"
   local file=${_filename}.store
   [[ ! ${file[@]:0:1} = '.' ]] && file=.$file
   local filename="$_dirname/$file"
   case $1 in
-    -g)
-      [[ -a $filename ]] && tac $filename | grep --max-count=1 --fixed-strings "$key:" | cut -d: -f2 | base64 -d
+  -g)
+    [[ -e $filename ]] && tac $filename | grep --max-count=1 --fixed-strings "$key:" | cut -d: -f2 | base64 -d
     ;;
-    -s)
-      [[ -f /dev/stdin || -p /dev/stdin ]] && read val
-      val=$(base64 <<< "$val")
-      echo "$key:$val" >> "$filename"
+  -s)
+    [[ -f /dev/stdin || -p /dev/stdin ]] && read val
+    val=$(base64 <<<"$val")
+    echo "$key:$val" >>"$filename"
     ;;
   esac
 }
@@ -529,7 +529,7 @@ function ask2() {
         [[ $i -eq $echoIndex ]] && _ASK_RESULT="${array[@]:$index:1}"
         _ASK_RESULTS+=("${array[@]:$index:1}")
       done
-      [[ ! $_ASK_NO_VERBOSE ]] && echo -en '\033[33m【结果】\033[0m\033[2;3;37m您输入的结果为：\033[0m' >&2 && echo -e "\033[2;3;36m${_ASK_RESULTS[*]}\033[0m" >&2
+      [[ ! $_ASK_NO_VERBOSE ]] && echo -en "\033[33m【结果】\033[32m${question}\033[0m\033[0m\033[2;3;37m您输入的结果为：\033[0m" >&2 && echo -e "\033[2;3;36m${_ASK_RESULTS[*]}\033[0m" >&2
       [[ ! $silent ]] && echo $_ASK_RESULT
     fi
     [[ ! $_ASK_NO_VERBOSE ]] && printf '\n' >&2
@@ -565,8 +565,9 @@ function question2() {
     i) input="$OPTARG" ;;
     esac
   done
+  local answer
   if [[ "$input" ]]; then
-    echo "$input"
+    answer="$input"
   else
     local msg="\033[33m【输入】\033[0m请输入\033[31m${question}\033[0m"
     [[ $question_desc ]] && msg="${msg}，${question_desc}"
@@ -576,11 +577,10 @@ function question2() {
     read
     debug $REPLY
     echo -en '\033[0m' >&2
-    local answer
     [[ -z $REPLY ]] && answer="$default" || answer="$REPLY"
-    [[ ! $_ASK_NO_VERBOSE ]] && echo -e "\033[33m【结果】\033[0m\033[2;3;37m您输入的有效值为：\033[0m\033[2;3;36m$answer\033[0m" >&2
-    echo "$answer"
   fi
+  [[ ! $_ASK_NO_VERBOSE ]] && echo -e "【结果】\033[32m${question}\033[0m\033[0m\033[2;3;37m您输入的有效值为：\033[0m\033[2;3;36m$answer\033[0m" >&2
+  echo "$answer"
 }
 
 function whether() {
@@ -709,7 +709,7 @@ function print_json() {
     esac
   done
   for i in "${curlparams[@]}"; do
-    _curlparams+=("$(base64 -d <<< "$i")")
+    _curlparams+=("$(base64 -d <<<"$i")")
   done
 
   echo "curl -v "$url" "${_curlparams[@]}" "${headers[@]}"" >>resou.log
@@ -812,23 +812,23 @@ function help() {
     local stylish=(-e '/^ \S\+/i\ ' -e 's/^ \( \+\)/\1\1\1\1/;s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;s/\(\s*\)\([^ |)]\+\)\([|)]\)/\1\\033[31m\2\\033[0m\3/;s/\(|\)\([^ |)]\+\)/\1\\033[32m\2\\033[0m/g;/^\S/i\ ')
     local endLevel=0
     for i in $(seq 0 $#); do [[ ${@:$i:1} == '-h' ]] && endLevel=$i; done
-    [[ $endLevel == 1 ]] && echo -e "$(sed "${stylish[@]}" <<< "$help_msg")" && exit 0
+    [[ $endLevel == 1 ]] && echo -e "$(sed "${stylish[@]}" <<<"$help_msg")" && exit 0
     echo -e "$(
       nextLevel=1
       while IFS= read line; do
-        lineLevel=$(grep -o '^\s*' <<< "$line")
+        lineLevel=$(grep -o '^\s*' <<<"$line")
         lineLevel=${#lineLevel}
         local pattern="${@:$lineLevel:1}"
         # nextLevel至少为1
         [[ $nextLevel < 1 ]] && nextLevel=1
         # echo "$nextLevel,$lineLevel,$line"
         # 回溯
-        [[ $lineLevel < $nextLevel ]] && { [[ $line =~ "$pattern" ]] &&  { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
+        [[ $lineLevel < $nextLevel ]] && { [[ $line =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
         # 打印全部子命令
-        [[ $lineLevel -ge $endLevel && $nextLevel -ge $endLevel ]] &&  echo -e "$line" && continue
+        [[ $lineLevel -ge $endLevel && $nextLevel -ge $endLevel ]] && echo -e "$line" && continue
         # 匹配上nextLevel，打印
         [[ $lineLevel = $nextLevel && $line =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((nextLevel + 1)) && continue; }
-      done <<< "$help_msg" | sed "${stylish[@]}"
+      done <<<"$help_msg" | sed "${stylish[@]}"
     )"
   else
     return 1

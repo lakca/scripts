@@ -7,7 +7,7 @@
     "withGlobalTauri": false
   },
   "package": {
-    "productName": "gui",
+    "productName": "Gui",
     "version": "0.0.0"
   },
   "tauri": {
@@ -40,7 +40,7 @@
       {
         "fullscreen": false,
         "resizable": true,
-        "title": "gui",
+        "title": "Gui",
         "width": 800,
         "height": 600
       }

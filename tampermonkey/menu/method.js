@@ -141,10 +141,6 @@ function jiraMention(data) {
     let git = form.node('git').value.trim()
     if (!jira.startsWith('http')) jira = `${jiraRoot}/browse/${kind}-${jira.match(/\d+/)[0]}`
     if (!git.startsWith('http')) git = ``
-    // return `[龙鹏|https://git.mizar.icu/longpeng] mentioned this issue in ` +
-    // `[a commit|https://git.mizar.icu/acms/${repo}/-/commit/${id}] of ` +
-    // `[ACMS / ${repo}|https://git.mizar.icu/acms/${repo}] on branch [${branch}|https://git.mizar.icu/acms/${repo}/-/tree/${branch}]:` +
-    // `{quote}${msg}{quote}`
   }
 }
 

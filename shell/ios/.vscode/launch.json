@@ -1,0 +1,28 @@
+{
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "sourceLanguages": [
+        "swift"
+      ],
+      "name": "Debug ios",
+      "program": "${workspaceFolder:ios}/.build/debug/ios",
+      "args": [],
+      "cwd": "${workspaceFolder:ios}",
+      "preLaunchTask": "swift: Build Debug ios"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "sourceLanguages": [
+        "swift"
+      ],
+      "name": "Release ios",
+      "program": "${workspaceFolder:ios}/.build/release/ios",
+      "args": [],
+      "cwd": "${workspaceFolder:ios}",
+      "preLaunchTask": "swift: Build Release ios"
+    }
+  ]
+}

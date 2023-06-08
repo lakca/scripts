@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.prod.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@2.51.4/dist/full.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      }
+    }
+  </script>
+</head>
+
+<body class="flex">
+  <iframe src="./url.html" frameborder="0" class="flex-1 h-screen"></iframe>
+  <iframe src="./url.html" frameborder="0" class="flex-1 h-screen"></iframe>
+</body>
+<script>
+  setTimeout(() => {
+    const frames = document.querySelectorAll('iframe')
+    frames.forEach(frame => {
+      frame.contentDocument.addEventListener('scroll', e => {
+        scrollTop = frame.contentDocument.documentElement.scrollTop
+        frames.forEach(e => e !== frame && (e.contentDocument.documentElement.scrollTop = scrollTop))
+      })
+    })
+  }, 1000)
+</script>
+</html>
