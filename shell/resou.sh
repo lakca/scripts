@@ -1212,13 +1212,19 @@ function json_res() {
         期货-中金所 'i:100.UDI,i:100.BDI,i:100.CRB'
         国债 'm:8+s:16+f:!8192'
       )
+      local zjCycles="
+        今日排行 f62 f12,f14,f2,f3,f62,f184,f66,f69,f72,f75,f78,f81,f84,f87,f204,f205,f124,f1,f13 (主力净流入)f62|number(cn)|indicator,(超大净流入)f66|number(cn)|indicator,(大单净流入)f72|number(cn)|indicator,(中单净流入)f78|number(cn)|indicator,(小单净流入)f84|number(cn)|indicator
+        3日排行 f267 f12,f14,f2,f127,f267,f268,f269,f270,f271,f272,f273,f274,f275,f276,f257,f258,f124,f1,f13 (3日涨跌幅)f127|format(+%)|indicator,(主力净流入)f267|number(cn)|indicator,(超大净流入)f269|number(cn)|indicator,(大单净流入)f271|number(cn)|indicator,(中单净流入)f273|number(cn)|indicator,(小单净流入)f275|number(cn)|indicator
+        5日排行 f164 f12,f14,f2,f109,f164,f165,f166,f167,f168,f169,f170,f171,f172,f173,f257,f258,f124,f1,f13 (5日涨跌幅)f109|format(+%)|indicator,(主力净流入)f164|number(cn)|indicator,(超大净流入)f166|number(cn)|indicator,(大单净流入)f168|number(cn)|indicator,(中单净流入)f170|number(cn)|indicator,(小单净流入)f172|number(cn)|indicator
+        10日排行 f174 f12,f14,f2,f160,f174,f175,f176,f177,f178,f179,f180,f181,f182,f183,f260,f261,f124,f1,f13 (10日涨跌幅)f160|format(+%)|indicator,(主力净流入)f174|number(cn)|indicator,(超大净流入)f176|number(cn)|indicator,(大单净流入)f178|number(cn)|indicator,(中单净流入)f180|number(cn)|indicator,(小单净流入)f182|number(cn)|indicator
+      "
       case $2 in
         滚动新闻|7x24直播|roll|kuaixun) # 7x24直播 http://kuaixun.eastmoney.com/
           url="https://newsapi.eastmoney.com/kuaixun/v2/api/list?callback=ajaxResult_102&column=102&limit=${SIZE:-20}&p=${PAGE:-1}&callback=kxall_ajaxResult102&_=$(date +%s)"
           jsonFormat='news|TABLE:(标题)title|red|bold|index,(内容)digest|white|dim|HIDE_IN_TABLE,(时间)showtime,(链接)url_unique|dim'
           jsonp=OBJ
         ;;
-        最新播报|zxbb) # http://roll.eastmoney.com/
+        最新播报|zxbb|news) # http://roll.eastmoney.com/
           url="https://emres.dfcfw.com/60/zxbb2018.js?callback=zxbb2018&_=$(date +%s)"
           aliases=(标题 时间 链接)
           fields=(Art_Title Art_Showtime Art_UniqueUrl)
@@ -1240,7 +1246,7 @@ function json_res() {
         盘后机构策略|phjgcl)
           json_res eastmoney search keyword '盘后机构策略'
         ;;
-        早间机构策略|zjjgcl)
+        早间机构策略|pqjgcl)
           json_res eastmoney search keyword '早间机构策略'
         ;;
         行情|quote)
@@ -1286,6 +1292,66 @@ function json_res() {
               jsonp=OBJ
               export IMGCAT=${IMGCAT-1}
             ;;
+            个股资金流|zj) # https://data.eastmoney.com/zjlx/detail.html
+              local zjMarkets="
+                全部股票 m:0+t:6+f:!2,m:0+t:13+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2,m:0+t:7+f:!2,m:1+t:3+f:!2
+                沪深A股 m:0+t:6+f:!2,m:0+t:13+f:!2,m:0+t:80+f:!2,m:1+t:2+f:!2,m:1+t:23+f:!2
+                沪市A股 m:1+t:2+f:!2,m:1+t:23+f:!2
+                科创板 m:1+t:23+f:!2
+                深市A股 m:0+t:6+f:!2,m:0+t:13+f:!2,m:0+t:80+f:!2
+                创业板 m:0+t:80+f:!2
+                沪市B股 m:1+t:3+f:!2
+                深市B股 m:0+t:7+f:!2
+              "
+              ask2 -1 -d '0' -i "$4" -q '统计天数' -A "${zjCycles[*]}" -N 4 -S 0
+              local zjCycle=$_ASK_RESULT
+              local fields="${_ASK_RESULTS[@]:2:1}"
+              local cols="${_ASK_RESULTS[@]:3:1}"
+              local market=$(ask2 -1 -d '0' -i "$5" -q '市场' -A "${zjMarkets[*]}" -N 2 -S 0)
+              local order=$(whether -q '正序' -i "$5" -y 0 -n 1)
+              url='https://push2.eastmoney.com/api/qt/clist/get'
+              curlparams+=(--data-urlencode cb=jQuery112305113121161098986_$(timestamp))
+              curlparams+=(--data-urlencode fid=$zjCycle)
+              curlparams+=(--data-urlencode po=$order)
+              curlparams+=(--data-urlencode pz=${SIZE:-10})
+              curlparams+=(--data-urlencode pn=${PAGE:-1})
+              curlparams+=(--data-urlencode np=1)
+              curlparams+=(--data-urlencode fltt=2)
+              curlparams+=(--data-urlencode invt=2)
+              curlparams+=(--data-urlencode ut=b2884a393a59ad64002292a3e90d46a5)
+              curlparams+=(--data-urlencode fs=$market)
+              curlparams+=(--data-urlencode fields=$fields)
+              jsonFormat='data.diff|TABLE:(证券)f14|${.f12} {.f14}$|indicator({.f3}),(涨跌幅)f3|format(+%)|indicator,'$cols',(链接)f12|$https://data.eastmoney.com/stockdata/{.f12}.html$'
+              jsonp=OBJ
+            ;;
+            板块资金流|bkzj) # https://data.eastmoney.com/bkzj/
+              local boards="
+                地域板块 1
+                行业板块 2
+                概念板块 3
+              "
+              ask2 -1 -d '0' -i "$4" -q '统计天数' -A "${zjCycles[*]}" -N 4 -S 0
+              local zjCycle=$_ASK_RESULT
+              local fields="${_ASK_RESULTS[@]:2:1}"
+              local cols="${_ASK_RESULTS[@]:3:1}"
+              local bkType=$(ask2 -1 -i "$input" -d '1' -i "$4" -q '板块类型' -A "${boards[*]}" -N 2 -S '0')
+              local order=$(whether -q '正序' -i "$5" -y 0 -n 1)
+              url='https://push2.eastmoney.com/api/qt/clist/get'
+              curlparams+=(--data-urlencode cb=jQuery112307932171275575526_$(timestamp))
+              curlparams+=(--data-urlencode fid=$zjCycle)
+              curlparams+=(--data-urlencode po=$order)
+              curlparams+=(--data-urlencode pz=${SIZE:-10})
+              curlparams+=(--data-urlencode pn=${PAGE:-1})
+              curlparams+=(--data-urlencode np=1)
+              curlparams+=(--data-urlencode fltt=2)
+              curlparams+=(--data-urlencode invt=2)
+              curlparams+=(--data-urlencode "fs=m:90+t:$bkType")
+              curlparams+=(--data-urlencode stat=1)
+              curlparams+=(--data-urlencode fields=$fields)
+              curlparams+=(--data-urlencode ut=b2884a393a59ad64002292a3e90d46a5)
+              jsonFormat='data.diff|TABLE:(板块)f14|SIMPLE,(涨跌幅)f3|format(+%)|indicator|SIMPLE,'$cols',(链接)f12|$https://quote.eastmoney.com/unify/r/{.f13}.{.f12}$|SIMPLE'
+              jsonp=OBJ
+            ;;
             # kline http://56.push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery35108905987798741108_1676431200477&secid=0.300250&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61&klt=103&fqt=1&beg=0&end=20500101&smplmt=460&lmt=1000000&_=1676431200584
             盘口异动|pkyd) # http://quote.eastmoney.com/changes/
               local input="$4"
@@ -1313,7 +1379,7 @@ function json_res() {
               curlparams+=(--data-urlencode pageindex=${PAGE:-0})
               curlparams+=(--data-urlencode pagesize=${SIZE:-50})
               curlparams+=(--data-urlencode _=$(timestamp))
-              jsonFormat='data.allbk|TABLE:(证券名称)n|red|bold,(代码)c|dim,(涨跌幅)u|format(%)|indicator,(主力净流入（万元）)zjl|indicator,(最频繁个股)ms.n|${.ms.t|map(bash:arr='${yd_types[*]}',bash:arrdim=2,bash:arridx=0)|indicator(exp=in,bash:arr='${yd_types[@]:0:22}')} {.ms.c|dim} {.ms.n|magenta}$,(链接)url|$http://quote.eastmoney.com/unify/r/{.m}.{.c}$|dim,(异动情况统计)ydl|TABLE|HIDE_IN_TABLE:(类型)t|map(bash:arr='${yd_types[*]}',bash:arrdim=2,bash:arridx=0)|indicator(exp=in,bash:arr='${yd_types[@]:0:22}'),(次数)ct'
+              jsonFormat='data.allbk|TABLE:(证券名称)n|red|bold,(代码)c|dim,(涨跌幅)u|format(+%)|indicator,(主力净流入)zjl|number(cn,base=万)|indicator,(最频繁个股)ms.n|${.ms.t|map(bash:arr='${yd_types[*]}',bash:arrdim=2,bash:arridx=0)|indicator(exp=in,bash:arr='${yd_types[@]:0:22}')} {.ms.c|dim} {.ms.n|magenta}$,(链接)url|$http://quote.eastmoney.com/unify/r/{.m}.{.c}$|dim,(异动情况统计)ydl|TABLE|HIDE_IN_TABLE:(类型)t|map(bash:arr='${yd_types[*]}',bash:arrdim=2,bash:arridx=0)|indicator(exp=in,bash:arr='${yd_types[@]:0:22}'),(次数)ct'
               jsonp=OBJ
             ;;
             盘口异动数据对比|yddb) # 图表 http://quote.eastmoney.com/changes/?from=center
@@ -1351,7 +1417,7 @@ function json_res() {
               curlparams+=(--data-urlencode "fs=$market")
               curlparams+=(--data-urlencode 'fields=f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f12,f13,f14,f15,f16,f17,f18,f20,f21,f23,f24,f25,f22,f11,f62,f128,f136,f115,f152')
               curlparams+=(--data-urlencode _=$(timestamp))
-              jsonFormat='data.diff|TABLE:(证券名称)f14|${.f12} {.f14}$|indicator({.f17},{.f18}),(涨速)f22|format(%)|indicator|SIMPLE,(5分钟)f11|format(%)|indicator|SIMPLE,(涨跌幅)f3|format(%)|indicator|SIMPLE,(量比)f10|cyan,(振幅)f7|format(%)|SIMPLE,(换手率)f8|format(%),(最新价)f2|indicator(cmp={.f18}),(PE)f9,(流通市值)f21|number(cn),(链接)url|$http://quote.eastmoney.com/unify/r/{.f13}.{.f12}$|dim$'
+              jsonFormat='data.diff|TABLE:(证券名称)f14|${.f12} {.f14}$|indicator({.f17},{.f18}),(涨速)f22|format(+%)|indicator|SIMPLE,(5分钟)f11|format(+%)|indicator|SIMPLE,(涨跌幅)f3|format(+%)|indicator|SIMPLE,(量比)f10|cyan,(振幅)f7|format(+%)|SIMPLE,(换手率)f8|format(+%),(最新价)f2|indicator(cmp={.f18}),(PE)f9,(流通市值)f21|number(cn),(链接)url|$http://quote.eastmoney.com/unify/r/{.f13}.{.f12}$|dim$'
               jsonp=OBJ
               local pages=${PAGES:-1}
               local offset=$(($page * 20))
@@ -1563,7 +1629,7 @@ function json_res() {
               jsonFormat='result.data|TABLE:(证券名称)SECURITY_NAME_ABBR|${.SECURITY_CODE} {.SECURITY_NAME_ABBR} {.CHANGE_RATE|number(+)|format(%)}$|indicator(cmp={.CHANGE_RATE})|bold|index,(机构名称)f128|${.PARTICIPANT_CODE} {.ORG_NAME}$|indicator(cmp={.HOLD_MARKET_CAPONE}),(持仓变化)HOLD_MARKET_CAPONE|number(cn)|indicator(cmp={.HOLD_MARKET_CAPONE}),(持股市值)HOLD_MARKET_CAP|number(cn),(链接)url|$https://data.eastmoney.com/hsgtcg/InstitutionHdStatistics/{.PARTICIPANT_CODE}.html$|HIDE_IN_TABLE'
               jsonp=OBJ
             ;;
-            北向资金历史|bxls)
+            个股北向资金历史|bxls)
               local columns=(
                 "SECURITY_INNER_CODE"  "1000009062"
                 "SECUCODE"             "002460.SZ"
@@ -1607,6 +1673,12 @@ function json_res() {
               curlparams+=(--data-urlencode filter="(SECURITY_CODE=\"$code\")(TRADE_DATE>='$date')")
               jsonFormat='result.data|TABLE:(证券名称)SECURITY_NAME|${.SECURITY_CODE} {.SECURITY_NAME} {.CHANGE_RATE|number(+)|format(%)}$|indicator(cmp={.CHANGE_RATE})|bold|index,(持仓变化)HOLD_MARKETCAP_CHG1|number(cn)|indicator(cmp={.HOLD_MARKETCAP_CHG1}),(持股市值)HOLD_MARKET_CAP|number(cn),(持仓比例)HOLD_SHARES_RATIO|format(%),(交易日期)TRADE_DATE|slice(0,10),(链接)url|$https://data.eastmoney.com/hsgtcg/StockHdDetail/{.SECURITY_CODE}/{.TRADE_DATE|slice(0,10)}.html$|HIDE_IN_TABLE'
               jsonp=OBJ
+            ;;
+            股吧最新发帖|zxft)
+              url="http://guba.eastmoney.com/list,zssz399006,f_$PAGE.html"
+            ;;
+            股吧最新评论|zxpl)
+              url="http://guba.eastmoney.com/list,zssz399006_$PAGE.html"
             ;;
           esac
         ;;

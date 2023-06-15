@@ -1,6 +1,6 @@
 const fs = require('fs')
 
-const fp = '/Users/dgrocsky/Documents/github/notes/src/语言-Swift/swift.md'
+const fp = $SWIFT_NOTE_MD
 
 const f = fs.readFileSync(fp).toString()
 

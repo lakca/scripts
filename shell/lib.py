@@ -489,8 +489,8 @@ class Pipe:
     def apply(cls, v, pipes=[], data={}, interpolate=None, signed=None):
         __stack = [v]
         __interpolate = (
-                lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
-            )
+            lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
+        )
         for pipe in pipes:
             if pipe == "true" and not v:
                 return v
@@ -530,7 +530,8 @@ class Pipe:
             if interpolate is not None and pipe.startswith(interpolate):
                 v = cls._interpolate(pipe[1:], data)
             elif method:
-                v = method(v, *args, **kwargs, data=data, vx=cls._get_v(v, **kwargs))
+                v = method(v, *args, **kwargs, data=data,
+                           vx=cls._get_v(v, **kwargs))
             __stack.append(v)
 
         return v
@@ -668,11 +669,17 @@ class Pipe:
             return ("{:0" + str(kwargs["n"]) + "d}").format(v)
         # 转换为中文单位
         elif type == "cn":
+            base = kwargs.get("base", "")
+            start = False
             for e in ["", "万", "亿", "兆"]:
+                if (base == e):
+                    start = True
+                if (not start):
+                    continue
                 if abs(v) > 10000:
                     v = v / 10000
                 else:
-                    return str(v) + e if isinstance(v, int) else "{:.4f}".format(v) + e
+                    return str(v) + e if isinstance(v, int) else "{:.2f}".format(v) + e
         # 四舍五入
         elif type.isdecimal():
             return round(v, int(type))
@@ -711,9 +718,12 @@ class Pipe:
     @classmethod
     def conditional(cls, v, cond, handler, *args, **kwargs):
         condition = kwargs.get('condition') or cond
-        _condition = lambda e, **kws: cls._exp(e, **kws) if condition == 'exp' else getattr(cls, condition) if hasattr(cls, condition) else None
-        _handler = getattr(cls, handler) if hasattr(cls, handler) else lambda e: handler.format(e)
+        _condition = lambda e, **kws: cls._exp(e, **kws) if condition == 'exp' else getattr(
+            cls, condition) if hasattr(cls, condition) else None
+        _handler = getattr(cls, handler) if hasattr(
+            cls, handler) else lambda e: handler.format(e)
         return _handler(v) if _condition(kwargs['vx'], **kwargs) else v
+
     @classmethod
     def cond(cls, *args, **kwargs):
         return cls.conditional(*args, **kwargs)

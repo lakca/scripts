@@ -37,9 +37,8 @@ process.stdin.setEncoding('utf-8')
     return res.json()
   }
   request().then(data => {
-    fs.writeFileSync(path.join('${folder}', '${filename}.${new Date().toLocaleDateString().replaceAll('/', '-')}.${page}.txt'), JSON.stringify(data, null, 2))
+    fs.writeFileSync(path.join('${folder}', '${filename}.${new Date().toLocaleDateString().replaceAll('/', '-')}.${page}.json'), JSON.stringify(data, null, 2))
   })
   `
-    console.log(code)
     vm.runInNewContext(code, { fs, path, fetch, URLSearchParams })
   })
