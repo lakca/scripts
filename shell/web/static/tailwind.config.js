@@ -1,5 +1,4 @@
 module.exports = {
-  corePlugins: {
-    preflight: false,
-  }
+  content: ['static/*.html'],
+  plugins: [require('tw-elements/dist/plugin.cjs')],
 }
