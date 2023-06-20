@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <link rel="stylesheet" href="./base.css">
+  <script src="./vue.js"></script>
+  <script src="./utils.js"></script>
+  <style>
+    tr.hover td {
+      background-color: rgb(227, 235, 247);
+    }
+
+    td.hover {
+      background-color: rgb(227, 235, 247);
+    }
+  </style>
+</head>
+
+<body class="h-full overflow-x-auto text-xs">
+  <div id="app">
+    <div class="inline-flex" role="group">
+      <!-- <button type="button"
+        class="inline-block rounded bg-neutral-50 px-6 pb-2 pt-2.5 text-xs font-medium uppercase leading-normal text-neutral-800 shadow-[0_4px_9px_-4px_#cbcbcb] transition duration-150 ease-in-out hover:bg-neutral-100 hover:shadow-[0_8px_9px_-4px_rgba(203,203,203,0.3),0_4px_18px_0_rgba(203,203,203,0.2)] focus:bg-neutral-100 focus:shadow-[0_8px_9px_-4px_rgba(203,203,203,0.3),0_4px_18px_0_rgba(203,203,203,0.2)] focus:outline-none focus:ring-0 active:bg-neutral-200 active:shadow-[0_8px_9px_-4px_rgba(203,203,203,0.3),0_4px_18px_0_rgba(203,203,203,0.2)] dark:shadow-[0_4px_9px_-4px_rgba(251,251,251,0.3)] dark:hover:shadow-[0_8px_9px_-4px_rgba(251,251,251,0.1),0_4px_18px_0_rgba(251,251,251,0.05)] dark:focus:shadow-[0_8px_9px_-4px_rgba(251,251,251,0.1),0_4px_18px_0_rgba(251,251,251,0.05)] dark:active:shadow-[0_8px_9px_-4px_rgba(251,251,251,0.1),0_4px_18px_0_rgba(251,251,251,0.05)]">
+        Light
+      </button>
+      <button type="button"
+        class="inline-block rounded bg-primary-100 px-6 pb-2 pt-2.5 text-xs font-medium uppercase leading-normal text-primary-700 transition duration-150 ease-in-out hover:bg-primary-accent-100 focus:bg-primary-accent-100 focus:outline-none focus:ring-0 active:bg-primary-accent-200">
+        Secondary
+      </button> -->
+      <input
+        class="inline-block rounded bg-primary-100 px-6 pb-2 pt-2.5 font-medium uppercase leading-normal text-primary-700 transition duration-150 ease-in-out hover:bg-primary-accent-100 focus:bg-primary-accent-100 focus:outline-none focus:ring-0 active:bg-primary-accent-200"
+        type="file" id="formFile" multiple @change="handleInputFile" />
+    </div>
+    <ul role="list" class="divide-y divide-gray-100 rounded-md border border-gray-200">
+      <li class="flex items-center justify-between py-4 pl-4 pr-5 text-sm leading-6" v-for="(file, i) in data"
+        :key="file.name">
+        <div class="flex w-0 flex-1 items-center">
+          <input type="checkbox" value="" id="checkboxChecked" :checked="file.checked"
+            @change="file.checked = !file.checked" />
+          <div class="ml-4 flex min-w-0 flex-1 gap-2">
+            <span class="truncate font-medium">{{file.name}}</span>
+            <span class="flex-shrink-0 text-gray-400">{{file.size | convertRadix({ fixed: 2, base: 1024, units: ['B',
+              'KB', 'MB'] })}}</span>
+          </div>
+        </div>
+        <a href="#" class="ml-4 flex-shrink-0 only:font-medium text-indigo-600 hover:text-indigo-500"
+          @click="() => data.splice(i, 1)">删除</a>
+      </li>
+    </ul>
+    <div class="w-full">
+      <table class="min-w-full border text-center dark:border-neutral-500 table-fixed" :data-hover-col="hover[0]"
+        :data-hover-row="hover[1]">
+        <thead class="border-b dark:border-neutral-500 sticky top-0 bg-gray-100">
+          <tr>
+            <th scope="col" class="border-r px-6 py-4 dark:border-neutral-500" :title="col.index_name"
+              v-for="(col, colIndex) in columns" :key="col.key">
+              {{col.key}}
+              <div class="upvote w-2 h-2 cursor-pointer inline-block" :class="{'text-red-500': sorts[0] === true && sorts[1] === col }" @click="sorts = sorts[0] === true && sorts[1] === col ? [] : [true, col]">
+                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 320 512"><path d="M177 255.7l136 136c9.4 9.4 9.4 24.6 0 33.9l-22.6 22.6c-9.4 9.4-24.6 9.4-33.9 0L160 351.9l-96.4 96.4c-9.4 9.4-24.6 9.4-33.9 0L7 425.7c-9.4-9.4-9.4-24.6 0-33.9l136-136c9.4-9.5 24.6-9.5 34-.1zm-34-192L7 199.7c-9.4 9.4-9.4 24.6 0 33.9l22.6 22.6c9.4 9.4 24.6 9.4 33.9 0l96.4-96.4l96.4 96.4c9.4 9.4 24.6 9.4 33.9 0l22.6-22.6c9.4-9.4 9.4-24.6 0-33.9l-136-136c-9.2-9.4-24.4-9.4-33.8 0z" fill="currentColor"></path></svg>
+              </div>
+              <div class="downvote w-2 h-2 cursor-pointer inline-block" :class="{'text-red-500': sorts[0] === false && sorts[1] === col }" @click="sorts = sorts[0] === false && sorts[1] === col ? [] : [false, col]">
+                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 320 512"><path d="M143 256.3L7 120.3c-9.4-9.4-9.4-24.6 0-33.9l22.6-22.6c9.4-9.4 24.6-9.4 33.9 0l96.4 96.4l96.4-96.4c9.4-9.4 24.6-9.4 33.9 0L313 86.3c9.4 9.4 9.4 24.6 0 33.9l-136 136c-9.4 9.5-24.6 9.5-34 .1zm34 192l136-136c9.4-9.4 9.4-24.6 0-33.9l-22.6-22.6c-9.4-9.4-24.6-9.4-33.9 0L160 352.1l-96.4-96.4c-9.4-9.4-24.6-9.4-33.9 0L7 278.3c-9.4 9.4-9.4 24.6 0 33.9l136 136c9.4 9.5 24.6 9.5 34 .1z" fill="currentColor"></path></svg>
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <template v-for="(row, rowIndex) in realRows">
+            <tr class="border-b dark:border-neutral-500" :class="{hover: hover[1] === row['股票代码']}"
+              :data-row="row['股票代码']" :key="rowIndex">
+              <template v-for="col in columns">
+                <render-block :key="col.key" component="td" :title="row[col.index_name]"
+                  class="whitespace-nowrap border-r px-6 py-4 dark:border-neutral-500 text-ellipsis"
+                  :class="{ ...getClasses(col, row), hover: hover[0] === col.index_name }"
+                  @mouseover="handleMouseover(col.index_name, row['股票代码'])" :data-row="row['股票代码']"
+                  :data-col="col.index_name" :render="renderCell(col, row)"></render-block>
+              </template>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+<script>
+  const app = new Vue({
+    el: '#app',
+    data() {
+      return {
+        data: [],
+        hover: [],
+        orders: ['索引', '股票代码', '股票简称', 'a股市值(不含限售股)', '集中度90', '最新股东户数', '最新价', '历史最高价前复权', '历史最高价日', '历史最低价前复权', '历史最低价日', '所属概念', '技术形态', '选股动向'],
+        sorts: [],
+      }
+    },
+    computed: {
+      columns() {
+        const cols = [{
+          key: '索引',
+          index_name: '索引',
+        }].concat(this.data[0]?.data?.answer?.components[0]?.data?.columns || [])
+        return cols.sort(this.cmp.bind(this))
+      },
+      rows() {
+        return this.data.reduce((r, v) => v.checked ? r.concat(v.data.answer.components[0].data.datas) : r, [])
+          ?.map((e, i) => {
+            if (e) e['索引'] = i + 1
+            return e
+          })
+      },
+      realRows() {
+        const [flag, col] = this.sorts
+        if (this.sorts.length < 2) return this.rows
+        return this.rows.map(e => e).sort((a, b) => {
+          const r = a[col.key] - b[col.key]
+          return flag ? r : -r
+        })
+      },
+    },
+    filters: {
+      convertRadix,
+      checkNumber(v) {
+        return /^[-0-9][0-9]*(\.[0-9]+)?$/.test('' + v)
+      },
+    },
+    methods: {
+      cmp(a, b) {
+        const ai = this.orders.indexOf(a.index_name)
+        const bi = this.orders.indexOf(b.index_name)
+        return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi)
+      },
+      getClasses(col, row) {
+        const classes = []
+        const indexName = col.index_name
+        const value = row[col.key]
+        if (row && this.$options.filters.checkNumber(value)) {
+          classes.push('text-right')
+        }
+        switch (col.index_name) {
+          case '所属概念':
+          case '选股动向':
+          case '技术形态':
+          case '实际控制人':
+          case '所属同花顺行业':
+            classes.push('text-left')
+            break
+          case '最新涨跌幅':
+            classes.push(value > 0 ? 'text-red-500' : 'text-green-500')
+            break
+          case '股票简称':
+            classes.push(row['最新涨跌幅'] > 0 ? 'text-red-500' : 'text-green-600')
+            break
+        }
+        return Object.fromEntries(classes.map(e => [e, true]))
+      },
+      renderCell(col, row) {
+        const indexName = col.index_name
+        const value = row[col.key]
+        const current = row['最新价']
+        switch (indexName) {
+          case 'a股市值(不含限售股)':
+          case '最新股东户数':
+          case '总股本':
+          case '最新dde大单净额':
+          case '最新户均持股数量':
+          case '最新户均持股市值':
+            return convertRadix(value, { base: 10000, fixed: 2 })
+          case '历史最低价前复权':
+          case '历史最高价前复权': {
+            const ratio = (100 * (current - value) / Math.abs(value)).toFixed(2)
+            return h('span', [value.toFixed(2), h('span', { class: ratio > 0 ? 'text-red-500' : 'text-green-600', }, ` (${ratio}%)`)])
+          }
+          case '历史最高价日':
+          case '历史最低价日':
+          case '股东人数变动公告日':
+            return `${value}`.replace(/(?<=\d{4})\d{2}/, e => '-' + e + '-')
+          case '最新户均持股比例':
+          case '实际控制人持股比例':
+            return (+value).toFixed(3) + '%'
+          case '最新涨跌幅':
+            return (+value).toFixed(2) + '%'
+          case '股票代码':
+            return h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=${value}&querytype=stock` } }, value)
+          case '所属概念':
+            return h('div', { class: 'w-40 overflow-hidden text-ellipsis' },
+              value.split(';').map(v => h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=所属概念是${v}&querytype=stock` } }, v))
+            )
+          case '选股动向':
+          case '技术形态':
+            return h('div', { class: 'w-40 overflow-hidden text-ellipsis' },
+              value.split('||').map(v => h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=${v}&querytype=stock` } }, v))
+            )
+          case '所属同花顺行业':
+            return value.split('-').map(v => h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=所属同花顺行业是${v}&querytype=stock` } }, v))
+          case '最终控制人':
+            return (value || '').split('||').map(v => h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=所属同花顺行业是${v}&querytype=stock` } }, v))
+        }
+        return value
+      },
+      handleInputFile(e) {
+        const files = e.target.files
+          ;[...files].forEach(file => {
+            const fr = new FileReader()
+            fr.onload = () => {
+              const index = this.data.findIndex(e => e.name === file.name)
+              if (index > -1) this.data.splice(index, 1)
+              this.data.push({
+                name: file.name,
+                size: file.size,
+                type: file.type,
+                checked: true,
+                data: JSON.parse(fr.result),
+              })
+            }
+            fr.readAsText(file)
+          })
+      },
+      handleMouseover(col, row) {
+        this.hover = [col, row]
+      },
+    },
+    mounted() {
+      this.data = JSON.parse(window.localStorage.getItem('table')) || []
+      window.addEventListener('beforeunload', () => {
+        window.localStorage.setItem('table', JSON.stringify(this.data))
+      })
+    },
+  })
+</script>
+
+</html>

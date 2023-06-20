@@ -1228,7 +1228,7 @@ function json_res() {
           url="https://emres.dfcfw.com/60/zxbb2018.js?callback=zxbb2018&_=$(date +%s)"
           aliases=(标题 时间 链接)
           fields=(Art_Title Art_Showtime Art_UniqueUrl)
-          jsonFormat='Result|TABLE:(标题)Art_Title|red|bold|index,(时间)Art_Showtime,(链接)Art_UniqueUrl|white|dim'
+          jsonFormat='Result|TABLE|reverse:(标题)Art_Title|red|bold|index,(时间)Art_Showtime,(链接)Art_UniqueUrl|white|dim'
           jsonp=OBJ
         ;;
         周末消息|zmxx) # https://data.eastmoney.com/xg/xg/calendar.html

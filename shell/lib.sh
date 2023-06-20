@@ -712,7 +712,7 @@ function print_json() {
     _curlparams+=("$(base64 -d <<<"$i")")
   done
 
-  echo "curl -v "$url" "${_curlparams[@]}" "${headers[@]}"" >>resou.log
+  echo "curl -v "$url" "${_curlparams[@]}" "${headers[@]}"" >>$_dirname/resou.log
 
   # 使用本地数据
   if [[ ${DEBUG_LOCAL+x} ]]; then
@@ -724,7 +724,7 @@ function print_json() {
 
   # 获取数据
   if [[ ! "$text" ]]; then
-    text="$(curl -v "$url" "${_curlparams[@]}" "${headers[@]}" 2>curl.log)"
+    text="$(curl -v "$url" "${_curlparams[@]}" "${headers[@]}" 2>$_dirname/curl.log)"
   fi
   # 保存数据
   [[ ${DEBUG_LOCAL-x} && $SHOULD_STORE && $file ]] && printf %s "$text" >"$(datafile $file)"
