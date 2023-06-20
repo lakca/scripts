@@ -214,6 +214,9 @@ export async function importTextFile(type) {
 }
 const READING_LIST = '稍后阅读'
 const READING_LIST_PARENT = '书签栏'
+/**
+ * @returns {Promise<chrome.bookmarks.BookmarkTreeNode & { children: chrome.bookmarks.BookmarkTreeNode[] } | undefined>}
+ */
 export async function getReadingFolder() {
   const bookmarks = await chrome.bookmarks.getTree()
   const parent = bookmarks[0].children.find(bk => bk.children && bk.title === READING_LIST_PARENT)
@@ -246,7 +249,6 @@ export async function readTabsLater(dir) {
       const old = reading.children.find(bk => {
         return bk.url === tab.url
       })
-      console.log(tab.url)
       tasks.push(async function (old, tab) {
         if (old) {
           old.title !== tab.title && await chrome.bookmarks.update(old.id, { title: tab.title })
