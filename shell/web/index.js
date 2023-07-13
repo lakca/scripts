@@ -18,6 +18,7 @@ app.use(koaBody({
 }));
 app.use(router.routes())
 app.use(serve(__dirname + '/static'))
+app.use(serve(__dirname + '/node_modules'))
 app.use(async function(ctx, next) {
   try {
     await next()

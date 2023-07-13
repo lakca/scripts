@@ -6,36 +6,41 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Document</title>
-  <link rel="stylesheet" href="./base.css">
+  <link rel="stylesheet" href="./tailwind.base.css">
   <script src="./vue.js"></script>
   <script src="./utils.js"></script>
   <style>
-    tr.hover td {
+    tr:hover td, tr.hover td {
       background-color: rgb(227, 235, 247);
     }
-
-    td.hover {
-      background-color: rgb(227, 235, 247);
+    [data-col="索引"] {
+      position: sticky;
+      left: 0;
+    }
+    [data-col="股票代码"], [data-col="股票简称"] {
+      position: sticky;
+      left: 72px;
+    }
+    [data-col="股票简称"] {
+      position: sticky;
+      left: 185px;
     }
   </style>
 </head>
 
 <body class="h-full overflow-x-auto text-xs">
   <div id="app">
-    <div class="inline-flex" role="group">
-      <!-- <button type="button"
-        class="inline-block rounded bg-neutral-50 px-6 pb-2 pt-2.5 text-xs font-medium uppercase leading-normal text-neutral-800 shadow-[0_4px_9px_-4px_#cbcbcb] transition duration-150 ease-in-out hover:bg-neutral-100 hover:shadow-[0_8px_9px_-4px_rgba(203,203,203,0.3),0_4px_18px_0_rgba(203,203,203,0.2)] focus:bg-neutral-100 focus:shadow-[0_8px_9px_-4px_rgba(203,203,203,0.3),0_4px_18px_0_rgba(203,203,203,0.2)] focus:outline-none focus:ring-0 active:bg-neutral-200 active:shadow-[0_8px_9px_-4px_rgba(203,203,203,0.3),0_4px_18px_0_rgba(203,203,203,0.2)] dark:shadow-[0_4px_9px_-4px_rgba(251,251,251,0.3)] dark:hover:shadow-[0_8px_9px_-4px_rgba(251,251,251,0.1),0_4px_18px_0_rgba(251,251,251,0.05)] dark:focus:shadow-[0_8px_9px_-4px_rgba(251,251,251,0.1),0_4px_18px_0_rgba(251,251,251,0.05)] dark:active:shadow-[0_8px_9px_-4px_rgba(251,251,251,0.1),0_4px_18px_0_rgba(251,251,251,0.05)]">
-        Light
-      </button>
-      <button type="button"
-        class="inline-block rounded bg-primary-100 px-6 pb-2 pt-2.5 text-xs font-medium uppercase leading-normal text-primary-700 transition duration-150 ease-in-out hover:bg-primary-accent-100 focus:bg-primary-accent-100 focus:outline-none focus:ring-0 active:bg-primary-accent-200">
-        Secondary
-      </button> -->
-      <input
-        class="inline-block rounded bg-primary-100 px-6 pb-2 pt-2.5 font-medium uppercase leading-normal text-primary-700 transition duration-150 ease-in-out hover:bg-primary-accent-100 focus:bg-primary-accent-100 focus:outline-none focus:ring-0 active:bg-primary-accent-200"
-        type="file" id="formFile" multiple @change="handleInputFile" />
+    <div class="fixed z-50 w-10 h-10 top-2 right-2 opacity-0 hover:opacity-90 text-red-600 cursor-pointer transition-all duration-300" @click="neat = !neat">
+      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 20 20"><g fill="none"><path d="M2 4.5A2.5 2.5 0 0 1 4.5 2h11A2.5 2.5 0 0 1 18 4.5v11a2.5 2.5 0 0 1-2.5 2.5h-11A2.5 2.5 0 0 1 2 15.5v-11zM4.5 3A1.5 1.5 0 0 0 3 4.5v11A1.5 1.5 0 0 0 4.5 17h11a1.5 1.5 0 0 0 1.5-1.5v-11A1.5 1.5 0 0 0 15.5 3h-11zm6.5 9a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-2zm0-6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V6zm-6 6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-2zm0-6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6z" fill="currentColor"></path></g></svg>
     </div>
-    <ul role="list" class="divide-y divide-gray-100 rounded-md border border-gray-200">
+    <div v-if="!neat" class="inline-flex" role="group">
+      <select v-model="orderKind" class="select select-bordered w-full max-w-xs outline-none">
+        <option v-for="order in Object.keys(kindOfOrders)" :value="order">{{order}}</option>
+      </select>
+      <input class="file-input file-input-ghost w-full max-w-xs" type="file" id="formFile" multiple
+        @change="handleInputFile" />
+    </div>
+    <ul v-if="!neat" role="list" class="divide-y divide-gray-100 rounded-md border border-gray-200">
       <li class="flex items-center justify-between py-4 pl-4 pr-5 text-sm leading-6" v-for="(file, i) in data"
         :key="file.name">
         <div class="flex w-0 flex-1 items-center">
@@ -54,30 +59,34 @@
     <div class="w-full">
       <table class="min-w-full border text-center dark:border-neutral-500 table-fixed" :data-hover-col="hover[0]"
         :data-hover-row="hover[1]">
-        <thead class="border-b dark:border-neutral-500 sticky top-0 bg-gray-100">
+        <thead class="border-b dark:border-neutral-500 sticky top-0 z-10 bg-gray-100">
           <tr>
-            <th scope="col" class="border-r px-6 py-4 dark:border-neutral-500" :title="col.index_name"
-              v-for="(col, colIndex) in columns" :key="col.key">
-              {{col.key}}
-              <div class="upvote w-2 h-2 cursor-pointer inline-block" :class="{'text-red-500': sorts[0] === true && sorts[1] === col }" @click="sorts = sorts[0] === true && sorts[1] === col ? [] : [true, col]">
-                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 320 512"><path d="M177 255.7l136 136c9.4 9.4 9.4 24.6 0 33.9l-22.6 22.6c-9.4 9.4-24.6 9.4-33.9 0L160 351.9l-96.4 96.4c-9.4 9.4-24.6 9.4-33.9 0L7 425.7c-9.4-9.4-9.4-24.6 0-33.9l136-136c9.4-9.5 24.6-9.5 34-.1zm-34-192L7 199.7c-9.4 9.4-9.4 24.6 0 33.9l22.6 22.6c9.4 9.4 24.6 9.4 33.9 0l96.4-96.4l96.4 96.4c9.4 9.4 24.6 9.4 33.9 0l22.6-22.6c9.4-9.4 9.4-24.6 0-33.9l-136-136c-9.2-9.4-24.4-9.4-33.8 0z" fill="currentColor"></path></svg>
-              </div>
-              <div class="downvote w-2 h-2 cursor-pointer inline-block" :class="{'text-red-500': sorts[0] === false && sorts[1] === col }" @click="sorts = sorts[0] === false && sorts[1] === col ? [] : [false, col]">
-                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 320 512"><path d="M143 256.3L7 120.3c-9.4-9.4-9.4-24.6 0-33.9l22.6-22.6c9.4-9.4 24.6-9.4 33.9 0l96.4 96.4l96.4-96.4c9.4-9.4 24.6-9.4 33.9 0L313 86.3c9.4 9.4 9.4 24.6 0 33.9l-136 136c-9.4 9.5-24.6 9.5-34 .1zm34 192l136-136c9.4-9.4 9.4-24.6 0-33.9l-22.6-22.6c-9.4-9.4-24.6-9.4-33.9 0L160 352.1l-96.4-96.4c-9.4-9.4-24.6-9.4-33.9 0L7 278.3c-9.4 9.4-9.4 24.6 0 33.9l136 136c9.4 9.5 24.6 9.5 34 .1z" fill="currentColor"></path></svg>
+            <th scope="col" class="border-r px-2 py-4 dark:border-neutral-500 whitespace-nowrap bg-gray-100" :title="col.index_name" :data-col="col.index_name"
+              v-for="(col, colIndex) in realColumns" :key="col.key">
+              <div class="flex justify-center">
+                <div class="w-4 cursor-pointer"
+                  :class="[sorts[0] === true && sorts[1] === col ? 'text-red-500' : 'text-gray-400']"
+                  @click="sorts = sorts[0] === true && sorts[1] === col ? [] : [true, col]">
+                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 20 20"><g fill="none"><path d="M6.03 7.03a.75.75 0 0 1-1.06-1.06l4-4a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1-1.06 1.06l-2.72-2.72v5.44c0 1.947.245 3.321.74 4.366c.486 1.026 1.243 1.8 2.396 2.49a.75.75 0 1 1-.772 1.287c-1.347-.808-2.34-1.785-2.98-3.134c-.63-1.33-.884-2.956-.884-5.009V4.31L6.03 7.03z" fill="currentColor"></path></g></svg>
+                </div>
+                <div>{{col.key}}</div>
+                <div class="w-4 cursor-pointer"
+                  :class="[sorts[0] === false && sorts[1] === col ? 'text-red-500' : 'text-gray-400']"
+                  @click="sorts = sorts[0] === false && sorts[1] === col ? [] : [false, col]">
+                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 20 20"><g fill="none"><path d="M6.614 3.143a.75.75 0 1 1 .772-1.286c1.347.808 2.34 1.785 2.98 3.135c.63 1.33.884 2.955.884 5.008v5.44l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V10c0-1.947-.245-3.321-.74-4.366c-.486-1.026-1.243-1.799-2.396-2.49z" fill="currentColor"></path></g></svg>
+                </div>
               </div>
             </th>
           </tr>
         </thead>
         <tbody>
           <template v-for="(row, rowIndex) in realRows">
-            <tr class="border-b dark:border-neutral-500" :class="{hover: hover[1] === row['股票代码']}"
-              :data-row="row['股票代码']" :key="rowIndex">
-              <template v-for="col in columns">
+            <tr class="border-b dark:border-neutral-500" :class="{ hover: clickedRow === row['股票代码'] }" :data-row="row['股票代码']" :key="rowIndex" @click="clickedRow = row['股票代码']">
+              <template v-for="col in realColumns">
                 <render-block :key="col.key" component="td" :title="row[col.index_name]"
-                  class="whitespace-nowrap border-r px-6 py-4 dark:border-neutral-500 text-ellipsis"
-                  :class="{ ...getClasses(col, row), hover: hover[0] === col.index_name }"
-                  @mouseover="handleMouseover(col.index_name, row['股票代码'])" :data-row="row['股票代码']"
-                  :data-col="col.index_name" :render="renderCell(col, row)"></render-block>
+                  class="whitespace-nowrap border-r px-6 py-4 dark:border-neutral-500 text-ellipsis bg-white"
+                  :class="getClasses(col, row)" @mouseover="handleMouseover(col.index_name, row['股票代码'])"
+                  :data-row="row['股票代码']" :data-col="col.index_name" :render="renderCell(col, row)"></render-block>
               </template>
             </tr>
           </template>
@@ -91,24 +100,40 @@
     el: '#app',
     data() {
       return {
+        neat: false,
         data: [],
         hover: [],
-        orders: ['索引', '股票代码', '股票简称', 'a股市值(不含限售股)', '集中度90', '最新股东户数', '最新价', '历史最高价前复权', '历史最高价日', '历史最低价前复权', '历史最低价日', '所属概念', '技术形态', '选股动向'],
+        orderKind: '潜伏',
+        clickedRow: null,
+        kindOfOrders: {
+          '一般': ['索引', '股票代码', '股票简称', '距离历史最高', '距离历史最低', 'a股市值(不含限售股)', '集中度90', '最新股东户数', '最新户均持股市值', '历史最高价前复权', '最新价', '历史最低价前复权', '所属概念', '技术形态', '选股动向', '历史最高价日', '历史最低价日'],
+          '潜伏': ['索引', '股票代码', '股票简称', '最新价', '距离历史最高', '距离历史最低', 'a股市值(不含限售股)', '集中度90', '最新股东户数', '最新户均持股市值', '所属概念', '技术形态', '选股动向'],
+          '避险': ['索引', '股票代码', '股票简称', '距离历史最高', '距离历史最低', 'a股市值(不含限售股)', '市盈率(pe)', '资产负债率', '股息率', 'PEG'],
+        },
         sorts: [],
+        columnKeys: [],
       }
     },
     computed: {
+      orders() {
+        return this.kindOfOrders[this.orderKind]
+      },
       columns() {
-        const cols = [{
-          key: '索引',
-          index_name: '索引',
-        }].concat(this.data[0]?.data?.answer?.components[0]?.data?.columns || [])
-        return cols.sort(this.cmp.bind(this))
+        return [
+          { key: '索引', index_name: '索引', },
+          { key: '距离历史最高', index_name: '距离历史最高', },
+          { key: '距离历史最低', index_name: '距离历史最低', },
+        ].concat(this.data[0]?.data?.answer?.components[0]?.data?.columns || [])
+      },
+      realColumns() {
+        return this.columns.sort(this.cmp.bind(this))
       },
       rows() {
         return this.data.reduce((r, v) => v.checked ? r.concat(v.data.answer.components[0].data.datas) : r, [])
           ?.map((e, i) => {
             if (e) e['索引'] = i + 1
+            if (e && e['最新价'] && e['历史最高价前复权']) e['距离历史最高'] = 100 * (e['最新价'] - e['历史最高价前复权']) / Math.abs(e['历史最高价前复权'])
+            if (e && e['最新价'] && e['历史最低价前复权']) e['距离历史最低'] = 100 * (e['最新价'] - e['历史最低价前复权']) / Math.abs(e['历史最低价前复权'])
             return e
           })
       },
@@ -116,7 +141,8 @@
         const [flag, col] = this.sorts
         if (this.sorts.length < 2) return this.rows
         return this.rows.map(e => e).sort((a, b) => {
-          const r = a[col.key] - b[col.key]
+          let r = a[col.key] - b[col.key]
+          if (isNaN(r)) r = a[col.key].localeCompare(b[col.key])
           return flag ? r : -r
         })
       },
@@ -154,50 +180,111 @@
           case '股票简称':
             classes.push(row['最新涨跌幅'] > 0 ? 'text-red-500' : 'text-green-600')
             break
+          case '历史最高价前复权':
+          case '历史最低价前复权':
+            classes.push('text-gray-300')
+            break
         }
         return Object.fromEntries(classes.map(e => [e, true]))
+      },
+      getCell(value, options = {}) {
+        const { separator, width, classes, query, href, indicator, digits, date, percent } = options
+        let content = value
+        if (separator != null) {
+          content = (value || '').split(separator).map(v => this.getCell(v, { ...options, separator: null, width: null, classes: ['mx-1'] }))
+        } else {
+          let { tag } = options
+          const opts = {
+            attrs: {},
+            class: [].concat(classes || []),
+          }
+          if (digits != null) {
+            content = (+value).toFixed(digits)
+          }
+          if (percent) {
+            content = content + '%'
+          }
+          if (date) {
+            content = `${value}`.replace(/(?<=\d{4})\d{2}/, e => '-' + e + '-')
+          }
+          if (indicator != null) {
+            opts.class.push(indicator > 0 ? 'text-red-500' : 'text-green-600')
+          }
+          if (href != null) {
+            opts.class.push('text-blue-600')
+            opts.attrs.href = href.replace(/\${v}/, value)
+            opts.attrs.target = '_blank'
+            tag = 'a'
+          }
+          if (tag) {
+            content = h(tag, opts, [content])
+          } else if (opts.class.length) {
+            content = h('span', opts, [content])
+          }
+        }
+        return width != null ? h('div', {
+          class: [`${width} overflow-hidden text-ellipsis`],
+        }, [content]) : content
       },
       renderCell(col, row) {
         const indexName = col.index_name
         const value = row[col.key]
         const current = row['最新价']
+        if (value == null) return ''
         switch (indexName) {
-          case 'a股市值(不含限售股)':
-          case '最新股东户数':
+          case '总市值':
           case '总股本':
-          case '最新dde大单净额':
+          case '最新股东户数':
+          case 'a股市值(不含限售股)':
           case '最新户均持股数量':
           case '最新户均持股市值':
-            return convertRadix(value, { base: 10000, fixed: 2 })
+          case '历史最高价前复权':
           case '历史最低价前复权':
-          case '历史最高价前复权': {
-            const ratio = (100 * (current - value) / Math.abs(value)).toFixed(2)
-            return h('span', [value.toFixed(2), h('span', { class: ratio > 0 ? 'text-red-500' : 'text-green-600', }, ` (${ratio}%)`)])
+            return convertRadix(value, { base: 10000, fixed: 2 })
+          case '最新dde大单净额':
+            return this.getCell(convertRadix(value, { base: 10000, fixed: 2 }), { indicator: value })
+          case '市盈率(pe)':
+            return Math.round(value)
+          case '距离历史最高': {
+            return [
+              this.getCell(row['历史最高价前复权'], { digits: 2, classes: ['mr-1 text-gray-300'] }),
+              this.getCell(value, { digits: 2, percent: true, indicator: value }),
+            ]
           }
+          case '距离历史最低': {
+            return [
+              this.getCell(row['历史最低价前复权'], { digits: 2, classes: ['mr-1 text-gray-300'] }),
+              this.getCell(value, { digits: 2, percent: true, indicator: value }),
+            ]
+          }
+          case '实际控制人':
+            return this.getCell(value, { width: 'w-32', href: 'http://www.iwencai.com/unifiedwap/result?w=实际控制人是${v}&querytype=stock' })
           case '历史最高价日':
           case '历史最低价日':
           case '股东人数变动公告日':
-            return `${value}`.replace(/(?<=\d{4})\d{2}/, e => '-' + e + '-')
+          case '新股上市日期':
+            return this.getCell(value, { date: true })
           case '最新户均持股比例':
           case '实际控制人持股比例':
-            return (+value).toFixed(3) + '%'
+          case '最终控制人持股比例':
+            return this.getCell(value, { digits: 3, percent: true })
           case '最新涨跌幅':
-            return (+value).toFixed(2) + '%'
+            return this.getCell(value, { digits: 2, percent: true })
           case '股票代码':
-            return h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=${value}&querytype=stock` } }, value)
+            return this.getCell(value, { href: `http://www.iwencai.com/unifiedwap/result?w=${value}&querytype=stock` })
           case '所属概念':
-            return h('div', { class: 'w-40 overflow-hidden text-ellipsis' },
-              value.split(';').map(v => h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=所属概念是${v}&querytype=stock` } }, v))
-            )
+            return this.getCell(value, { separator: ';', width: 'w-40', href: 'http://www.iwencai.com/unifiedwap/result?w=所属概念是${v}&querytype=stock' })
           case '选股动向':
           case '技术形态':
-            return h('div', { class: 'w-40 overflow-hidden text-ellipsis' },
-              value.split('||').map(v => h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=${v}&querytype=stock` } }, v))
-            )
-          case '所属同花顺行业':
-            return value.split('-').map(v => h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=所属同花顺行业是${v}&querytype=stock` } }, v))
           case '最终控制人':
-            return (value || '').split('||').map(v => h('a', { class: 'text-blue-600 mx-1 ', attrs: { target: '_blank', href: `http://www.iwencai.com/unifiedwap/result?w=所属同花顺行业是${v}&querytype=stock` } }, v))
+          case '实际控制人':
+            return this.getCell(value, { separator: '||', width: 'w-40', href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
+          case '最终控制人类型':
+            return this.getCell(value, { separator: '||', width: 'w-20', href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
+          case '所属同花顺行业':
+            return this.getCell(value, { separator: '-', href: 'http://www.iwencai.com/unifiedwap/result?w=所属同花顺行业是${v}&querytype=stock' })
+          default:
+            return value
         }
         return value
       },
@@ -221,6 +308,28 @@
       },
       handleMouseover(col, row) {
         this.hover = [col, row]
+      },
+    },
+    watch: {
+      _realColumns: {
+        immediate: true,
+        handler(v, ov) {
+          if (!v) return
+          let styles = ''
+          for (const col of v) {
+            styles += `
+              table[data-hover-col="${col.index_name}"] tr td[data-col="${col.index_name}"] {
+                background-color: rgb(227, 235, 247);
+              }`
+          }
+          let style = document.getElementById('dynamic-style')
+          if (!style) {
+            style = document.createElement('style')
+            style.id = 'dynamic-style'
+            document.head.appendChild(style)
+          }
+          style.innerHTML = styles
+        },
       },
     },
     mounted() {

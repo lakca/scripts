@@ -19,11 +19,14 @@
   "content_scripts": [
     {
       "matches": [ "<all_urls>" ],
-      "js": [ "content.js" ],
-      "css": [ "style.css" ],
+      "js": [ "window.js", "content.js" ],
+      "css": [ "style.css", "content.css" ],
       "run_at": "document_start"
     }
   ],
+  "externally_connectable": {
+    "matches": ["<all_urls>"]
+  },
   "web_accessible_resources": [
 		{
 			"resources":  ["content.html", "style.css"],
@@ -46,13 +49,14 @@
     "128": "images/icon-128.png"
   },
   "manifest_version": 3,
-  "name": "Lakca",
+  "name": "Bookmarks & Tabs Manager",
   "permissions": [
     "activeTab",
     "bookmarks",
     "contextMenus",
     "scripting",
-    "tabs"
+    "tabs",
+    "storage"
   ],
   "version": "1.0"
 }
