@@ -3,15 +3,24 @@
   "version": "1.0.0",
   "description": "Lakca's toolkit.",
   "scripts": {
-    "dev": "tailwindcss build -w -i tailwind.css -o style.css",
+    "styl": "stylus -w -P $(node -p \"Buffer.from(require('./manifest.json').name).toString('base64') + '-'\") content.styl",
+    "tw": "tailwindcss build -w -i tailwind.css -o style.css",
+    "dev": "concurrently 'npm run tw' 'npm run styl'",
     "build": "NODE_ENV=production npm run dev",
     "test": "test"
   },
   "author": "lakca",
   "license": "MIT",
-  "dependencies": {
+  "devDependencies": {
     "autoprefixer": "^10.4.14",
     "chrome-types": "^0.1.201",
+    "concurrently": "^8.2.0",
+    "eslint": "^8.0.1",
+    "eslint-config-standard": "^17.1.0",
+    "eslint-plugin-import": "^2.25.2",
+    "eslint-plugin-n": "^15.0.0 || ^16.0.0 ",
+    "eslint-plugin-promise": "^6.0.0",
+    "stylus": "^0.59.0",
     "tailwindcss": "^3.3.2"
   }
 }

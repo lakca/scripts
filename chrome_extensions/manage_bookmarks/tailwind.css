@@ -1,3 +1,21 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer components {
+  .twx-action {
+    @apply twx-flex twx-items-center twx-gap-2 twx-text-gray-700 twx-px-4 twx-py-2 twx-text-sm twx-cursor-pointer hover:twx-bg-gray-200;
+  }
+  .twx-icon {
+    @apply twx-h-5 twx-w-5 twx-flex-shrink-0;
+  }
+  .twx-button-plain {
+    @apply twx-rounded-md twx-bg-white twx-px-3 twx-py-2 twx-text-sm twx-font-semibold twx-text-gray-900 twx-shadow-sm twx-ring-1 twx-ring-inset twx-ring-gray-300 hover:twx-bg-gray-50;
+  }
+  .twx-button {
+    @apply twx-rounded-md twx-bg-indigo-600 twx-px-3 twx-py-2 twx-text-sm twx-font-semibold twx-text-white twx-shadow-sm hover:twx-bg-indigo-500 focus-visible:twx-outline focus-visible:twx-outline-2 focus-visible:twx-outline-offset-2 focus-visible:twx-outline-indigo-600;
+  }
+  .twx-select {
+    @apply twx-block twx-w-full twx-rounded-md twx-border-0 twx-py-1.5 twx-text-gray-900 twx-shadow-sm twx-ring-1 twx-ring-inset twx-ring-gray-300 focus:twx-ring-2 focus:twx-ring-inset focus:twx-ring-indigo-600 sm:twx-max-w-xs sm:twx-text-sm sm:twx-leading-6
+  }
+}

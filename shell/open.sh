@@ -25,7 +25,7 @@ case $cmd in
     var='zy'
     filter=${3:-1}
   ;;
-  行情|quote|hq)
+  行情|quote|hq) # hq 600001
     code=$(grep -o '[0-9]\{6\}' <<< $name)
     [[ $code = [69]* ]] && market='sh'
     [[ $code = [320]* ]] && market='sz'
@@ -43,6 +43,10 @@ case $cmd in
     for i in "${items[@]}"; do echo $i; done
     exit 0
   ;;
+  gh) # github repo: gh jrnxf/gh-eco
+    open "https://github.com/$name"
+    exit 0
+  ;;
 esac
 
 _var=$var[@]
@@ -55,9 +59,9 @@ for i in "${!items[@]}"; do
   done
   grep '^[0-9]\+$' <<< $filter >/dev/null
   if [[ $? = 0 ]]; then
-    [[ $filter -ge $((i + 1)) ]] && open -a '/Applications/Safari.app' "$url"
+    [[ $filter -ge $((i + 1)) ]] && open "$url"
   elif [[ "$item" = *$filter* ]]; then
-    open -a '/Applications/Safari.app' "$url"
+    open "$url"
   fi
 done
 
