@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 
-[[ $* =~ ' +-h($| +.*)' ]] && echo "pash.sh <url> <name> <icon_url_or_file>" && exit 0
+[[ $* =~ (^| +)-h($| +.*) ]] && echo -e "
+  \x1b[2m打包pake应用\x1b[0m
+  pash.sh <url> <name> <icon_url_or_file>
+
+  name             \x1b[2m- 应用名称\x1b[0m
+  url              \x1b[2m- 网站地址\x1b[0m
+  icon_url_or_file \x1b[2m- 应用logo，可以是.icns或者.png（jpg之类的也可以）\x1b[0m
+" && exit 0
 
 if ! command -v pake &>/dev/null; then
   function pake() {

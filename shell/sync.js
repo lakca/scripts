@@ -14,15 +14,19 @@ for (const arg of process.argv) {
   else if (['-a', '--append'].includes(arg)) opts.append = true
   else if (['-h', '--help'].includes(arg)) {
     console.log(`
+    \x1b[2m将文件同步到指定位置\x1b[0m
     sync.js <src> <dest> [--append|-a] [--recursive|-r]
+
+    -a, --append    \x1b[2m- 执行文件追加，默认为完全替换\x1b[0m
+    -r, --recursive \x1b[2m- 递归目录\x1b[0m
     `)
-  }
-  else if (!opts.src) opts.src = arg
+    process.exit(0)
+  } else if (!opts.src) opts.src = arg
   else if (!opts.dest) opts.dest = arg
 }
 
 if (!opts.src) {
-  console.log('\033[31m缺少源文件\033[0m')
+  console.log('\x1b[31m缺少源文件\x1b[0m')
   process.exit(1)
 }
 
@@ -38,7 +42,7 @@ opts.destRoot = opts.destIsDir ? opts.dest : path.dirname(opts.dest)
 console.log(opts)
 
 let sync = false
-fs.watch(opts.src, { recursive: opts.recursive, }, async function (type, filename) {
+fs.watch(opts.src, { recursive: opts.recursive }, async function(type, filename) {
   if (sync) return console.log('waiting')
   console.log('sync...')
   sync = true
@@ -70,14 +74,14 @@ async function append(realpath, content, options = {}) {
 }
 
 async function removeBetween(filename, startPattern, endPattern) {
-  return new Promise((rsv, rej) => {
+  return new Promise((resolve, reject) => {
     const rl = readline.createInterface({
-      input: fs.createReadStream(filename),
-    });
+      input: fs.createReadStream(filename)
+    })
 
     const lines = []
     let ignoring = 0
-    rl.on('line', function (line) {
+    rl.on('line', function(line) {
       if (startPattern.test(line)) {
         if (ignoring < 0) ignoring = 0
         ignoring += 1
@@ -86,14 +90,14 @@ async function removeBetween(filename, startPattern, endPattern) {
       } else if (ignoring < 1) {
         lines.push(line)
       }
-    });
+    })
 
-    rl.on('close', function () {
+    rl.on('close', function() {
       setTimeout(() => {
         fs.writeFileSync(filename, lines.join(os.EOL))
-        rsv(null)
+        resolve(null)
       }, 0)
-    });
+    })
   })
 }
 
@@ -110,5 +114,5 @@ function ensureNewline(pathOrFileDescriptor) {
 }
 
 function escapeRegExp(string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // $& means the whole matched string
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') // $& means the whole matched string
 }

@@ -1,0 +1,91 @@
+.position-relative {
+  position relative !important
+}
+
+.overflow-hidden {
+  overflow hidden !important
+}
+
+.loading {
+  position absolute
+  top 0px
+  right 0px
+  bottom 0px
+  left 0px
+  z-index 999
+  margin auto
+  width 50px
+  height 50px
+  color rgb(0, 0, 0, .3)
+}
+
+.button-close {
+  width 12px
+  height 12px
+  border solid 1px #ff3838
+  border-radius 50%
+  background-color #ff5c5c
+  box-shadow: 0 0 1px gray
+  svg {
+    display block
+    color #4e0002
+    opacity 0
+    transition .2s
+    ../:hover svg {
+      opacity 1
+    }
+  }
+}
+
+.modal {
+  position fixed
+  z-index 9999
+  top 0px
+  right 0px
+  bottom 0px
+  left 0px
+  display flex
+  overflow auto
+  margin auto
+  width 100vw
+  height 100vh
+  border-radius 5px
+  border-radius 0
+  backdrop-filter blur(2px)
+  .wrap {
+    overflow auto
+    margin auto
+    max-width 100%
+    max-height 100%
+    width 500px
+    border-radius 4px
+    background white
+    ../.fullscreen .wrap {
+      width 100%
+      height 100%
+    }
+    @media (min-height 640px) {
+      ../ .wrap {
+        margin-top 200px
+      }
+    }
+  }
+  .bar {
+    padding 8px
+    background-color #fafafa
+  }
+  .inner {
+    padding 20px 12px
+  }
+  .overlay {
+    position absolute
+    top 0px
+    left 0px
+    z-index -1
+    width 100%
+    height 100%
+    background-color #000
+    opacity .2
+    transition background-color, opacity .1s cubic-bezier(.05, .03, .35, 1)
+  }
+}

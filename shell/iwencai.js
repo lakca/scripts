@@ -1,23 +1,37 @@
+#!/usr/bin/env node
+
 const fs = require('fs')
 const path = require('path')
 const vm = require('vm')
 let data = ''
 let page = 0
-let query
-const folder = process.cwd()
+let folder = path.join(__dirname, 'iwencai')
 let filename = 'iwencai'
 function main() {
   while (process.argv.length) {
     switch (process.argv.shift()) {
       case '-h':
         console.log(`
-        --page <n>         下载分页
-        --download         根据Node.js Fetch内容下载
-        --recommend, --rcmd <query> 根据搜索语句推荐搜索语句
+        \x1b[2m下载分页\x1b[0m
+        --page <n>
+        \x1b[2m根据iwencai的Node.js Fetch内容下载结果\x1b[0m
+        --download
+        \x1b[2m根据搜索语句推荐搜索语句\x1b[0m
+        --recommend, --rcmd <query>
+        \x1b[2m下载目录\x1b[0m
+        --dest <dest=${folder}>
+
+        \x1b[2m例如：\x1b[0m
+
+        \x1b[2mpbpaste | node iwencai.js --download --page 5\x1b[0m
         `)
         break
       case '--page':
         page = Number(process.argv.shift())
+        break
+      case '--dest':
+        folder = process.argv.shift() || folder
+        fs.mkdirSync(folder, { recursive: true })
         break
       case '--download':
         download().catch(handleError)
@@ -34,15 +48,14 @@ function main() {
 main()
 
 function handleError(e) {
-  console.error("\x1b[2m" + e.stack.split('\n')[1].trim() + "\x1b[0m \x1b[31m" + e.message + "\x1b[0m")
+  console.error('\x1b[2m' + e.stack.split('\n')[1].trim() + '\x1b[0m \x1b[31m' + e.message + '\x1b[0m')
 }
 
 async function download() {
   process.stdin.setEncoding('utf-8')
-    .on('data', (buf) => data += buf)
+    .on('data', (buf) => { data += buf })
     .on('end', () => {
-      let text = data.split('\n').map(line => {
-
+      const text = data.split('\n').map(line => {
         if (line.trim().startsWith('"body"')) {
           const e = JSON.parse(`{${line.replace(/,$/, '')}}`)
           e.body = Object.fromEntries(new URLSearchParams(e.body))
@@ -73,25 +86,24 @@ async function download() {
     })
 }
 
-
 async function recommend(query) {
   if (!query) throw new Error('没有问句')
-  return fetch("http://www.iwencai.com/unifiedwap/unified-wap/v1/query/recommend", {
-    "headers": {
-      "accept": "application/json, text/plain, */*",
-      "accept-language": "zh-CN,zh;q=0.9,en;q=0.8",
-      "cache-control": "no-cache",
-      "content-type": "application/x-www-form-urlencoded",
-      "hexin-v": "AxqRpeL3KnZj06Y2rvjJAXhhbcs-S_DHEPsSaCTfxFt4tbQ1DNvuNeBfYoD3",
-      "pragma": "no-cache",
-      "proxy-connection": "keep-alive",
-      "Referrer-Policy": "strict-origin-when-cross-origin"
+  return fetch('http://www.iwencai.com/unifiedwap/unified-wap/v1/query/recommend', {
+    headers: {
+      accept: 'application/json, text/plain, */*',
+      'accept-language': 'zh-CN,zh;q=0.9,en;q=0.8',
+      'cache-control': 'no-cache',
+      'content-type': 'application/x-www-form-urlencoded',
+      'hexin-v': 'AxqRpeL3KnZj06Y2rvjJAXhhbcs-S_DHEPsSaCTfxFt4tbQ1DNvuNeBfYoD3',
+      pragma: 'no-cache',
+      'proxy-connection': 'keep-alive',
+      'Referrer-Policy': 'strict-origin-when-cross-origin'
     },
-    "body": new URLSearchParams({
+    body: new URLSearchParams({
       query,
       query_type: 'stock',
-      rsh: '2',
+      rsh: '2'
     }).toString(),
-    "method": "POST"
+    method: 'POST'
   }).then(r => r.json())
 }
