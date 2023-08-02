@@ -1,5 +1,19 @@
 import { config } from './config.js'
 
+chrome.runtime.onMessage.addListener(function (msg, sender, /** @type {(...args) => void} */resp) {
+  console.log('popup', msg, sender)
+  if (msg.action === 'pingPopup') {
+    resp(true)
+  } else if (msg.action === 'window.alert') {
+    resp(window.alert(...msg.args))
+  } else if (msg.action === 'window.confirm') {
+    resp(window.confirm(...msg.args))
+  } else if (msg.action === 'window.prompt') {
+    resp(window.prompt(...msg.args))
+  }
+  return true
+})
+
 document.body.addEventListener('click', async e => {
   if (e?.target?.role === 'menuitem') {
     chrome.runtime.sendMessage({ action: e?.target?.dataset?.action })

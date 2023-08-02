@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "Lakca's toolkit.",
   "scripts": {
-    "styl": "stylus -w -P $(node -p \"Buffer.from(require('./manifest.json').name).toString('base64') + '-'\") content.styl",
-    "tw": "tailwindcss build -w -i tailwind.css -o style.css",
-    "dev": "concurrently 'npm run tw' 'npm run styl'",
+    "dev-styl": "stylus -w -P $(node -p \"Buffer.from(require('./manifest.json').name).toString('base64') + '-'\") content.styl",
+    "dev-tw": "tailwindcss build -w -i tailwind.css -o style.css",
+    "dev": "concurrently 'npm run dev-tw' 'npm run dev-styl'",
     "build": "NODE_ENV=production npm run dev",
     "test": "test"
   },
@@ -14,6 +14,7 @@
   "devDependencies": {
     "autoprefixer": "^10.4.14",
     "chrome-types": "^0.1.201",
+    "color": "^4.2.3",
     "concurrently": "^8.2.0",
     "eslint": "^8.0.1",
     "eslint-config-standard": "^17.1.0",

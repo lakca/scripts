@@ -8,11 +8,11 @@ function countdown(seconds) {
   return new Promise((resolve) => {
     const t = setInterval(() => {
       seconds--
-      process.stdout.write('\033[1K\r\033[31m' + seconds + '\033[0m')
+      process.stdout.write('\x1b[1K\r\x1b[31m' + seconds + '\x1b[0m')
       if (seconds < 1) {
-        process.stdout.write('\033[1K\r')
+        process.stdout.write('\x1b[1K\r')
         clearInterval(t)
-        resolve()
+        resolve(null)
       }
     }, 1000)
   })

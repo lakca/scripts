@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Rust websites shortcuts",
+  "description": "docs.rs, crates.io",
+  "version": "0.0.1",
+  "icons": {
+    "16": "logo/icon-16.png",
+    "32": "logo/icon-32.png",
+    "48": "logo/icon-48.png",
+    "128": "logo/icon-128.png"
+  },
+  "options_page": "settings/settings.html",
+  "action": {
+  },
+  "permissions": [
+    "storage",
+    "commands"
+  ],
+  "host_permissions": [
+    "*://*/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "content_scripts": [ {
+      "js": [ "foreground.js" ],
+      "matches": [
+        "https://docs.rs/*",
+        "https://crates.io/*"
+      ]
+    } ]
+}

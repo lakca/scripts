@@ -2,3 +2,8 @@ data/**
 *.log
 .*.store
 cache
+*.txt
+douyin
+iwencai
+demo
+data

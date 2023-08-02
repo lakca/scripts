@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
-[[ "$*" =~ ' +-h($| +.*)' ]] && echo "icns.sh <png_or_svg> <icon_name>" && exit 0
+[[ "$*" =~ (^| +)-h($| +.*) ]] && echo -e "
+  icns.sh <png_or_svg> <icon_name> \x1b[2m- 将png转换成icns\x1b[0m
+" && exit 0
 
 tmp="pake.icon.$RANDOM.png"
 if [[ -p /dev/stdin ]]; then

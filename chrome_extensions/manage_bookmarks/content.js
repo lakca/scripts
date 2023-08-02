@@ -160,7 +160,7 @@ class UI {
    */
   createCloseButton (target, cb) {
     /** @type {El<'div'> & { destroy: typeof destroy }} */
-    const closeBtn = this.el('div').class('button-close').html('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 0 0 351 127l-95 95l-95-95a24 24 0 0 0-34 34l95 95l-95 95a24 24 0 1 0 34 34l95-95l95 95a24 24 0 0 0 34-34z" fill="currentColor"></path></svg>').mount(target)
+    const closeBtn = this.el('div').bareClass('twx-button-handle twx-theme-button-handle/close').html('<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512"><path d="M289.94 256l95-95A24 24 0 0 0 351 127l-95 95l-95-95a24 24 0 0 0-34 34l95 95l-95 95a24 24 0 1 0 34 34l95-95l95 95a24 24 0 0 0 34-34z" fill="currentColor"></path></svg>').mount(target)
     cb && (closeBtn.el.onclick = cb)
     closeBtn.destroy = destroy
     return closeBtn
@@ -218,7 +218,9 @@ const ui = new UI()
 
 chrome.runtime.onMessage.addListener(function (msg, sender, /** @type {(...args) => void} */resp) {
   console.log('content Got', msg)
-  if (msg.action === 'window.alert') {
+  if (msg.action === 'pingWebpage') {
+    resp(true)
+  } else if (msg.action === 'window.alert') {
     resp(window.alert(...msg.args))
   } else if (msg.action === 'window.confirm') {
     resp(window.confirm(...msg.args))
@@ -245,8 +247,8 @@ async function askSelectBookmarkFolder (bookmarks) {
     .append(select)
     .mount(modal.inner)
   ui.el('div').bareClass('twx-flex twx-items-center twx-justify-center')
-    .append(ui.el('button').bareClass('twx-button-plain twx-mr-2').html('取消').on('click', cancel))
-    .append(ui.el('button').bareClass('twx-button').html('确认').on('click', submit))
+    .append(ui.el('button').bareClass('twx-button-text twx-mr-4').html('取消').on('click', cancel))
+    .append(ui.el('button').bareClass('twx-button twx-theme-button/primary').html('确认').on('click', submit))
     .mount(modal.inner)
   renderOptions(bookmarks)
   function cancel () {
