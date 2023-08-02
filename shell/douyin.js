@@ -43,22 +43,35 @@ argv.shift()
 if (argv.includes('-h')) {
   console.log(`
     \x1b[2m将douyin各api返回数据中的视频或图片项目解析为统一的结构信息，<name>及解析配置见douyin.json\x1b[0m
-    transform <name>
+    \x1b[32mtransform\x1b[0m
+        <name> \x1b[2m- 见douyin.json key 或 alias\x1b[0m
 
     \x1b[2m下载统一结构（经过transform）信息的视频/图片到<dest>目录（默认为工作目录）下的用户目录中\x1b[0m
-    curl [<dest>] [-high|-low|-rename|-forcebitrate]
+    \x1b[32mcurl\x1b[0m
+        [<dest>]        \x1b[2m- 默认为当前工作目录\x1b[0m
+        [-high]         \x1b[2m- 下载高比特率\x1b[0m
+        [-low]          \x1b[2m- 下载低比特略\x1b[0m
+        [-rename]       \x1b[2m- 对已存在的文件（文件名以{item.awemeId}.mp4判断）重命名（以符合最新命名规则）\x1b[0m
+        [-forcebitrate] \x1b[2m- 强制下载（覆盖）低比特率\x1b[0m
 
-    \x1b[2m下载用户主页中的作品\x1b[0m
-    posts -c <cookie> -u <user_sec_uid> [-o <output_dir=cwd()>]
+    \x1b[2m下载用户主页中的作品
+    web_id与cookie紧密相关，获取方式: SSR_RENDER_DATA.app.odin.user_unique_id\x1b[0m
+    \x1b[32mposts\x1b[0m
+        -c <cookie>             \x1b[2m- 网页cookie\x1b[0m
+        -w <web_id>             \x1b[2m- 客户端ID，需要同cookie保持来源一致（SSR_RENDER_DATA.app.odin.user_unique_id）\x1b[0m
+        -u <user_sec_uid>       \x1b[2m- 用户sec_id\x1b[0m
+        [-o <output_dir=cwd()>] \x1b[2m- 保存目录\x1b[0m
+        [-d <max_cursor>]       \x1b[2m- 最小时间戳\x1b[0m
+        [-D <max_time>]         \x1b[2m- 最小时间，会传入Date进行构造\x1b[0m
+        [-p <max_pages>]        \x1b[2m- 最多页面（以18条每页计）\x1b[0m
 
-    \x1b[2m例如：\x1b[0m
+    \x1b[2m例如：
 
-    \x1b[2m下载用户主页列表文件：\x1b[0m
-    \x1b[2mnode douyin.js posts -u ... c ...\x1b[0m
-    \x1b[2mpbpaste | node douyin.js posts -u ...\x1b[0m # 通过剪切板获取cookie
+    # 获取用户主页作品列表，通过剪切板获取cookie:
+    > pbpaste | douyin.js posts -u ... -w 7268870306478261795 -D 2023-08-18
 
-    \x1b[2m通过（存在剪切板）原始douyin数据，下载用户主页列表文件：\x1b[0m
-    \x1b[2mpbpaste | node douyin.js transform userhome | node douyin.js curl\x1b[0m
+    # 下载用户主页列表文件，通过（存在剪切板）原始douyin数据：
+    > pbpaste | douyin.js transform userhome | douyin.js curl --low --forcebitrate\x1b[0m
   `)
   process.exit(0)
 }
@@ -101,32 +114,28 @@ async function main(cmd, input) {
         await curl(item, destDir, opts)
       }
     } break
-    case 'archive':
-      fs.readdirSync(DEFAULT_DEST_DIR).forEach(file => {
-        if (/\.(mp4|jpg)/.test(file)) {
-          console.log(`\x1b[32m${file}\x1b[0m`)
-          const [_, desc, awemeId, author, uid, secUid, ext] = file.match(/^([\s\S]*?)-([0-9]{10,})-(.+?)-([0-9]{10,})-(.+)(\.[^\.]+)$/)
-          const folder = [author, uid, secUid].join('-')
-          const basename = [desc, awemeId].join('-') + ext
-          console.log(`\x1b[34m${basename}\x1b[0m\x1b[31m in \x1b[0m \x1b[33m${folder}\x1b[0m`)
-          !fs.existsSync(folder) && fs.mkdirSync(folder)
-          fs.renameSync(file, path.join(folder, basename))
-        }
-      })
-      break
     case 'posts': {
       /** @type {any} */
-      const opts = { output: DEFAULT_DEST_DIR, cookie: input.trim(), pages: 1 }
+      const opts = {
+        output: DEFAULT_DEST_DIR,
+        cookie: input.trim(),
+        pages: 1,
+        web_id: '7268870306478261795',
+        max_cursor: 0
+      }
       let arg = null
       while (argv.length) {
         arg = argv.shift()
         if (arg === '-c') opts.cookie = argv.shift()
         if (arg === '-u') opts.user_sec_uid = argv.shift()
+        if (arg === '-w') opts.web_id = argv.shift()
         if (arg === '-o') opts.output = argv.shift()
         if (arg === '-p') opts.pages = argv.shift()
+        if (arg === '-d') opts.max_cursor = argv.shift()
+        if (arg === '-D') opts.max_time = argv.shift()
       }
       const data = await getUserHome(opts.cookie, opts.user_sec_uid, opts)
-      data && fs.writeFileSync(path.join(opts.output, `douyin.user.post.${opts.user_sec_uid}.${Date.now()}.json`), JSON.stringify(data, null, 2))
+      data && fs.writeFileSync(path.join(opts.output, `douyin.user.post.${opts.user_sec_uid}.${new Date().toISOString().slice(0, -5).replace(/[T:]/g, '-')}.json`), JSON.stringify(data, null, 2))
     } break
     default:
   }
@@ -390,24 +399,54 @@ function getXBogus(dataStr, cookie, referer) {
   `
   // eslint-disable-next-line no-eval
   eval(code)
-  console.warn(xBogus)
+  console.warn(green(xBogus))
   return xBogus
 }
 
+/**
+ * @param {string} cookie
+ * @param {string} user_sec_uid
+ * @param {object} opts
+ * @param {string} opts.web_id - 客户端ID（SSR_RENDER_DATA.app.odin.user_unique_id）
+ * @param {number} opts.max_cursor - timestamp
+ * @param {string} opts.max_time - date string, param of `Date`
+ * @param {number} opts.pages
+ */
 async function getUserHome(cookie, user_sec_uid, opts) {
-  opts = { pages: 1, ...opts }
+  if (opts.max_time && !opts.max_cursor) {
+    opts.max_cursor = new Date(opts.max_time).getTime()
+  }
   let max_cursor = 0
-  let pages = opts.pages
   const count = 18
   const resp = []
   try {
-    while (pages-- > 0) {
-      const data = await getUserHomePosts(cookie, user_sec_uid, count, max_cursor)
-      resp.push(data)
-      if (!data.has_more) {
-        break
-      } else {
-        max_cursor = data.max_cursor
+    if (opts.pages) {
+      let pages = opts.pages
+      while (pages-- > 0) {
+        const data = await getUserHomePosts(cookie, user_sec_uid, opts.web_id, count, max_cursor)
+        resp.push(data)
+        if (!data.has_more) {
+          break
+        } else {
+          max_cursor = data.max_cursor
+          if (pages && opts.max_cursor && max_cursor < opts.max_cursor) {
+            pages = Math.min(1, pages)
+          }
+        }
+      }
+    } else if (opts.max_cursor) {
+      let pages = Infinity
+      while (pages--) {
+        const data = await getUserHomePosts(cookie, user_sec_uid, opts.web_id, count, max_cursor)
+        resp.push(data)
+        if (!data.has_more) {
+          break
+        } else {
+          max_cursor = data.max_cursor
+          if (pages && max_cursor < opts.max_cursor) {
+            pages = Math.min(1, pages)
+          }
+        }
       }
     }
     return resp
@@ -420,10 +459,11 @@ async function getUserHome(cookie, user_sec_uid, opts) {
 /**
  * @param {string} cookie
  * @param {string} user_sec_uid
+ * @param {string} web_id - 客户端ID（SSR_RENDER_DATA.app.odin.user_unique_id）
  * @param {number} max_cursor
  * @param {number} count
  */
-function getUserHomePosts(cookie, user_sec_uid, count = 18, max_cursor = 0) {
+function getUserHomePosts(cookie, user_sec_uid, web_id, count = 18, max_cursor = 0) {
   const cookieObj = parseCookie(cookie)
   const ms_token = cookieObj.msToken
   const referer = `https://www.douyin.com/user/${user_sec_uid}`
@@ -459,12 +499,12 @@ function getUserHomePosts(cookie, user_sec_uid, count = 18, max_cursor = 0) {
     downlink: '1.5',
     effective_type: '3g',
     round_trip_time: '350',
-    webid: '7259988089359468032', // 客户端ID（RENDER_DATA.app.odin.user_unique_id）
-    msToken: `${ms_token}` // cookie信息
+    webid: `${web_id}`, // 客户端ID（SSR_RENDER_DATA.app.odin.user_unique_id）
+    msToken: `${ms_token}` // cookie中获取
   })
   // 请求ID, X-Bogus
   query.set('X-Bogus', getXBogus(query.toString(), cookie, referer))
-  console.warn(query.toString())
+  console.warn(green(query.toString()))
   return fetch('https://www.douyin.com/aweme/v1/web/aweme/post?' + query, {
     headers: {
       accept: 'application/json, text/plain, */*',
@@ -481,7 +521,10 @@ function getUserHomePosts(cookie, user_sec_uid, count = 18, max_cursor = 0) {
     },
     body: null,
     method: 'GET'
-  }).then(res => res.json())
+  }).then(res => {
+    console.log(res.status, res.url)
+    return res.json()
+  })
 }
 
 function getUserProfile(user_sec_id) {
