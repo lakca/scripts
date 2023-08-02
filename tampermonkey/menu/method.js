@@ -11,7 +11,7 @@ const {
   isElementInvisible,
   SEARCHES,
   openTab,
-  GM_listValues,
+  GM_listValues
 } = require('./context')
 
 function inHostname(part) {
@@ -19,8 +19,7 @@ function inHostname(part) {
   if (
     hostname.indexOf(part) === 0 ||
     hostname.indexOf(part) === hostname.length - part.length
-  )
-    return true
+  ) { return true }
   if (part[0] !== '.') part = '.' + part
   if (part[part.length - 1] !== '.') part += '.'
   return hostname.indexOf(part) > -1
@@ -100,7 +99,7 @@ function showStore() {
       .prop({
         value: vs,
         rows: rows.length,
-        cols: Math.max(...rows.map(row => row.length)),
+        cols: Math.max(...rows.map(row => row.length))
       })
     return el
   })).up())
@@ -135,12 +134,11 @@ function jiraMention(data) {
     .next('input').key('git').attr('value', Value(data).get('git')).attr('placeholder', 'git commit id')
     .next('button').text('copy').on('click', getComment)
   function getComment() {
-    // http://jira.mizar.icu/browse/MIZAR-451
-    let kind = form.node('kind').value.trim()
+    const kind = form.node('kind').value.trim()
     let jira = form.node('jira').value.trim()
     let git = form.node('git').value.trim()
     if (!jira.startsWith('http')) jira = `${jiraRoot}/browse/${kind}-${jira.match(/\d+/)[0]}`
-    if (!git.startsWith('http')) git = ``
+    if (!git.startsWith('http')) git = ''
   }
 }
 
