@@ -48,7 +48,8 @@ function main(argv) {
         recommend(argv.shift()).then(data => console.table(data?.data, ['tag', 'query'])).catch(handleError)
         break
       case '--question': {
-        const qs = ['非ST，非退市，股东人数从少到多排名，列名包含前复权历史最高价、前复权历史最低价、股东数、集中度90、流通市值、近一年涨跌幅、所属概念、所属板块、所属行业、技术形态、选股动向、资产负债率、股息率、PEG']
+        const qs = ['非ST，非退市，股东人数从少到多排名，列名包含前复权历史最高价、前复权历史最低价、股东数、集中度90、流通市值、近一个月涨跌幅、近一年涨跌幅、所属概念、所属板块、所属行业、技术形态、选股动向、资产负债率、股息率、PEG、十大股东、企业性质']
+        // 总市值大于10亿且小于50亿，股价低于10元，非ST，非退市、非北交所、非科创，股东人数从少到多排名，列名包含前复权历史最高价和历史最低价、股东数、集中度90、流通市值、近一个月涨跌幅、近一年涨跌幅、所属概念、所属板块、所属行业、技术形态、选股动向、资产负债率、股息率、PEG、十大股东、企业性质
         if (argv.length) {
           qs.unshift(argv)
           const qss = qs.join('，')
@@ -76,7 +77,7 @@ async function download() {
   process.stdin.setEncoding('utf-8')
     .on('data', (buf) => { data += buf })
     .on('end', () => {
-      const text = data.split('\n').map(line => {
+      const text = data.split(/\r?\n/).map(line => {
         if (line.trim().startsWith('"body"')) {
           const e = JSON.parse(`{${line.replace(/,$/, '')}}`)
           e.body = Object.fromEntries(new URLSearchParams(e.body))
@@ -107,7 +108,7 @@ async function download() {
       return res.json()
     }
     request().then(data => {
-      fs.writeFileSync(path.join('${folder}', '${filename}.${new Date().toLocaleDateString().replaceAll('/', '-')}.${page}.json'), JSON.stringify(data, null, 2))
+      fs.writeFileSync(path.join('${folder.replace(/\\/g, '\\\\')}', '${filename}.${new Date().toLocaleDateString().replace(/\//g, '-')}.${page}.json'), JSON.stringify(data, null, 2))
     })
     `
       vm.runInNewContext(code, { fs, path, fetch, URLSearchParams })
