@@ -62,14 +62,14 @@ function quote() {
         p) alertLowPercents[$index]="$OPTARG" ;;
         P) alertHighPercents[$index]="$OPTARG" ;;
         h)
-           echo -e '\033[32m-c\033[0m \033[2m<code>         如：-c sh000001\033[0m'
-           echo -e '\033[32m-v\033[0m \033[2m<low_price>\033[0m'
-           echo -e '\033[32m-V\033[0m \033[2m<high_price>\033[0m'
-           echo -e '\033[32m-p\033[0m \033[2m<low_percent>\033[0m'
-           echo -e '\033[32m-P\033[0m \033[2m<high_percent>\033[0m'
-           echo -e '\033[2m例如：\033[0m'
-           echo -e '\033[2m  em.sh quote -c sh000001 -p 0 -V 3300 -c sh600352 -p 0 -P 5\033[0m'
-           exit 0
+          echo -e '\033[32m-c\033[0m \033[2m<code>         如：-c sh000001\033[0m'
+          echo -e '\033[32m-v\033[0m \033[2m<low_price>\033[0m'
+          echo -e '\033[32m-V\033[0m \033[2m<high_price>\033[0m'
+          echo -e '\033[32m-p\033[0m \033[2m<low_percent>\033[0m'
+          echo -e '\033[32m-P\033[0m \033[2m<high_percent>\033[0m'
+          echo -e '\033[2m例如：\033[0m'
+          echo -e '\033[2m  em.sh quote -c sh000001 -p 0 -V 3300 -c sh600352 -p 0 -P 5\033[0m'
+          exit 0
         ;;
       esac
     done
@@ -84,9 +84,19 @@ function quote() {
 
   if [[ ${#list[@]} -gt 0 ]]; then
     local result=''
-    local title=''
-    [[ ${#prices[@]} -gt 0 ]] && result=$result"\033[$((1 + ${#prices[@]}))A\033[2K"
+    [[ ${#prices[@]} -gt 0 ]] && result=$result"\033[$((2 + ${#prices[@]}))A\033[2K$(date '+%H:%M:%S')\n"
     result=$result'\033[2;37m名称 幅度 价格 成交额 时间 最低 最高\033[0m\n'
+    # terminal title
+    local title=''
+    for i in ${!list[@]}; do
+      local fields=($(sed "s/,/ /g" <<< "${list[@]:$i:1}"))
+      local close=${fields[@]:2:1}
+      local price=${fields[@]:3:1}
+      local percent=$(bc <<< "scale=2;100*($price-$close)/$close")
+      local percentText=$(printf "%+.2f" $percent)%
+      title="$title$percentText "
+    done
+    echo -en "\033];$title\007"
     for i in ${!list[@]}; do
       local fields=($(sed "s/,/ /g" <<< "${list[@]:$i:1}"))
       local name=${fields[@]:0:1}
@@ -102,7 +112,6 @@ function quote() {
       local highPercentText=$(printf "%+.2f" $(bc <<< "scale=2;100*($high-$close)/$close"))%
       local lowPercentText=$(printf "%+.2f" $(bc <<< "scale=2;100*($low-$close)/$close"))%
       local result=$result"$(indicate $name $price ${prices[@]:$i:1}) $(indicate $percentText $price $close) $(indicate $price $price ${prices[@]:$i:1}) $(prettyAmount $amount) \033[2m$time \033[2m$(indicate $lowPercentText $low $close) \033[2m$(indicate $highPercentText $high $close)\n"
-      [[ $i == 0 ]] && echo -en "\033];$percentText\007"
 
       local alertHighPrice=${alertHighPrices[@]:$i:1}
       local alertLowPrice=${alertLowPrices[@]:$i:1}
@@ -126,7 +135,6 @@ function quote() {
       prices[$i]=$price
     done
     echo -en $result | tabulate -f plain | tee -a em.log
-    echo -en "\033];$title\007"
   else
     echo "$url" >> debug
     echo "${#}:${@}" >> debug

@@ -26,7 +26,8 @@
       "js": [ "foreground.js" ],
       "matches": [
         "https://docs.rs/*",
-        "https://crates.io/*"
+        "https://crates.io/*",
+        "https://*eastmoney.com/*"
       ]
     } ]
 }

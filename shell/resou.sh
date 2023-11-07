@@ -1334,8 +1334,8 @@ function json_res() {
               local zjCycle=$_ASK_RESULT
               local fields="${_ASK_RESULTS[@]:2:1}"
               local cols="${_ASK_RESULTS[@]:3:1}"
-              local bkType=$(ask2 -1 -i "$input" -d '1' -i "$4" -q '板块类型' -A "${boards[*]}" -N 2 -S '0')
-              local order=$(whether -q '正序' -i "$5" -y 0 -n 1)
+              local bkType=$(ask2 -1 -i "$input" -d '1' -i "$5" -q '板块类型' -A "${boards[*]}" -N 2 -S '0')
+              local order=$(whether -q '正序' -i "$6" -y 0 -n 1)
               url='https://push2.eastmoney.com/api/qt/clist/get'
               curlparams+=(--data-urlencode cb=jQuery112307932171275575526_$(timestamp))
               curlparams+=(--data-urlencode fid=$zjCycle)
@@ -1349,7 +1349,7 @@ function json_res() {
               curlparams+=(--data-urlencode stat=1)
               curlparams+=(--data-urlencode fields=$fields)
               curlparams+=(--data-urlencode ut=b2884a393a59ad64002292a3e90d46a5)
-              jsonFormat='data.diff|TABLE:(板块)f14|SIMPLE,(涨跌幅)f3|format(+%)|indicator|SIMPLE,'$cols',(链接)f12|$https://quote.eastmoney.com/unify/r/{.f13}.{.f12}$|SIMPLE'
+              jsonFormat='data.diff|TABLE:(板块)f14|SIMPLE,(涨跌幅)f3|format(+%)|indicator|SIMPLE,'$cols',(链接)f12|$https://data.eastmoney.com/bkzj/{.f12}.html$|SIMPLE'
               jsonp=OBJ
             ;;
             # kline http://56.push2his.eastmoney.com/api/qt/stock/kline/get?cb=jQuery35108905987798741108_1676431200477&secid=0.300250&ut=fa5fd1943c7b386f172d6893dbfba10b&fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61&klt=103&fqt=1&beg=0&end=20500101&smplmt=460&lmt=1000000&_=1676431200584
@@ -1565,43 +1565,43 @@ function json_res() {
             大宗交易) # https://data.eastmoney.com/dzjy/
             ;;
             个股北向资金持仓明细|bxcg) # https://data.eastmoney.com/hsgtcg/StockHdDetail/002460.html
-              #   {
-              #     "SECUCODE": "002460.SZ",
-              #     "SECURITY_CODE": "002460",
-              #     "SECURITY_INNER_CODE": "1000009062",
-              #     "SECURITY_NAME_ABBR": "赣锋锂业",
-              #     "HOLD_DATE": "2023-06-05 00:00:00",
-              #     "ORG_CODE": "10088542",
-              #     "ORG_NAME": "奕丰证券(香港)有限公司",
-              #     "HOLD_NUM": 1640,
-              #     "MARKET_CODE": "003",
-              #     "HOLD_SHARES_RATIO": 0,
-              #     "HOLD_MARKET_CAP": 106042.4,
-              #     "CLOSE_PRICE": 64.66,
-              #     "CHANGE_RATE": 0.7165,
-              #     "HOLD_MARKET_CAPONE": 754.4,
-              #     "HOLD_MARKET_CAPFIVE": 5412,
-              #     "HOLD_MARKET_CAPTEN": -3854,
-              #     "PARTICIPANT_CODE": "B01459"
+              # {
+              #   "SECUCODE": "002049.SZ",
+              #   "SECURITY_CODE": "002049",
+              #   "SECURITY_INNER_CODE": "1000001786",
+              #   "SECURITY_NAME_ABBR": "紫光国微",
+              #   "HOLD_DATE": "2023-10-27 00:00:00",
+              #   "ORG_CODE": "10057606",
+              #   "ORG_NAME": "美林远东有限公司",
+              #   "HOLD_NUM": 620535,
+              #   "MARKET_CODE": "003",
+              #   "HOLD_SHARES_RATIO": 0.07,
+              #   "HOLD_MARKET_CAP": 45882357.9,
+              #   "CLOSE_PRICE": 73.94,
+              #   "CHANGE_RATE": 2.9518,
+              #   "HOLD_MARKET_CAPONE": 11657183.28,
+              #   "HOLD_MARKET_CAPFIVE": 17577656.97,
+              #   "HOLD_MARKET_CAPTEN": 22901281.07,
+              #   "PARTICIPANT_CODE": "B01224"
               # }
               local columns=(
-                "SECUCODE"            "002460.SZ"
-                "SECURITY_CODE"       "002460"
-                "SECURITY_INNER_CODE" "1000009062"
-                "SECURITY_NAME_ABBR"  "赣锋锂业"
-                "HOLD_DATE"           "2023-06-05,00:00:00"
-                "ORG_CODE"            "10088542"
-                "ORG_NAME"            "奕丰证券(香港)有限公司"
-                "HOLD_NUM"            1640
-                "MARKET_CODE"         "003"
-                "HOLD_SHARES_RATIO"   0
-                "HOLD_MARKET_CAP"     106042.4
-                "CLOSE_PRICE"         64.66
-                "CHANGE_RATE"         0.7165
+                "SECUCODE"            "002049.SZ",
+                "SECURITY_CODE"       "002049",
+                "SECURITY_INNER_CODE" "1000001786",
+                "SECURITY_NAME_ABBR"  "紫光国微",
+                "HOLD_DATE"           "2023-10-27 00:00:00",
+                "ORG_CODE"            "10057606",
+                "ORG_NAME"            "美林远东有限公司",
+                "HOLD_NUM"            620535,
+                "MARKET_CODE"         "003",
+                "HOLD_SHARES_RATIO"   0.07,
+                "HOLD_MARKET_CAP"     45882357.9,
+                "CLOSE_PRICE"         73.94,
+                "CHANGE_RATE"         2.9518,
                 "HOLD_MARKET_CAPONE"  1日持仓变化
                 "HOLD_MARKET_CAPFIVE" 5日持仓变化
                 "HOLD_MARKET_CAPTEN"  10日持仓变化
-                "PARTICIPANT_CODE"    "B01459"
+                "PARTICIPANT_CODE"    "B01224"
               )
               local sortTypes=(
                 -1 倒序
@@ -1631,23 +1631,23 @@ function json_res() {
             ;;
             个股北向资金历史|bxls)
               local columns=(
-                "SECURITY_INNER_CODE"  "1000009062"
-                "SECUCODE"             "002460.SZ"
-                "TRADE_DATE"           "2023-05-15,00:00:00"
-                "SECURITY_CODE"        "002460"
-                "SECURITY_NAME"        "赣锋锂业"
-                "MUTUAL_TYPE"          "003"
-                "CHANGE_RATE"          8.668730650155
-                "CLOSE_PRICE"          70.2
-                "HOLD_SHARES"          113688049
-                "HOLD_MARKET_CAP"      7980901039.8
-                "A_SHARES_RATIO"       7.05
-                "HOLD_SHARES_RATIO"    7.04
-                "FREE_SHARES_RATIO"    9.416
-                "TOTAL_SHARES_RATIO"   5.6362
-                "HOLD_MARKETCAP_CHG1"  903135180.4
-                "HOLD_MARKETCAP_CHG5"  1050883183.8
-                "HOLD_MARKETCAP_CHG10" 1791118169.84
+                "SECURITY_INNER_CODE"  "1000001786",
+                "SECUCODE"             "002049.SZ",
+                "TRADE_DATE"           "2023-10-27 00 :00:00",
+                "SECURITY_CODE"        "002049",
+                "SECURITY_NAME"        "紫光国微",
+                "MUTUAL_TYPE"          "003",
+                "CHANGE_RATE"          2.951824004456,
+                "CLOSE_PRICE"          73.94,
+                "HOLD_SHARES"          16548245,
+                "HOLD_MARKET_CAP"      1223577235.3,
+                "A_SHARES_RATIO"       1.95,
+                "HOLD_SHARES_RATIO"    1.94,
+                "FREE_SHARES_RATIO"    1.9481,
+                "TOTAL_SHARES_RATIO"   1.9477,
+                "HOLD_MARKETCAP_CHG1"  43417349.5,
+                "HOLD_MARKETCAP_CHG5"  -14849373.35,
+                "HOLD_MARKETCAP_CHG10" -97354940.03
               )
               local sortTypes=(
                 -1 倒序
@@ -1705,7 +1705,7 @@ function json_res() {
               curlparams+=(--data-urlencode cb=jQuery35109401671042551594_$(timestamp))
               curlparams+=(--data-urlencode 'param={"uid":"","keyword":"'$keyword'","type":["codetableLabelWeb"],"client":"web","clientType":"wap","clientVersion":"curr","param":{"codetableLabelWeb":{"pageIndex":'${PAGE:-1}',"pageSize":'${SIZE:-10}',"preTag":"","postTag":"","isHighlight":false,"label":"'$type'"}}}')
               curlparams+=(--data-urlencode _=$(timestamp))
-              jsonFormat=':(分类名称)name|red|bold|SIMPLE,(分类)type,(列表)quoteList|TABLE|SIMPLE:(证券名称)shortName|green|SIMPLE,(证券代码)unifiedCode|magenta|SIMPLE,(行情)url|SIMPLE|$http://quote.eastmoney.com/unify/r/{.unifiedId}$|dim,(股吧)guba|$http://guba.eastmoney.com/interface/GetList.aspx?code={.unifiedId}$|dim'
+              jsonFormat=':(分类名称)name|red|bold|SIMPLE,(分类)type,(列表)quoteList|TABLE|SIMPLE:(证券名称)shortName|green|SIMPLE,(证券代码)unifiedCode|magenta|SIMPLE,(行情)url|SIMPLE|$http://quote.eastmoney.com/unify/cr/{.unifiedId}$|dim,(股吧)guba|$http://guba.eastmoney.com/interface/GetList.aspx?code={.unifiedId}$|dim'
               jsonp=ARR
             ;;
             资讯|CMS) # https://so.eastmoney.com/news/s?keyword=%E6%96%B0%E8%83%BD%E6%BA%90
@@ -2153,22 +2153,22 @@ declare -a args=()
 
 for op in "$@"; do
   [[ $op == '-t' ]] && TABLE=1 || [[ $op == '-s' ]] && SIMPLE=1 || args+=("$op")
-
-  if [[ $op == '-h' ]]; then
-  echo -e '\033[32;2m环境参数: \033[0m\033[2mSIMPLE, TABLE, TRADING, LOOP, SIZE, PAGE, SHOULD_STORE, DEBUG_LOCAL\033[0m'
-  echo -e '\033[32;2m概念排行: \033[0m\033[2mSIMPLE=1 resou.sh em quote rank f3 27 n\033[0m'
-  echo -e '\033[32;2m个股异动: \033[0m\033[2mLOOP=5 SIMPLE=1 resou.sh em quote pkyd ALL\033[0m'
-  echo -e '\033[32;2m板块异动: \033[0m\033[2mLOOP=5 SIMPLE=1 resou.sh em quote bkyd ALL\033[0m'
-  echo -e '\033[32;2m强势股池: \033[0m\033[2mresou.sh em quote qsgc\033[0m'
-  echo -e '\033[32;2m涨停股池: \033[0m\033[2mresou.sh em quote ztgc\033[0m'
-  echo -e '\033[32;2m炸板股池: \033[0m\033[2mresou.sh em quote zbgc\033[0m'
-  echo -e '\033[32;2m次新股池: \033[0m\033[2mresou.sh em quote cxgc\033[0m'
-  fi
+  [[ $op == '-h' ]] && HELP=1
 done
 
 help "${args[@]}"
 
-if [[ $? -eq 1 ]]; then
+if [[ $HELP ]]; then
+echo -e '\033[33;2m环境参数: \033[0m\033[2mSIMPLE, TABLE, TRADING, LOOP, SIZE, PAGE, SHOULD_STORE, DEBUG_LOCAL\033[0m'
+echo -e '\033[31;2m概念排行: \033[0m\033[2mSIMPLE=1 resou.sh em quote rank f3 27 n\033[0m'
+echo -e '\033[31;2m板块资金: \033[0m\033[2mLOOP=5 resou.sh em quote bkzj\033[0m'
+echo -e '\033[31;2m个股异动: \033[0m\033[2mLOOP=5 SIMPLE=1 resou.sh em quote pkyd ALL\033[0m'
+echo -e '\033[31;2m板块异动: \033[0m\033[2mLOOP=5 SIMPLE=1 resou.sh em quote bkyd ALL\033[0m'
+echo -e '\033[31;2m强势股池: \033[0m\033[2mresou.sh em quote qsgc\033[0m'
+echo -e '\033[31;2m涨停股池: \033[0m\033[2mresou.sh em quote ztgc\033[0m'
+echo -e '\033[31;2m炸板股池: \033[0m\033[2mresou.sh em quote zbgc\033[0m'
+echo -e '\033[31;2m次新股池: \033[0m\033[2mresou.sh em quote cxgc\033[0m'
+else
   json_res "${args[@]}"
   echo -e "\033];{TRADING=$TRADING LOOP=$LOOP ${args[@]}}\007"
   if [[ $LOOP ]]; then
@@ -2177,6 +2177,7 @@ if [[ $? -eq 1 ]]; then
       [[ $TRADING && $? -eq 1 ]] && continue
       output="$(json_res "${args[@]}" 2>/dev/null)"
       echo -e '\033[2J\033[3J\033[1;1H'
+      date '+%H:%M:%S'
       echo -e "$output"
       sleep ${LOOP:-1}
     done

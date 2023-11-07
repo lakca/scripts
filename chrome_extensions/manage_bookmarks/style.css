@@ -237,8 +237,16 @@
   }
 }
 
+.twx-inline {
+  flex: 1 1 0%
+}
+
 .twx-mr-4 {
   margin-right: 1rem
+}
+
+.twx-inline {
+  display: inline
 }
 
 .twx-flex {
@@ -247,6 +255,10 @@
 
 .twx-w-56 {
   width: 14rem
+}
+
+.twx-flex-1 {
+  flex: 1 1 0%
 }
 
 .twx-origin-top-right {
@@ -341,72 +353,6 @@
   background-color: rgb(255 96 92 / var(--tw-bg-opacity));
   --tw-text-opacity: 1;
   color: rgb(255 255 255 / var(--tw-text-opacity))
-}
-
-.twx-theme-button-handle\/maximize {
-  --tw-border-opacity: 1;
-  border-color: rgb(0 202 78 / var(--tw-border-opacity));
-  --tw-bg-opacity: 1;
-  background-color: rgb(0 202 78 / var(--tw-bg-opacity));
-  --tw-text-opacity: 1;
-  color: rgb(255 255 255 / var(--tw-text-opacity))
-}
-
-.twx-theme-button-handle\/minimize {
-  --tw-border-opacity: 1;
-  border-color: rgb(255 189 68 / var(--tw-border-opacity));
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 189 68 / var(--tw-bg-opacity));
-  --tw-text-opacity: 1;
-  color: rgb(255 255 255 / var(--tw-text-opacity))
-}
-
-.twx-theme-button\/close {
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 96 92 / var(--tw-bg-opacity));
-  --tw-text-opacity: 1;
-  color: rgb(255 255 255 / var(--tw-text-opacity))
-}
-
-.twx-theme-button\/close:hover {
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 62 57 / var(--tw-bg-opacity))
-}
-
-.twx-theme-button\/close:focus-visible {
-  outline-color: #FF605C
-}
-
-.twx-theme-button\/maximize {
-  --tw-bg-opacity: 1;
-  background-color: rgb(0 202 78 / var(--tw-bg-opacity));
-  --tw-text-opacity: 1;
-  color: rgb(255 255 255 / var(--tw-text-opacity))
-}
-
-.twx-theme-button\/maximize:hover {
-  --tw-bg-opacity: 1;
-  background-color: rgb(0 182 70 / var(--tw-bg-opacity))
-}
-
-.twx-theme-button\/maximize:focus-visible {
-  outline-color: #00CA4E
-}
-
-.twx-theme-button\/minimize {
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 189 68 / var(--tw-bg-opacity));
-  --tw-text-opacity: 1;
-  color: rgb(255 255 255 / var(--tw-text-opacity))
-}
-
-.twx-theme-button\/minimize:hover {
-  --tw-bg-opacity: 1;
-  background-color: rgb(255 178 36 / var(--tw-bg-opacity))
-}
-
-.twx-theme-button\/minimize:focus-visible {
-  outline-color: #FFBD44
 }
 
 .twx-theme-button\/primary {

@@ -2,6 +2,16 @@
 
 pythonInstalled=$(which python3 >/dev/null && echo 1 || echo 0)
 
+alias _realpath=realpath
+
+realpath() {
+  if command -v grealpath &>/dev/null; then
+    grealpath "$@"
+  else
+    _realpath "$@"
+  fi
+}
+
 _dirname=$(dirname $0)
 _filename=$(realpath "$0" --relative-to "$_dirname")
 
