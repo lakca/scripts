@@ -7,3 +7,4 @@ edition = "2021"
 
 [dependencies]
 async-std = "1.12.0"
+clap = { version = "4", features = ["deprecated", "derive", "wrap_help"] }

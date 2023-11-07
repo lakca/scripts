@@ -11,62 +11,90 @@ const app = Vue.createApp({
       feature: {
         quote: true,
         highlight: true,
-        highlightBK: true,
+        highlightBK: true
       },
-      symbols: [ 'sh000001', 'sh600352', 'sh603706', 'sz002671', 'sh512480', ],
+      symbols: ['sh000001', 'sh600352', 'sh603706', 'sz002671', 'sh512480'],
       alertRules: {},
       alertTypes: [
         { value: 'hc', label: '价格>=', suffix: '' },
         { value: 'lc', label: '价格<=', suffix: '' },
         { value: 'hp', label: '幅度>=', suffix: '%' },
-        { value: 'lp', label: '幅度<=', suffix: '%' },
+        { value: 'lp', label: '幅度<=', suffix: '%' }
       ],
       shownEditAlertRulesModal: false,
-      formEditAlertRulesModel: { symbol: null, name: null, items: [], },
+      formEditAlertRulesModel: { symbol: null, name: null, items: [] },
       oldData: null,
       data: null,
       columns: [
         { key: 'symbol', className: 'symbol', title: '代码', width: 100, render(rowData) { return rowData.symbol?.toUpperCase() } },
-        { key: 'name', className: 'name', title: '证券', width: 100, render(rowData) {
-          return h('a', { href: `https://www.xueqiu.com/S/${rowData.symbol}`, target: '_blank', }, rowData.name)
-        } },
-        { key: 'percent_', className: 'percent_', align: 'center', title: '涨幅', width: 160, render: (rowData) => {
-          return h('div', { class: 'flex flex-col items-center' }, [
-            h('span', { class: 'high-percent opacity-75' }, rowData.highPercent),
-            h('span', { class: 'flex items-center' }, [
-              h('span', { class: 'open-percent opacity-50' }, rowData.openPercent),
-              h('NDivider', { vertical: true }),
-              h('span', { class: 'percent' }, rowData.percent),
-            ]),
-            h('span', { class: 'low-percent opacity-75' }, rowData.lowPercent),
-          ])
-        } },
-        { key: 'price_', className: 'price_', align: 'center', title: '价格', width: 160, render: (rowData) => {
-          return h('div', { class: 'flex flex-col items-center' }, [
-            h('span', { class: 'high-price opacity-75' }, rowData.high),
-            h('span', { class: 'flex items-center' }, [
-              h('span', { class: 'open-price opacity-50' }, rowData.open),
-              h('NDivider', { vertical: true }),
-              h('span', { class: 'price' }, rowData.price),
-            ]),
-            h('span', { class: 'low-price opacity-75' }, rowData.low),
-          ])
-        } },
-        { key: 'time', className: 'time', title: '时间', width: 88, },
-        { key: 'alert', className: 'alert', title: '预警',
+        {
+          key: 'name',
+          className: 'name',
+          title: '证券',
+          width: 100,
+          render(rowData) {
+            return h('a', { href: `https://www.xueqiu.com/S/${rowData.symbol}`, target: '_blank' }, rowData.name)
+          }
+        },
+        {
+          key: 'percent_',
+          className: 'percent_',
+          align: 'center',
+          title: '涨幅',
+          width: 160,
+          render: (rowData) => {
+            return h('div', { class: 'flex flex-col items-center' }, [
+              h('span', { class: 'high-percent opacity-75' }, rowData.highPercent),
+              h('span', { class: 'flex items-center' }, [
+                h('span', { class: 'open-percent opacity-50' }, rowData.openPercent),
+                h('NDivider', { vertical: true }),
+                h('span', { class: 'percent' }, rowData.percent)
+              ]),
+              h('span', { class: 'low-percent opacity-75' }, rowData.lowPercent)
+            ])
+          }
+        },
+        {
+          key: 'price_',
+          className: 'price_',
+          align: 'center',
+          title: '价格',
+          width: 160,
+          render: (rowData) => {
+            return h('div', { class: 'flex flex-col items-center' }, [
+              h('span', { class: 'high-price opacity-75' }, rowData.high),
+              h('span', { class: 'flex items-center' }, [
+                h('span', { class: 'open-price opacity-50' }, rowData.open),
+                h('NDivider', { vertical: true }),
+                h('span', { class: 'price' }, rowData.price)
+              ]),
+              h('span', { class: 'low-price opacity-75' }, rowData.low)
+            ])
+          }
+        },
+        { key: 'time', className: 'time', title: '时间', width: 88 },
+        {
+          key: 'alert',
+          className: 'alert',
+          title: '预警',
           render: rowData => {
             const rules = this.alertRules[rowData.symbol] || []
             return rules.map(rule => h('NTag', { class: 'm-1 cursor-pointer', bordered: false, round: true, type: rule.checked ? 'info' : 'default', onClick: () => rule.checked = !rule.checked },
-                () => {
-                  const cfg = this.alertTypes.find(t => t.value === rule.type)
-                  return `${cfg?.label}${rule.value}${cfg.suffix}`
-                }))
+              () => {
+                const cfg = this.alertTypes.find(t => t.value === rule.type)
+                return `${cfg?.label}${rule.value}${cfg.suffix}`
+              }))
               .concat([h('NButton', { type: 'info', text: true, onClick: () => this.showEditAlertRulesModal(rowData.symbol, rowData.name) }, () => '编辑')])
           }
         },
-        { key: 'action', className: 'action', title: '操作', render: (rowData) => {
-          return h('NButton', { onClick: () => this.deleteSymbol(rowData.symbol) , text: true, color: 'red' }, () => '删除')
-        } },
+        {
+          key: 'action',
+          className: 'action',
+          title: '操作',
+          render: (rowData) => {
+            return h('NButton', { onClick: () => this.deleteSymbol(rowData.symbol), text: true, color: 'red' }, () => '删除')
+          }
+        }
       ],
       highlightData: [],
       highlightBKData: [],
@@ -76,7 +104,7 @@ const app = Vue.createApp({
       ],
       shownDropdown: false,
       cursor: [0, 0],
-      row: null,
+      row: null
     }
   },
   computed: {
@@ -87,7 +115,7 @@ const app = Vue.createApp({
       const list = [[], [], []]
       const num = Math.ceil(this.highlightData.length / list.length)
       return list.map((e, i) => this.highlightData.slice(num * i, num * i + num))
-    },
+    }
   },
   methods: {
     makeSortable() {
@@ -98,22 +126,22 @@ const app = Vue.createApp({
             const arr = this.symbols.splice(e.oldIndex, 1)
             this.symbols.splice(e.newIndex, 0, arr[0])
           }
-        },
+        }
       })
     },
     toggleFeature(feature, checked) {
       this.feature[feature] = checked
       switch (feature) {
         case 'quote':
-            checked ? this.send({type: 'begin', action: 'quote', data: { symbol: this.symbols }}) : this.send({type: 'end', action: 'quote', data: { symbol: this.symbols }})
+          checked ? this.send({ type: 'begin', action: 'quote', data: { symbol: this.symbols } }) : this.send({ type: 'end', action: 'quote', data: { symbol: this.symbols } })
           break
         case 'highlight':
-            checked ? this.send({type: 'begin', action: 'highlight'}) : this.send({type: 'end', action: 'highlight'})
+          checked ? this.send({ type: 'begin', action: 'highlight' }) : this.send({ type: 'end', action: 'highlight' })
           break
         case 'highlightBK':
-            checked ? this.send({type: 'begin', action: 'highlightBK'}) : this.send({type: 'end', action: 'highlightBK'})
+          checked ? this.send({ type: 'begin', action: 'highlightBK' }) : this.send({ type: 'end', action: 'highlightBK' })
           break
-      default:
+        default:
       }
     },
     deleteSymbol(symbol) {
@@ -217,7 +245,7 @@ const app = Vue.createApp({
             this.shownDropdown = true
             this.cursor = [e.clientX, e.clientY]
           })
-        },
+        }
       }
     },
     handleClickContextmenu(key) {
@@ -230,12 +258,12 @@ const app = Vue.createApp({
         const res = await fetch(`/s/search?q=${q}`).then(res => res.json())
         this.selectOptions = res.map(e => ({
           label: e.name,
-          value: e.symbol,
+          value: e.symbol
         }))
       } finally {
         this.loadingSearch = false
       }
-    },
+    }
   },
   watch: {
     opacity(val) {
@@ -259,14 +287,14 @@ const app = Vue.createApp({
       handler(val) {
         setStorage('quote:symbols', this.symbols)
         this.toggleFeature('quote', true)
-      },
+      }
     },
     alertRules: {
       deep: true,
       handler(val) {
         setStorage('quote:alertRules', this.alertRules)
-      },
-    },
+      }
+    }
   },
   mounted() {
     this.createWs()
@@ -288,7 +316,7 @@ const app = Vue.createApp({
         this.symbols = getStorage('quote:symbols')
       }
     })
-  },
+  }
 })
 app.use(naive)
 const root = app.mount('#app')

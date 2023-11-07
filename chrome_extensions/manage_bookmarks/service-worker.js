@@ -1,4 +1,4 @@
-import { cleanBookmarks, readTabsLater, callWindow, sortBookmarkFolder, alert } from './headless.js'
+import { cleanBookmarks, readTabsLater, callWindow, sortBookmarkFolder, alert, googleTranslate, goPrevActiveTab, goNextActiveTab } from './headless.js'
 import { config } from './config.js'
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -18,8 +18,9 @@ chrome.omnibox.onInputChanged.addListener((text, suggest) => {
 
 chrome.runtime.onMessage.addListener(onmessage)
 
+// 功能通信（需要在worker常驻）
 function onmessage (msg, sender, /** @type {(...args) => void} */resp) {
-  console.log('worker', msg, sender)
+  console.log('\x1b[32mworker onmessage:\x1b[0m', msg, sender)
   if (msg.action === 'askSortBookmarks') {
     (async function () {
       const [connected, result] = await callWindow({
@@ -42,6 +43,12 @@ function onmessage (msg, sender, /** @type {(...args) => void} */resp) {
     readTabsLater('T').then(resp)
   } else if (msg.action === 'askCleanBookmarks') {
     cleanBookmarks().then(resp)
+  } else if (msg.action === 'googleTranslate') {
+    googleTranslate().then(resp)
+  } else if (msg.action === 'goPrevActiveTab') {
+    goPrevActiveTab().then(resp)
+  } else if (msg.action === 'goNextActiveTab') {
+    goNextActiveTab().then(resp)
   }
   return true
 }

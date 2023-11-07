@@ -4,7 +4,7 @@
 // Several foreground scripts can be declared
 // and injected into the same or different pages.
 
-console.log("This prints to the console of the page (injected only if the page url matched)")
+console.log('This prints to the console of the page (injected only if the page url matched)')
 
 class WindowKeyListener {
   constructor() {
@@ -13,26 +13,30 @@ class WindowKeyListener {
     /** @type Set<(e: KeyboardEvent) => void> */
     this.keyup = new Set()
     this.k = []
-    this.setup();
+    this.setup()
 
-    if (window.frameElement?.tagName === "IFRAME") {
+    if (window.frameElement?.tagName === 'IFRAME') {
       this.withinFrame = true;
-      (window.frameElement).addEventListener("load", this.setup, { capture: true, passive: true })
+      (window.frameElement).addEventListener('load', this.setup, { capture: true, passive: true })
     }
   }
+
   setup = () => {
-    window.addEventListener("keydown", this.handleKeyDown, true)
-    window.addEventListener("keyup", this.handleKeyUp, true)
+    window.addEventListener('keydown', this.handleKeyDown, true)
+    window.addEventListener('keyup', this.handleKeyUp, true)
   }
+
   release = () => {
-    window.removeEventListener("keydown", this.handleKeyDown, true)
-    window.removeEventListener("keyup", this.handleKeyUp, true)
+    window.removeEventListener('keydown', this.handleKeyDown, true)
+    window.removeEventListener('keyup', this.handleKeyUp, true)
   }
+
   handleKeyDown = (e) => {
     this.keydown.forEach(cb => {
       cb(e)
     })
   }
+
   handleKeyUp = (e) => {
     this.keyup.forEach(cb => {
       cb(e)
@@ -45,7 +49,7 @@ const keyListener = new WindowKeyListener()
 keyListener.keydown.add(e => {
   const tag = e.target.tagName
   if (!['INPUT', 'TEXTAREA'].includes(tag)) {
-    if (!(e.altKey || e.ctrlKey || e.metaKey || e.shiftKey)) {
+    if (!(e.altKey || e.ctrlKey || e.metaKey)) {
       handleKeydown(e)
     }
   }
@@ -65,25 +69,36 @@ function handleKeydown(e) {
       return returnHref ? link?.href : link
     }
     switch (e.key) {
-      case 'm': window.open(getLink(el => el.classList.contains('crate-name'), true)); break
-      case 'r': case 'g': window.open(getLink('repository', true)); break
-      case 'c': window.open(getLink('crates.io', true)); break
-      case 's': window.open(getLink('source', true)); break
-      case 'd': window.open(getLink('documentation', true)); break
-      case 'c': document.getElementById('clipboard')?.click(); break
-      case 'f': {
+      case 'm':
+      case 'M':
+        window.open(getLink(el => el.classList.contains('crate-name'), true)); break
+      case 'r':
+      case 'R':
+      case 'g':
+      case 'G':
+        window.open(getLink('repository', true)); break
+      case 'c':
+      case 'C':
+        window.open(getLink('crates.io', true)); break
+      case 's':
+      case 'S':
+        window.open(getLink('source', true)); break
+      case 'd':
+      case 'D':
+        window.open(getLink('documentation', true)); break
+      case 'f':
+      case 'F': {
         const mouseoverEvent = new Event('mouseover')
         getLink('feature', false)?.parentElement?.dispatchEvent(mouseoverEvent)
       } break
       case '?':
+      case '/':
         alert(`
         m: crate-name
-        r|g: repository
+        r, g: repository
         c: crate
         s: source
         d: documentation
-        p: documentation
-        c: clipboard
         `)
         break
       default:
@@ -97,8 +112,12 @@ function handleKeydown(e) {
       return returnHref ? header?.nextElementSibling?.querySelector('a')?.href : header
     }
     switch (e.key) {
-      case 'r': case 'g': window.open(getEl('repository', true)); break
-      case 'd': window.open(getEl('documentation', true)); break
+      case 'r': case 'R':
+      case 'g': case 'G':
+        window.open(getEl('repository', true)); break
+      case 'v': case 'V': document.body?.querySelector('nav li:nth-child(2) a')?.click(); break
+      case 'p': case 'P': document.body?.querySelector('nav li:nth-child(3) a')?.click(); break
+      case 'd': case 'D': window.open(getEl('documentation', true)); break
       case '?':
         alert(`
           r|g: repository
@@ -107,6 +126,12 @@ function handleKeydown(e) {
         break
       default:
         return
+    }
+  } else if (window.location.hostname.endsWith('eastmoney.com')) {
+    const code = location.href.match(/(?<=[^0-9]){0-9}{6}(?=[^0-9])/)?.[0]
+    switch (e.key) {
+      case 'q':
+        window.open(`https://quote.eastmoney.com/concept/${}.html`)
     }
   }
   console.log('trigger', e.key)

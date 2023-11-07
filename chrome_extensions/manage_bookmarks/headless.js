@@ -1,14 +1,33 @@
 const global = {
   tabId: -1,
-  windowId: -1
+  windowId: -1,
+  /** @type {{ persist: boolean, tabId: number }[]} */
+  tabQueue: [],
 }
+
 chrome.tabs.onActivated.addListener(({ tabId, windowId }) => {
-  console.log('actived', windowId, tabId)
   global.windowId = windowId
   global.tabId = tabId
+
+  const index = global.tabQueue.findIndex(e => e.tabId === tabId)
+  if (index > -1) {
+    if (global.tabQueue[index].persist) {
+      global.tabQueue.forEach(e => e.persist = false)
+    } else {
+      global.tabQueue.splice(index, 1)
+      global.tabQueue.push({ tabId })
+    }
+  } else {
+    global.tabQueue.push({ tabId })
+  }
+})
+chrome.tabs.onRemoved.addListener((tabId, { windowId, isWindowClosing }) => {
+  const index = global.tabQueue.findIndex(e => e.tabId === tabId)
+  if (index > -1) {
+    global.tabQueue.splice(index, 1)
+  }
 })
 chrome.windows.onFocusChanged.addListener(windowId => {
-  console.log('focused', windowId)
   global.windowId = windowId
 })
 
@@ -16,10 +35,10 @@ chrome.windows.onFocusChanged.addListener(windowId => {
  *
  * @param {*} data
  * @param {{window?: number|object, tab?: number|object, forcePopup?: boolean, forceWebpage?: boolean}} [options]
- * @returns
+ * @returns {Promise<[boolean, any]>}
  */
 export async function callWindow (data, options) {
-  console.log(options, data)
+  console.log('\x1b[32mcall window:\x1b[0m', options, data)
   options = options || {}
   if (options.tab) {
     const tabId = typeof options.tab === 'object' ? options.tab.id : options.tab
@@ -314,4 +333,40 @@ export async function readTabsLater (dir) {
     }
   }
   return Promise.all(tasks)
+}
+
+export async function googleTranslate() {
+  const currentTab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0]
+  const text = (await callWindow({ action: 'getSelection' }, { forceWebpage: true }))[1] 
+  || (await callWindow({ action: 'getClipboard' }, { forceWebpage: true }))[1]
+  const tabs = await chrome.tabs.query({ currentWindow: true, url: 'https://translate.google.com/*' })
+  const lang = /[\u4e00-\u9fa5]/u.test(text) ? 'en' : 'zh-CN'
+  const url = `https://translate.google.com/?sl=auto&tl=${lang}&text=${encodeURIComponent(text)}&op=translate`
+  if (tabs.length) {
+    const tab = tabs[0]
+    await chrome.tabs.move(tab.id, { index: currentTab.index + 1 })
+    await chrome.tabs.update(tab.id, { active: true, url })
+  } else {
+    await chrome.tabs.create({ active: true, url, index: currentTab.index + 1, openerTabId: currentTab.id })
+  }
+}
+
+export async function goPrevActiveTab() {
+  const currentTab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0]
+  const currentIndex = global.tabQueue.findIndex(e => e.tabId === currentTab.id)
+  const prev = global.tabQueue[currentIndex - 1]
+  if (prev) {
+    await chrome.tabs.update(prev.tabId, { active: true })
+    prev.persist = true
+  }
+}
+
+export async function goNextActiveTab() {
+  const currentTab = (await chrome.tabs.query({ active: true, currentWindow: true }))[0]
+  const currentIndex = global.tabQueue.findIndex(e => e.tabId === currentTab.id)
+  const next = global.tabQueue[currentIndex + 1]
+  if (next) {
+    await chrome.tabs.update(next.tabId, { active: true })
+    next.persist = true
+  }
 }

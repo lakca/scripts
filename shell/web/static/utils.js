@@ -1,10 +1,9 @@
-
 if ('Vue' in window) {
   window.Vue.component('RenderBlock', {
     name: 'RenderBlock',
     props: {
       component: [String, Object],
-      render: [Array, String, Object, Number],
+      render: [Array, String, Object, Number]
     },
     render() {
       const children = Array.isArray(this.$props.render) ? this.$props.render : [this.$props.render]
@@ -48,11 +47,11 @@ function notify(msg, voice) {
     btn.style.width = '10px'
     btn.style.height = '10px'
     btn.id = 'btn'
-    btn.addEventListener('click', function () {
+    btn.addEventListener('click', function() {
       console.log('click')
       window.__voice__ && fetch('/say', {
         method: 'POST',
-        body: window.__voice__,
+        body: window.__voice__
       })
       window.__notify__ && Notification.requestPermission().then(permission => {
         console.log(permission)
@@ -72,7 +71,7 @@ function alert(data, rules, oldData) {
     if (!rule || !rule.checked) continue
     const msg = `${data.name} ${data.percent} ${data.price}`
     let voice
-    let percentVoice = (data.ratio > 0 ? '当前涨幅' : data.ratio < 0 ? '当前跌幅' : '') + `${data.percent.replace(/[+-]/, '')}`
+    const percentVoice = (data.ratio > 0 ? '当前涨幅' : data.ratio < 0 ? '当前跌幅' : '') + `${data.percent.replace(/[+-]/, '')}`
     if ((rule.type === 'hc' && rule.value <= data.price && !equal)) {
       voice = `价格涨至${data.price} ${percentVoice}`
     }
@@ -108,16 +107,16 @@ function isTrading(force) {
 }
 function getFlowText(flow, offset = 0) {
   let unit = ''
-  let sign = flow < 0 ? '-' : '+'
+  const sign = flow < 0 ? '-' : '+'
   let value = Math.abs(flow)
     ;['万', '亿'].slice(offset).some((e, i) => {
-      if (value < (i + 1) * 10000) {
-        return true
-      } else {
-        value /= 10000
-        unit = e
-      }
-    })
+    if (value < (i + 1) * 10000) {
+      return true
+    } else {
+      value /= 10000
+      unit = e
+    }
+  })
   return sign + value.toFixed(2) + unit
 }
 

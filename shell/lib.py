@@ -1,4 +1,8 @@
 # coding=utf-8
+import inspect
+import sys
+import textwrap
+
 
 from time import mktime
 from datetime import datetime
@@ -17,8 +21,7 @@ from urllib.parse import quote
 NUMBER_REG = r"-?([0-9]+\.?[0-9]*|\.[0-9]*)"
 
 DEBUG = os.environ.get("DEBUG")
-DEBUG = "({})".format(DEBUG.replace(
-    ",", "|").replace("*", ".*")) if DEBUG else DEBUG
+DEBUG = "({})".format(DEBUG.replace(",", "|").replace("*", ".*")) if DEBUG else DEBUG
 SHOULD_STORE = bool(os.environ.get("SHOULD_STORE"))
 TABLE = bool(os.environ.get("TABLE"))
 NO_TABLE = bool(os.environ.get("NO_TABLE"))
@@ -457,13 +460,7 @@ class Unicode:
     def simpleWidth(cls, text):
         w = 0
         for char in text:
-            w += (
-                1
-                if cls.isrange(char, "ascii")
-                else 2
-                if cls.isrange(char, "cjk")
-                else 1
-            )
+            w += 1 if cls.isrange(char, "ascii") else 2 if cls.isrange(char, "cjk") else 1
         return w
 
 
@@ -488,9 +485,7 @@ class Pipe:
     @classmethod
     def apply(cls, v, pipes=[], data={}, interpolate=None, signed=None):
         __stack = [v]
-        __interpolate = (
-            lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
-        )
+        __interpolate = lambda tpl: cls._interpolate(str(tpl), data) if data else tpl
         for pipe in pipes:
             if pipe == "true" and not v:
                 return v
@@ -530,8 +525,7 @@ class Pipe:
             if interpolate is not None and pipe.startswith(interpolate):
                 v = cls._interpolate(pipe[1:], data)
             elif method:
-                v = method(v, *args, **kwargs, data=data,
-                           vx=cls._get_v(v, **kwargs))
+                v = method(v, *args, **kwargs, data=data, vx=cls._get_v(v, **kwargs))
             __stack.append(v)
 
         return v
@@ -552,7 +546,7 @@ class Pipe:
             token = None
             debug("replace:", key)
             # 兼容定义中的绝对路径，如 data.band_list:word
-            for (i, char) in enumerate(key):
+            for i, char in enumerate(key):
                 if char == "\\":
                     escaped = True
                 elif char == "|" and not escaped:
@@ -564,8 +558,7 @@ class Pipe:
                 token = tokenize(key[index:]).data
                 key = key[0:index]
             if key.startswith("."):  # 所在对象的后代属性
-                value = str(retrieve(data.get("__", ""),
-                            key.split(".")[1:], ""))
+                value = str(retrieve(data.get("__", ""), key.split(".")[1:], ""))
             elif key.startswith("/"):  # 绝对路径
                 key_token = tokenize(key[1:]).data
                 value = str(Parser.retrieve(data, key_token, ""))
@@ -588,11 +581,9 @@ class Pipe:
             pass
         for case in (
             # custom
-            lambda: datetime.strptime(
-                sv, kwargs["from"]) if kwargs["from"] else 0 / 0,
+            lambda: datetime.strptime(sv, kwargs["from"]) if kwargs["from"] else 0 / 0,
             # timestamp 1667632623
-            lambda: datetime.fromtimestamp(
-                nv / 1000 if nv > 9999999999 else nv),
+            lambda: datetime.fromtimestamp(nv / 1000 if nv > 9999999999 else nv),
             # UTC "Tue, 18 Oct 2022 23:00:23 +0800"
             lambda: datetime.strptime(sv, "%a, %d %b %Y %H:%M:%S %z"),
             # Mon Jan 31 20:50:10 +0800 2022
@@ -615,10 +606,7 @@ class Pipe:
             "hm": "%H:%M",
         }
         return v.strftime(
-            fmts.get(
-                kwargs.get("format") or (
-                    len(args) and args[0]), "%Y-%m-%d %H:%M:%S"
-            ),
+            fmts.get(kwargs.get("format") or (len(args) and args[0]), "%Y-%m-%d %H:%M:%S"),
         )
 
     @classmethod
@@ -628,15 +616,7 @@ class Pipe:
             return v
         if isinstance(v, (float, int)):
             return v
-        return (
-            0
-            if v == "."
-            else float(v)
-            if "." in v
-            else int(v)
-            if re.match(NUMBER_REG + "$", str(v))
-            else None
-        )
+        return 0 if v == "." else float(v) if "." in v else int(v) if re.match(NUMBER_REG + "$", str(v)) else None
 
     @classmethod
     def seekNumber(cls, v, *args, **kwargs):
@@ -672,9 +652,9 @@ class Pipe:
             base = kwargs.get("base", "")
             start = False
             for e in ["", "万", "亿", "兆"]:
-                if (base == e):
+                if base == e:
                     start = True
-                if (not start):
+                if not start:
                     continue
                 if abs(v) > 10000:
                     v = v / 10000
@@ -718,10 +698,10 @@ class Pipe:
     @classmethod
     def conditional(cls, v, cond, handler, *args, **kwargs):
         condition = kwargs.get('condition') or cond
-        _condition = lambda e, **kws: cls._exp(e, **kws) if condition == 'exp' else getattr(
-            cls, condition) if hasattr(cls, condition) else None
-        _handler = getattr(cls, handler) if hasattr(
-            cls, handler) else lambda e: handler.format(e)
+        _condition = (
+            lambda e, **kws: cls._exp(e, **kws) if condition == 'exp' else getattr(cls, condition) if hasattr(cls, condition) else None
+        )
+        _handler = getattr(cls, handler) if hasattr(cls, handler) else lambda e: handler.format(e)
         return _handler(v) if _condition(kwargs['vx'], **kwargs) else v
 
     @classmethod
@@ -746,13 +726,7 @@ class Pipe:
                 ]
         else:
             ops = [cls.seekNumber(v), 0]
-        return (
-            Pipe.green(v)
-            if ops[0] < ops[1]
-            else Pipe.red(v)
-            if ops[0] > ops[1]
-            else str(v)
-        )
+        return Pipe.green(v) if ops[0] < ops[1] else Pipe.red(v) if ops[0] > ops[1] else str(v)
 
     @classmethod
     def style(cls, v, styles=[], *args, **kwargs):
@@ -835,9 +809,7 @@ class Pipe:
 
     @classmethod
     def index(cls, v, *args, **kwargs):
-        index = (kwargs.get("data", {}).get("__index", 0)) + (
-            (int(args[0]) if len(args) else 0)
-        )
+        index = (kwargs.get("data", {}).get("__index", 0)) + ((int(args[0]) if len(args) else 0))
         return cls.white(f"【{index}】") + str(v)
 
     @classmethod
@@ -859,16 +831,13 @@ class Pipe:
             return v
         useKwargs = {}
         if kwargs["key"]:
-            def getVal(e): return e[kwargs["key"]]
+
+            def getVal(e):
+                return e[kwargs["key"]]
+
             if kwargs["sorts"]:
-                getIndex = (
-                    lambda k: kwargs["sorts"].index(k)
-                    if k in kwargs["sorts"]
-                    else float("inf")
-                )
-                useKwargs["key"] = cmp_to_key(
-                    lambda a, b: getIndex(getVal(a)) - getIndex(getVal(b))
-                )
+                getIndex = lambda k: kwargs["sorts"].index(k) if k in kwargs["sorts"] else float("inf")
+                useKwargs["key"] = cmp_to_key(lambda a, b: getIndex(getVal(a)) - getIndex(getVal(b)))
             else:
                 useKwargs["key"] = getVal
         v.sort(**useKwargs)
@@ -930,8 +899,7 @@ class Pipe:
             nonlocal start
             nonlocal ansi
             end = match.start()
-            ansi = cls._getLeftStyleANSI(
-                "".join(ansi) + match.string[start:end])
+            ansi = cls._getLeftStyleANSI("".join(ansi) + match.string[start:end])
             start = end
             return "\033[7m" + match.group(3) + "\033[0m" + "".join(ansi)
 
@@ -950,7 +918,7 @@ class Pipe:
     @classmethod
     def _rsv_bash_args(cls, **kwargs):
         args = {}
-        for (k, v) in kwargs.items():
+        for k, v in kwargs.items():
             if k.startswith("bash:"):
                 args[k[5:]] = v
         if "arr" in args:  # bash array
@@ -968,7 +936,7 @@ class Pipe:
         arrdim = bash_args.get("arrdim", 1)
         arridx = bash_args.get("arridx", 0)
         if "arr" in bash_args:
-            for (i, e) in enumerate(bash_args["arr"]):
+            for i, e in enumerate(bash_args["arr"]):
                 if e == str(v):
                     return arr[i - i % arrdim + arridx]
         return v
@@ -1033,15 +1001,14 @@ class Pipe:
         if t >= time_points[0] and t <= time_points[1]:
             delta = t - time_points[0]
         if t >= time_points[2] and t <= time_points[3]:
-            delta = t - time_points[2] + \
-                time_points[1] - time_points[0]
+            delta = t - time_points[2] + time_points[1] - time_points[0]
         return (divmod(delta.seconds, 60)[0], time_points) if delta is not None else None
 
     @classmethod
     def plot(cls, dt, *args, **kwargs):
         interpolate = kwargs.get("__interpolate", noop)
         meta = {}
-        for (k, v) in kwargs.items():
+        for k, v in kwargs.items():
             if k.startswith("m:"):
                 meta[k[2:]] = interpolate(kwargs.get(k))
         debug(meta)
@@ -1087,10 +1054,7 @@ class Pipe:
                 x,
                 y,
                 tick_label=xt,
-                color=list(
-                    map(lambda e: "red" if e >
-                        0 else "gray" if e == 0 else "green", x)
-                ),
+                color=list(map(lambda e: "red" if e > 0 else "gray" if e == 0 else "green", x)),
             )
             barLabels = ax.bar_label(bar, padding=3)
             texts.append(ax.set_title("涨跌分布"))
@@ -1170,10 +1134,8 @@ class Pipe:
             ax.xaxis.set_ticklabels(xtick_labels)
             ax.set_xlim(xticks[0], xticks[-1])
             ax.set_ylim(-1, 1)
-            ax.fill_between([xticks[0], xticks[-1]], 0,
-                            1, color="red", alpha=0.2)
-            ax.fill_between([xticks[0], xticks[-1]], -1,
-                            0, color="green", alpha=0.2)
+            ax.fill_between([xticks[0], xticks[-1]], 0, 1, color="red", alpha=0.2)
+            ax.fill_between([xticks[0], xticks[-1]], -1, 0, color="green", alpha=0.2)
             texts.append(ax.set_title(f"股吧情绪"))
 
         elif kwargs["type"] == "yddb":  # 盘口异动数据对比
@@ -1184,7 +1146,7 @@ class Pipe:
             xtick_labels = []
             up_nums = []
             down_nums = []
-            for (i, (a, b)) in enumerate(zip(up.split(" "), down.split(" "))):
+            for i, (a, b) in enumerate(zip(up.split(" "), down.split(" "))):
                 if not (i % 2):
                     xtick_labels.append(a + "\n" + b)
                 else:
@@ -1211,8 +1173,10 @@ class Pipe:
 
         elif kwargs["type"] == "fst":  # 分时图
             fig = plt.figure(figsize=(11, 5.6), dpi=100)
-            ax: list[plt.Axes] = (fig.add_axes((0.06, 0.35, 0.88, 0.6)),
-                                  fig.add_axes((0.06, 0.05, 0.88, 0.25)))
+            ax: list[plt.Axes] = (
+                fig.add_axes((0.06, 0.35, 0.88, 0.6)),
+                fig.add_axes((0.06, 0.05, 0.88, 0.25)),
+            )
             x_data_n: list[int] = []
             y_close = []
             y_volume = []
@@ -1222,46 +1186,66 @@ class Pipe:
             time_points = None
 
             for item in dt:
-                [time, open, close, high, low, vol,
-                    amount, avg] = item.split(",")
-                diff, time_points = cls.time_diff(
-                    datetime.strptime(time, "%Y-%m-%d %H:%M"), time_points)
+                [time, open, close, high, low, vol, amount, avg] = item.split(",")
+                diff, time_points = cls.time_diff(datetime.strptime(time, "%Y-%m-%d %H:%M"), time_points)
                 x_data_n.append(diff)
                 y_close.append(float(close))
                 y_volume.append(int(vol))
                 y_average.append(float(avg))
-                y_percent.append(
-                    round((float(close) - pre_close) / pre_close, 4))
+                y_percent.append(round((float(close) - pre_close) / pre_close, 4))
 
             cls._em_a_stock_time_axis(ax[0])
             ax[0].plot(x_data_n, y_close, color="red")
             ax[0].plot(x_data_n, y_average, color="orange")
 
-            texts.append(ax[0].text(0, ax[0].get_ylim()[
-                         1], f"{meta.get('code', '')}", horizontalalignment="left", verticalalignment="bottom"))
+            texts.append(
+                ax[0].text(
+                    0,
+                    ax[0].get_ylim()[1],
+                    f"{meta.get('code', '')}",
+                    horizontalalignment="left",
+                    verticalalignment="bottom",
+                )
+            )
 
-            ax[0].text(ax[0].get_xlim()[1], ax[0].get_ylim()[1], cls.number(y_percent[-1], '+%'), color=indicate(
-                y_percent[-1], 0), horizontalalignment="right", verticalalignment="bottom", fontsize="x-large", fontweight="bold")
+            ax[0].text(
+                ax[0].get_xlim()[1],
+                ax[0].get_ylim()[1],
+                cls.number(y_percent[-1], '+%'),
+                color=indicate(y_percent[-1], 0),
+                horizontalalignment="right",
+                verticalalignment="bottom",
+                fontsize="x-large",
+                fontweight="bold",
+            )
 
-            ax[0].annotate(y_close[-1], (x_data_n[-1], y_close[-1]),
-                           color=indicate(y_close[-1], y_close[-2]), fontsize="large")
+            ax[0].annotate(
+                y_close[-1],
+                (x_data_n[-1], y_close[-1]),
+                color=indicate(y_close[-1], y_close[-2]),
+                fontsize="large",
+            )
 
             cls._em_a_stock_time_axis(ax[1], no_labels=True)
-            ax[1].bar(x_data_n, y_volume, color=["red" if y_close[i] > y_close[i-1]
-                      else "lightgray" if y_close[i] == y_close[i-1] else "green" for (i, e) in enumerate(y_volume)])
+            ax[1].bar(
+                x_data_n,
+                y_volume,
+                color=[
+                    "red" if y_close[i] > y_close[i - 1] else "lightgray" if y_close[i] == y_close[i - 1] else "green"
+                    for (i, e) in enumerate(y_volume)
+                ],
+            )
 
             ax2 = ax[0].twinx()
             ax2.set_ylim(ax[0].get_ylim())
             ax2.set_yticks(ax[0].get_yticks())
 
-#            for tick in ax[0].yaxis.get_major_ticks():
-#                tick.label1.set_color(indicate(tick, pre_close))
+            #            for tick in ax[0].yaxis.get_major_ticks():
+            #                tick.label1.set_color(indicate(tick, pre_close))
 
-            ax2.yaxis.set_major_formatter(
-                lambda e, pos: cls.discount(e, pre_close))
+            ax2.yaxis.set_major_formatter(lambda e, pos: cls.discount(e, pre_close))
 
-            texts.append(ax[0].set_title(
-                f"{meta.get('name', '')}-分时图"))
+            texts.append(ax[0].set_title(f"{meta.get('name', '')}-分时图"))
 
         else:
             fig = None
@@ -1271,13 +1255,7 @@ class Pipe:
             global STORAGE_FILE
             global SHOULD_STORE
             if STORAGE_FILE and SHOULD_STORE:
-                fig.savefig(
-                    STORAGE_FILE
-                    + "."
-                    + kwargs["type"]
-                    + str(random.randint(101, 999))
-                    + ".png"
-                )
+                fig.savefig(STORAGE_FILE + "." + kwargs["type"] + str(random.randint(101, 999)) + ".png")
 
             global IMGCAT
             if IMGCAT:
@@ -1321,10 +1299,7 @@ def trim_ansi(a):
     CMD = "[@-~]"
     ST = ESC + r"\\"
     BEL = r"\x07"
-    pattern = (
-        "(" + CSI + ".*?" + CMD + "|" + OSC +
-        ".*?" + "(" + ST + "|" + BEL + ")" + ")"
-    )
+    pattern = "(" + CSI + ".*?" + CMD + "|" + OSC + ".*?" + "(" + ST + "|" + BEL + ")" + ")"
     return re.sub(pattern, "", a)
 
 
@@ -1332,11 +1307,11 @@ xxx = False
 
 
 class Parser:
-    @ classmethod
+    @classmethod
     def getTokens(cls, fmt):
         return tokenize(fmt).data
 
-    @ classmethod
+    @classmethod
     def retrieve(cls, data, node, default=None, iter=False):
         key = "iterKeys" if iter else "keys"
         if "key_or" in node and len(node["key_or"]):
@@ -1347,7 +1322,7 @@ class Parser:
         else:
             return retrieve(data, node[key], default)
 
-    @ classmethod
+    @classmethod
     def getValue(cls, data, node):
         if "iterKeys" in node:
             if data:
@@ -1370,20 +1345,12 @@ class Parser:
                         result = {"__": item, "__index": i + 1}
                         results.append(result)
                         for child in node["children"]:
-                            value = (
-                                cls.getValue(item, child)
-                                if "children" in child or "iterKeys" in child
-                                else cls.retrieve(item, child)
-                            )
+                            value = cls.getValue(item, child) if "children" in child or "iterKeys" in child else cls.retrieve(item, child)
                             result[child["key"]] = value
                 elif isinstance(data, dict):
                     results = {"__": data}
                     for child in node["children"]:
-                        value = (
-                            cls.getValue(data, child)
-                            if "children" in child or "iterKeys" in child
-                            else cls.retrieve(data, child)
-                        )
+                        value = cls.getValue(data, child) if "children" in child or "iterKeys" in child else cls.retrieve(data, child)
                         results[child["key"]] = value
 
             return results
@@ -1391,7 +1358,7 @@ class Parser:
         else:
             return data
 
-    @ classmethod
+    @classmethod
     def flatTokens(cls, tokens):
         flatted = {}
         flatted[tokens["key"]] = tokens
@@ -1400,7 +1367,7 @@ class Parser:
                 flatted.update(cls.flatTokens(child))
         return flatted
 
-    @ classmethod
+    @classmethod
     def applyPipes(cls, value, pipes: list, data: dict, signed=None):
         realPipes = pipes.copy()
         global NO_EMPTY_DASH
@@ -1409,29 +1376,23 @@ class Parser:
 
         return Pipe.apply(value, realPipes, data, interpolate="$", signed=signed)
 
-    @ classmethod
+    @classmethod
     def shouldHidden(cls, token, **kwargs):
         key = token.get("key", "")
         pipes = token.get("pipes", [])
         label = token.get("label", key)
         global SIMPLE
         return "HIDE" in pipes or (
-            SIMPLE
-            and ("index" in kwargs and kwargs["index"] != 0)
-            and not (LINK and label in ["链接"])
-            and "SIMPLE" not in pipes
+            SIMPLE and ("index" in kwargs and kwargs["index"] != 0) and not (LINK and label in ["链接"]) and "SIMPLE" not in pipes
         )
 
-    @ classmethod
+    @classmethod
     def printRecord(cls, record, meta, indent=0):
         INDENT = 2
         _indent = indent
-        scopedStdout = lambda *args: sys.stdout.write(
-            " " * indent + "".join(list(*args))
-        )
+        scopedStdout = lambda *args: sys.stdout.write(" " * indent + "".join(list(*args)))
         index = 0
-        for (key, val) in record.items():
-
+        for key, val in record.items():
             indent = _indent
 
             if key.startswith("__"):
@@ -1449,8 +1410,7 @@ class Parser:
                 indent -= INDENT
 
             if labeled:
-                scopedStdout("{}: ".format(
-                    Pipe.apply(label, ["yellow", "italic"])))
+                scopedStdout("{}: ".format(Pipe.apply(label, ["yellow", "italic"])))
 
             if isinstance(val, dict):
                 cls.printRecord(val, meta, indent + INDENT)
@@ -1472,31 +1432,19 @@ class Parser:
                                 )
                             )
                         else:
-                            scopedStdout(
-                                "  {}\n".format(
-                                    cls.applyPipes(item or "", pipes, record)
-                                )
-                            )
+                            scopedStdout("  {}\n".format(cls.applyPipes(item or "", pipes, record)))
             else:
-                sys.stdout.write(
-                    "{}\n".format(cls.applyPipes(val or "", pipes, record))
-                )
+                sys.stdout.write("{}\n".format(cls.applyPipes(val or "", pipes, record)))
 
-    @ classmethod
+    @classmethod
     def printTable(cls, records, tokens, indent=0, header=True):
-
         children = []
 
         for index, token in enumerate(tokens["children"]):
-            if (
-                not cls.shouldHidden(token, index=index)
-                and not "HIDE_IN_TABLE" in token["pipes"]
-            ):
+            if not cls.shouldHidden(token, index=index) and not "HIDE_IN_TABLE" in token["pipes"]:
                 children.append(token)
 
-        scopedStdout = lambda *args: sys.stdout.write(
-            " " * indent + "".join(list(*args))
-        )
+        scopedStdout = lambda *args: sys.stdout.write(" " * indent + "".join(list(*args)))
         bodies = []
         widths = [[0] * (len(children) + 1)]
         if header:
@@ -1504,18 +1452,12 @@ class Parser:
                 [Pipe.apply("序号", ["yellow"])]
                 + list(
                     map(
-                        lambda child: str(
-                            Pipe.apply(
-                                child.get("label", child["key"]), [
-                                    "yellow", "italic"]
-                            )
-                        ),
+                        lambda child: str(Pipe.apply(child.get("label", child["key"]), ["yellow", "italic"])),
                         children,
                     )
                 )
             ]
-            widths = [
-                list(map(lambda e: Unicode.simpleWidth(trim_ansi(e)), bodies[0]))]
+            widths = [list(map(lambda e: Unicode.simpleWidth(trim_ansi(e)), bodies[0]))]
 
         maxWidths = widths[0].copy()
 
@@ -1525,12 +1467,7 @@ class Parser:
             widths.append([len(str(i + 1))])
             for j, child in enumerate(children):
                 "index" in child["pipes"] and child["pipes"].remove("index")
-                text = str(
-                    cls.applyPipes(
-                        cls.retrieve(record["__"], child,
-                                     ""), child["pipes"], record
-                    )
-                )
+                text = str(cls.applyPipes(cls.retrieve(record["__"], child, ""), child["pipes"], record))
                 bodies[-1].append(text)
                 widths[-1].append(Unicode.simpleWidth(trim_ansi(text)))
                 maxWidths[j + 1] = max(widths[-1][-1], maxWidths[j + 1])
@@ -1539,7 +1476,7 @@ class Parser:
                 scopedStdout(text + " " * (maxWidths[j] - widths[i][j] + 4))
             sys.stdout.write("\n")
 
-    @ classmethod
+    @classmethod
     def output(cls, fmt, data, file=None):
         # print(data)
         if fmt.startswith(":") and not isinstance(data, list):
@@ -1577,7 +1514,7 @@ class Parser:
                     Parser.printToken(record, token, index=index)
                 sys.stdout.write("-" * 50 + "\n")
 
-    @ classmethod
+    @classmethod
     def printToken(cls, data, token: dict, indent=0, INDENT=2, **kwargs):
         key = token.get("key")
         pipes = token.get("pipes")
@@ -1587,18 +1524,11 @@ class Parser:
         useDowngrade = "DOWNGRADE" in pipes
         useTable = "TABLE" in pipes
         value = cls.applyPipes(rawValue, pipes, data, signed=False)
-        scopedStdout = lambda *args: sys.stdout.write(
-            " " * indent + "".join(list(*args))
-        )
+        scopedStdout = lambda *args: sys.stdout.write(" " * indent + "".join(list(*args)))
         if cls.shouldHidden(token, index=kwargs.get('index')):
             return
 
-        scopedStdout(
-            "{}: ".format(
-                Pipe.apply(label if label is not None else key,
-                           ["yellow", "italic"])
-            )
-        )
+        scopedStdout("{}: ".format(Pipe.apply(label if label is not None else key, ["yellow", "italic"])))
 
         if useDowngrade:
             indent -= max(indent, INDENT)
@@ -1610,14 +1540,11 @@ class Parser:
                 else:
                     for val in value:
                         for child in children:
-                            cls.printToken(
-                                val, child, indent=indent + INDENT, INDENT=INDENT
-                            )
+                            cls.printToken(val, child, indent=indent + INDENT, INDENT=INDENT)
                         scopedStdout(" " * INDENT + "-" * 50 + "\n")
             else:
                 for child in children:
-                    cls.printToken(value, child, indent=indent +
-                                   INDENT, INDENT=INDENT)
+                    cls.printToken(value, child, indent=indent + INDENT, INDENT=INDENT)
         elif isinstance(value, list):
             for item in value:
                 scopedStdout("\n")

@@ -148,7 +148,6 @@ class UI {
     loading.destroy = destroy
     return loading
     function destroy () {
-      console.log('destroy')
       loading.el.remove()
       unsetRelative()
     }
@@ -217,7 +216,7 @@ class UI {
 const ui = new UI()
 
 chrome.runtime.onMessage.addListener(function (msg, sender, /** @type {(...args) => void} */resp) {
-  console.log('content Got', msg)
+  console.log('\x1b[32mcontent onmessage:\x1b[0m', msg)
   if (msg.action === 'pingWebpage') {
     resp(true)
   } else if (msg.action === 'window.alert') {
@@ -230,6 +229,10 @@ chrome.runtime.onMessage.addListener(function (msg, sender, /** @type {(...args)
     // importFile().then(resp)
   } else if (msg.action === 'askSelectBookmarkFolder') {
     askSelectBookmarkFolder(msg.bookmarks).then(resp)
+  } else if (msg.action === 'getSelection') {
+    resp(window.getSelection().toString())
+  } else if (msg.action === 'getClipboard') {
+    window.navigator.clipboard.readText().then(resp)
   }
   return true
 })

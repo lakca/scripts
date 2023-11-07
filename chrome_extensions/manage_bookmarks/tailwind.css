@@ -24,4 +24,7 @@
   .twx-select {
     @apply twx-block twx-w-full twx-rounded-md twx-border-0 twx-py-1.5 twx-text-gray-900 twx-shadow-sm twx-ring-1 twx-ring-inset twx-ring-gray-300 focus:twx-ring-2 focus:twx-ring-inset focus:twx-ring-indigo-600 sm:twx-max-w-xs sm:twx-text-sm sm:twx-leading-6
   }
+  .twx-inline {
+    @apply twx-flex-1
+  }
 }
