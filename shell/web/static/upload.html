@@ -22,7 +22,7 @@
   <div id="resp" class="min-h-10 text-orange-500 my-2"></div>
   <Input id="dest" type="text" placeholder="指定上传到的服务器文件夹绝对路径" class="border outline-none border-slate-300 w-3/5" />
   <Input id="root_folder_name" type="text" placeholder="指定上传文件夹" class="border outline-none border-slate-300 w-3/5" />
-  <Input type="file" multiple />
+  <Input type="file" multiple onchange="handleUpload(event)" />
   <div class="flex space-x-2">
     <Button class="text-rose-500" onClick="openDir()">选择目录</Button>
     <Button class="text-rose-500" onClick="openFile()">选择文件</Button>
@@ -71,7 +71,7 @@
     for (const unit of ['KB', 'MB', 'GB']) {
       size /= 1024
       if (size < 1000) {
-        return size.toFixed(2) + unit
+        return +size.toFixed(2) + unit
       }
     }
   }
@@ -126,6 +126,14 @@
     for await (const fileHandle of fileHandles) {
       file = await fileHandle.getFile()
       file.relativePath = [file.name]
+      upload_files.push(file)
+    }
+    render()
+  }
+
+  function handleUpload(event) {
+    for (const file of event.target.files) {
+      file.relativePath = file.relativePath || [file.name]
       upload_files.push(file)
     }
     render()
