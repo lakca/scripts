@@ -382,6 +382,24 @@
       observer.in(document.body, '.modal-container', { remove: true })
     } else if (checkHref('kmcha.com')) {
       observer.in(document.body, 'iframe', { subtree: true, remove: true })
+    } else if (checkHref('node.green')) {
+      const cls = 'fuck-clicked'
+      document.addEventListener('click', evt => {
+        const tr = evt.target.closest('tr')
+        if (tr) {
+          tr.classList.add(cls)
+          if (evt.metaKey) {
+            Array.from(tr.parentNode.children).forEach(ele => {
+              if (tr !== ele && ele.tagName.toUpperCase() === 'TR') {
+                ele.classList.remove(cls)
+              }
+            })
+          }
+        }
+      })
+      const style = document.createElement('style')
+      style.innerHTML = `tr.${cls} td:not(.feature) { filter: invert(1); }`
+      document.head.appendChild(style)
     }
   }
   function opense(type) {

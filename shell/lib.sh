@@ -361,11 +361,17 @@ function ask2() {
       ;;
     i) # 输入值
       input="$OPTARG" ;;
+    I) # 输入值，不检查输入值是否存在于数组中
+      if [[ $OPTARG ]]; then
+        echo $OPTARG;
+        return 0
+      fi
+      ;;
     d) # 默认值
       default="$OPTARG"
       defaultConst=''
       ;;
-    D) # 特殊默认值
+    D) # 预定义特殊默认值，目前有ALL（表示所有选项）
       defaultConst="$OPTARG"
       default=''
       ;;
@@ -737,7 +743,7 @@ function print_json() {
     text="$(curl -v "$url" "${_curlparams[@]}" "${headers[@]}" 2>$_dirname/curl.log)"
   fi
   # 保存数据
-  [[ ${DEBUG_LOCAL-x} && $SHOULD_STORE && $file ]] && printf %s "$text" >"$(datafile $file)"
+  [[ ${DEBUG_LOCAL-x} && $PERSIST && $file ]] && printf %s "$text" >"$(datafile $file)"
 
   if [[ "$jsonFormat" && $(declare -f jsonparser) ]]; then
 
@@ -817,28 +823,41 @@ function print_json() {
 }
 
 function help() {
+
+  _sed="sed"
+  if command -v gsed &>/dev/null; then
+    _sed="gsed"
+  fi
+
   if [[ "$*" =~ (^|[[:space:]])-h([[:space:]]|$) ]]; then
-    local help_msg="$(cat $0 | grep -oE '^\s*[^|)( ]+(\|[^|)( ]*)*\)\s*(#.*)?$' | sed 's/    / /g;')"
-    local stylish=(-e '/^ \S\+/i\ ' -e 's/^ \( \+\)/\1\1\1\1/;s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;s/\(\s*\)\([^ |)]\+\)\([|)]\)/\1\\033[31m\2\\033[0m\3/;s/\(|\)\([^ |)]\+\)/\1\\033[32m\2\\033[0m/g;/^\S/i\ ')
+    local help_msg="$(cat $0 | grep -oE '^\s*[^|)( ]+(\|[^|)( ]*)*\)\s*(#.*)?$' | $_sed 's/    / /g;')"
+    local stylish=(-e '/^ \S\+/i\ ' -e '
+    s/#\(.*\)/\\033[2;3;37m\1\\033[0m/;
+    s/\(|\)\([^|)]\+\)/\\033[2m\1\\033[22m\\033[32m\2\\033[0m/g;
+    s/^\(\s*\)\([^ |)]\+\)/\1\\033[31m\2\\033[0m/;
+    s/^\( \+\)/\1\1\1\1/g;
+    s/\(http[[:print:]]\+\)/\\033[4m\1\\033[0m/g;
+    s/^    //;')
     local endLevel=0
     for i in $(seq 0 $#); do [[ ${@:$i:1} == '-h' ]] && endLevel=$i; done
-    [[ $endLevel == 1 ]] && echo -e "$(sed "${stylish[@]}" <<<"$help_msg")" && exit 0
+    [[ $endLevel == 1 ]] && echo -e "$($_sed "${stylish[@]}" <<<"$help_msg")" && exit 0
     echo -e "$(
       nextLevel=1
       while IFS= read line; do
         lineLevel=$(grep -o '^\s*' <<<"$line")
         lineLevel=${#lineLevel}
         local pattern="${@:$lineLevel:1}"
+        local comparing=$($_sed -e 's/http[[:print:]]\+//' <<< $line | head -1)
         # nextLevel至少为1
         [[ $nextLevel < 1 ]] && nextLevel=1
         # echo "$nextLevel,$lineLevel,$line"
         # 回溯
-        [[ $lineLevel < $nextLevel ]] && { [[ $line =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
+        [[ $lineLevel < $nextLevel ]] && { [[ $comparing =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((lineLevel + 1)); } || nextLevel=$lineLevel; }
         # 打印全部子命令
         [[ $lineLevel -ge $endLevel && $nextLevel -ge $endLevel ]] && echo -e "$line" && continue
         # 匹配上nextLevel，打印
-        [[ $lineLevel = $nextLevel && $line =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((nextLevel + 1)) && continue; }
-      done <<<"$help_msg" | sed "${stylish[@]}"
+        [[ $lineLevel = $nextLevel && $comparing =~ "$pattern" ]] && { echo -e "$line" && nextLevel=$((nextLevel + 1)) && continue; }
+      done <<<"$help_msg" | $_sed "${stylish[@]}"
     )"
   else
     return 1

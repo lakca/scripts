@@ -7,3 +7,6 @@ target
 *.png
 *.jpg
 *.conf
+*.store
+*.dump
+*.cache
