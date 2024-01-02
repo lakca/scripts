@@ -1,5 +1,6 @@
 const https = require('https')
 const fs = require('fs')
+const fsp = require('fs').promises
 const cp = require('child_process')
 const Koa = require('koa')
 const KoaRouter = require('koa-router')
@@ -12,10 +13,16 @@ const em = require('./em')
 const store = require('./store')
 const path = require('path')
 
+async function ensureFolder(filename, isFolder) {
+  const dir = isFolder ? filename : path.dirname(filename)
+  return fsp.mkdir(dir, { recursive: true })
+}
+
 const app = new Koa()
 const router = new KoaRouter()
 app.use(koaBody({
-  jsonLimit: '1kb'
+  jsonLimit: '1kb',
+  multipart: true
 }))
 app.use(router.routes())
 app.use(serve(path.join(__dirname, '/static')))
@@ -50,6 +57,52 @@ router.post('/say', async ctx => {
   console.log(ctx.request.body)
   ctx.request.body && cp.execSync('say ' + ctx.request.body)
   ctx.status = 200
+})
+router.post('/upload', async ctx => {
+  const dest = ctx.request.body.dest
+  const overwritten = ctx.request.body.overwritten
+  const files = ctx.request.files
+  if (!dest) {
+    ctx.status = 400
+    ctx.body = '未指定存储目录。'
+    return
+  }
+  try {
+    await fsp.access(dest, fsp.constants.F_OK | fsp.constants.W_OK)
+  } catch (e) {
+    ctx.body = '给定目录不存在或无写入权限。'
+    ctx.status = 400
+    return
+  }
+  const destStat = await fsp.stat(dest)
+  if (!destStat.isDirectory()) {
+    ctx.body = '存储的目标位置不是目录。'
+    ctx.status = 400
+    return
+  }
+  if (!files) {
+    ctx.body = '未上传文件。'
+    ctx.status = 400
+    return
+  }
+  const skipped = []
+  for (const relativePath of Object.keys(files)) {
+    const file = files[relativePath]
+    // @ts-ignore
+    const srcPath = file.filepath
+    const filepath = path.join(dest, relativePath)
+    await ensureFolder(filepath)
+    if (fs.existsSync(filepath)) {
+      if (!overwritten) {
+        await fsp.unlink(srcPath)
+        skipped.push(relativePath)
+        continue
+      }
+    }
+    await fsp.copyFile(srcPath, filepath)
+    await fsp.unlink(srcPath)
+  }
+  ctx.body = { skipped }
 })
 router.get('/download', async ctx => {
   console.log('download')

@@ -134,7 +134,8 @@ function quote() {
       [[ $script ]] && osascript -e "$script"
       prices[$i]=$price
     done
-    echo -en $result | tabulate -f plain | tee -a em.log
+    echo -en $result | tabulate -f plain
+    # | tee -a em.log
   else
     echo "$url" >> debug
     echo "${#}:${@}" >> debug

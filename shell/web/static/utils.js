@@ -128,3 +128,21 @@ function convertRadix(v, opts) {
     else return +v.toFixed(fixed) + u
   }
 }
+
+/**
+ * Get value(s) of properties matching the key.
+ * @param {*} obj
+ * @param {*} keyPart
+ * @param {*} onlyOne
+ * @returns
+ */
+function getKeyMatches(obj, keyPart, onlyOne) {
+  const values = []
+  for (const k in obj) {
+    if (k.indexOf(keyPart) > -1) {
+      values.push(obj[k])
+      if (onlyOne) break
+    }
+  }
+  return onlyOne ? values[0] : values
+}

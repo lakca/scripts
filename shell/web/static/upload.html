@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.prod.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/daisyui@2.51.4/dist/full.css" rel="stylesheet" type="text/css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: {
+        preflight: false,
+      }
+    }
+  </script>
+</head>
+
+<body class="flex flex-col items-center">
+  <div id="resp" class="min-h-10 text-orange-500 my-2"></div>
+  <Input id="dest" type="text" placeholder="指定上传到的服务器文件夹绝对路径" class="border outline-none border-slate-300 w-3/5" />
+  <Input id="root_folder_name" type="text" placeholder="指定上传文件夹" class="border outline-none border-slate-300 w-3/5" />
+  <Input type="file" multiple />
+  <div class="flex space-x-2">
+    <Button class="text-rose-500" onClick="openDir()">选择目录</Button>
+    <Button class="text-rose-500" onClick="openFile()">选择文件</Button>
+    <Button class="text-rose-500" onClick="upload()">上传</Button>
+  </div>
+  <table>
+    <tbody id="fs"></tbody>
+  </table>
+</body>
+
+<script>
+  /** @type {File[]} */
+  const upload_files = []
+
+  async function upload() {
+    const form = new FormData()
+    form.append('dest', document.getElementById('dest').value.trim())
+    for (const file of upload_files) {
+      form.append([document.getElementById('root_folder_name').value.trim(), ...file.relativePath].join('/'), file, file.name)
+    }
+    const resp = await fetch('/upload', { method: 'POST', body: form }).then(res => res.json())
+    document.getElementById('resp').innerHTML = resp.skipped.map(name => `<ul><li>已跳过：${name}</li></ul>`).join('')
+  }
+
+  function render() {
+    const fs = document.getElementById('fs')
+    fs.innerHTML = upload_files.map(file => {
+      file.id = (Date.now() + Math.random()).toString(32)
+      return `<tr>
+      <td class="text-rose-500"><button onClick="delete_upload_file('${file.id}')">删除</button></td>
+      <td class="text-right text-gray-300 text-xs">${humanSize(file.size)}</td>
+      <td class="text-blue-600 text-sm">${file.relativePath.join('/')}</td>
+      </tr>`
+    }).join('')
+  }
+
+  function delete_upload_file(file_id) {
+    const idx = upload_files.findIndex(file => file.id === file_id)
+    if (idx > -1) {
+      upload_files.splice(idx, 1)
+      render()
+    }
+  }
+
+  function humanSize(size) {
+    for (const unit of ['KB', 'MB', 'GB']) {
+      size /= 1024
+      if (size < 1000) {
+        return size.toFixed(2) + unit
+      }
+    }
+  }
+
+  /**
+   * @returns {Generator<File>}
+   */
+  async function* getFileRecursively(entryHandle, dirHandle) {
+    if (entryHandle.kind === 'file') {
+      /** @type {File} */
+      const file = await entryHandle.getFile()
+      file.relativePath = dirHandle ? await dirHandle.resolve(entryHandle) : [file.name]
+      yield file
+    } else if (entryHandle.kind === 'directory') {
+      for await (const itemHandle of entryHandle.values()) {
+        yield* getFileRecursively(itemHandle, dirHandle)
+      }
+    }
+  }
+
+  async function openDir() {
+    const dirHandle = await window.showDirectoryPicker()
+    for await (const file of getFileRecursively(dirHandle, dirHandle)) {
+      file.relativePath = [dirHandle.name, ...file.relativePath]
+      upload_files.push(file)
+    }
+    render()
+  }
+
+  async function openFile() {
+    const fileHandles = await window.showOpenFilePicker({
+      multiple: true,
+      excludeAcceptAllOption: true,
+      types: [
+        {
+          description: "Select Medias",
+          accept: {
+            "image/*": ['.png', '.gif', '.jpeg', '.jpg', '.gif', '.heic', '.webp'],
+            "video/*": ['.mov', '.mp4', '.mpeg', '.avi', '.flv', '.ogv', '.webm'],
+            "audio/*": ['.mp3', '.aac', '.oga', '.weba'],
+            "text/*": ['.txt', '.csv', '.md'],
+            "application/*": [
+              '.pdf', '.ppt', '.pptx', '.xls', '.xlsx', '.doc', '.docx',
+              '.js', '.json', '.svg',
+              '.rar', '.tar', '.zip', '.7z',
+              '.dmg', '.apk', '.ipa'
+            ],
+          },
+        },
+      ]
+    })
+    for await (const fileHandle of fileHandles) {
+      file = await fileHandle.getFile()
+      file.relativePath = [file.name]
+      upload_files.push(file)
+    }
+    render()
+  }
+</script>
+
+</html>

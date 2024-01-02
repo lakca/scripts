@@ -1,5 +1,6 @@
 # coding=utf-8
 import inspect
+import math
 import sys
 import textwrap
 
@@ -17,12 +18,15 @@ import os
 from typing import MutableSequence, Sequence, get_type_hints
 from urllib import request
 from urllib.parse import quote
+from matplotlib.axes import Axes
+
+from matplotlib.ticker import FuncFormatter
 
 NUMBER_REG = r"-?([0-9]+\.?[0-9]*|\.[0-9]*)"
 
 DEBUG = os.environ.get("DEBUG")
 DEBUG = "({})".format(DEBUG.replace(",", "|").replace("*", ".*")) if DEBUG else DEBUG
-SHOULD_STORE = bool(os.environ.get("SHOULD_STORE"))
+PERSIST = bool(os.environ.get("PERSIST"))
 TABLE = bool(os.environ.get("TABLE"))
 NO_TABLE = bool(os.environ.get("NO_TABLE"))
 IMGCAT = bool(os.environ.get("IMGCAT"))
@@ -466,20 +470,20 @@ class Unicode:
 
 class Pipe:
     STYLES = {
-        "red": "31",
-        "green": "32",
-        "yellow": "33",
-        "blue": "34",
-        "magenta": "35",
-        "cyan": "36",
-        "white": "37",
-        "bold": "1",
-        "dim": "2",
-        "italic": "3",
-        "underline": "4",
-        "blink": "5",
-        "reverse": "7",
-        "invisible": "8",
+        "red": ("31", "0"),
+        "green": ("32", "0"),
+        "yellow": ("33", "0"),
+        "blue": ("34", "0"),
+        "magenta": ("35", "0"),
+        "cyan": ("36", "0"),
+        "white": ("37", "0"),
+        "bold": ("1", "21"),
+        "dim": ("2", "22"),
+        "italic": ("3", "23"),
+        "underline": ("4", "24"),
+        "blink": ("5", "25"),
+        "reverse": ("7", "27"),
+        "invisible": ("8", "28"),
     }
 
     @classmethod
@@ -621,6 +625,8 @@ class Pipe:
     @classmethod
     def seekNumber(cls, v, *args, **kwargs):
         """v: str<number + any>"""
+        if v is None:
+            return math.nan
         if isinstance(v, (float, int)):
             return v
         match = re.search(NUMBER_REG, str(v))
@@ -659,7 +665,7 @@ class Pipe:
                 if abs(v) > 10000:
                     v = v / 10000
                 else:
-                    return str(v) + e if isinstance(v, int) else "{:.2f}".format(v) + e
+                    return str(v) + e if isinstance(v, int) else ("{:." + str(kwargs.get("fixed", 2)) + "f}").format(v) + e
         # 四舍五入
         elif type.isdecimal():
             return round(v, int(type))
@@ -686,7 +692,7 @@ class Pipe:
             b = interpolate(args[0])
             b = cls.seekNumber(b)
             v = cls.seekNumber(v)
-            return "{:+.2%}".format((v - b) / b) if b != 0 else ""
+            return ("{:+." + str(kwargs.get('fix', 2)) + "%}").format((v - b) / b) if b != 0 else ""
 
     @classmethod
     def _exp(cls, v, *args, **kwargs):
@@ -731,10 +737,12 @@ class Pipe:
     @classmethod
     def style(cls, v, styles=[], *args, **kwargs):
         codes = []
+        reset = []
         for style in styles:
             if style in cls.STYLES:
-                codes.append(cls.STYLES[style])
-        text = "\033[" + ";".join(codes) + "m" + str(v) + "\033[0m"
+                codes.append(cls.STYLES[style][0])
+                reset.append(cls.STYLES[style][1])
+        text = "\033[" + ";".join(codes) + "m" + str(v) + "\033[" + ";".join(reset) + "m"
         # if kwargs.get('preserve', False):
         #     regReset = re.compile(r"\033\[0m")
         return text
@@ -957,12 +965,12 @@ class Pipe:
                 e.g. 930, 1059, 1300 ...
 
         Returns:
-            (t, seconds_diff_to_AStock_day_start_time)
+            (seconds_diff_to_AStock_day_start_time, time_label)
 
         Examples:
-            - 930 -> (930, 0)
-            - 1030 -> (930, 60)
-            - 1330 -> (930, 150)
+            - 930 -> (0, '09:30')
+            - 1030 -> (60, '10:30')
+            - 1330 -> (150, '13:30')
         """
         t = "{:04d}".format(t)
         tl = t[0:2] + ":" + t[2:4]
@@ -971,38 +979,59 @@ class Pipe:
         return (t, tl)
 
     @classmethod
-    def _em_a_stock_time_axis(cls, ax, *args, **kwargs):
-        ax.set_xlim((0, 240))
-        ax.xaxis.set_ticks((0, 30, 60, 90, 120, 150, 180, 210, 240))
-        kwargs.get('no_labels', False) and ax.set_xticklabels([]) or ax.xaxis.set_ticklabels(
-            (
-                "09:30",
-                "10:00",
-                "10:30",
-                "11:00",
-                "11:30/13:00",
-                "13:30",
-                "14:00",
-                "14:30",
-                "15:00",
-            )
-        )
+    def _em_a_stock_time(cls, t, fmt=None, *args, **kwargs):
+        """
+        Args:
+            t: str
+                e.g. 2023-11-16 09:31
+
+        Returns:
+            (seconds_diff_to_AStock_day_start_time, time_label)
+
+        Examples:
+            - 2023-11-16 09:31 -> (1, '09:31')
+        """
+        t = datetime.strptime(t, fmt) if fmt else datetime.fromisoformat(t)
+        delta = 60 * (t.hour - 9) + t.minute - 30
+        delta = delta if delta <= 120 else delta - 90
+        return (delta, datetime.strftime(t, '%H:%M'))
 
     @classmethod
-    def time_diff(cls, t, time_points):
-        delta = None
-        if not time_points:
-            time_points = [
-                t.replace(hour=9, minute=30, second=0),
-                t.replace(hour=11, minute=30, second=0),
-                t.replace(hour=13, minute=0, second=0),
-                t.replace(hour=15, minute=0, second=0),
+    def _em_a_stock_time_axis(cls, ax, *args, **kwargs):
+        ticks = [0, 30, 60, 90, 120, 150, 180, 210, 240]
+        labels = [
+            "09:30",
+            "10:00",
+            "10:30",
+            "11:00",
+            "11:30/13:00",
+            "13:30",
+            "14:00",
+            "14:30",
+            "15:00",
+        ]
+        if kwargs.get('close_type', '') == '1530':
+            ticks.append(270)
+            labels.append('15:30')
+        ax.set_xlim((ticks[0], ticks[-1]))
+        ax.xaxis.set_ticks(ticks)
+        kwargs.get('no_labels', False) and ax.set_xticklabels([]) or ax.xaxis.set_ticklabels(labels)
+
+    @classmethod
+    def time_diff(cls, t: datetime, time_ranges=None):
+        delta = t - t
+        if not time_ranges:
+            time_ranges = [
+                [t.replace(hour=9, minute=30, second=0), t.replace(hour=11, minute=30, second=0)],
+                [t.replace(hour=13, minute=0, second=0)],
             ]
-        if t >= time_points[0] and t <= time_points[1]:
-            delta = t - time_points[0]
-        if t >= time_points[2] and t <= time_points[3]:
-            delta = t - time_points[2] + time_points[1] - time_points[0]
-        return (divmod(delta.seconds, 60)[0], time_points) if delta is not None else None
+        for range in time_ranges:
+            if len(range) == 1 or t <= range[1]:
+                delta += t - range[0]
+                break
+            else:
+                delta += range[1] - range[0]
+        return (delta.seconds // 60, time_ranges)
 
     @classmethod
     def plot(cls, dt, *args, **kwargs):
@@ -1030,13 +1059,13 @@ class Pipe:
         if kwargs["type"] == "zdfb":  # 涨跌分布
             fig = plt.figure(figsize=(11, 5.6), dpi=100)
             ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
-            x = []
+            x_ticks = []
             xt = []
-            y = []
+            y_cfg_list = []
             for item in dt:
                 (k, v) = list(item.items())[0]
-                x.append(int(k))
-                y.append(v)
+                x_ticks.append(int(k))
+                y_cfg_list.append(v)
                 xt.append(
                     "跌停"
                     if k == "-11"
@@ -1051,10 +1080,10 @@ class Pipe:
                     else k + "%"
                 )
             bar = ax.bar(
-                x,
-                y,
+                x_ticks,
+                y_cfg_list,
                 tick_label=xt,
-                color=list(map(lambda e: "red" if e > 0 else "gray" if e == 0 else "green", x)),
+                color=list(map(lambda e: "red" if e > 0 else "gray" if e == 0 else "green", x_ticks)),
             )
             barLabels = ax.bar_label(bar, padding=3)
             texts.append(ax.set_title("涨跌分布"))
@@ -1064,19 +1093,19 @@ class Pipe:
             ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
             y1 = []
             y2 = []
-            x = []
+            x_ticks = []
             xt = []
             for item in dt:
                 t, tl = cls._em_a_stock_int_time(item["t"])
                 xt.append(tl)
-                x.append(t)
+                x_ticks.append(t)
                 y1.append(item["ztc"])
                 y2.append(item["dtc"])
             cls._em_a_stock_time_axis(ax)
-            ax.plot(x, y1, "red")
-            ax.plot(x, y2, "green")
-            texts.append(ax.text(x[-1], y1[-1], y1[-1]))
-            texts.append(ax.text(x[-1], y2[-1], y2[-1]))
+            ax.plot(x_ticks, y1, "red")
+            ax.plot(x_ticks, y2, "green")
+            texts.append(ax.text(x_ticks[-1], y1[-1], y1[-1]))
+            texts.append(ax.text(x_ticks[-1], y2[-1], y2[-1]))
             texts.append(ax.set_title(f"涨跌停对比\t{xt[-1]}"))
 
         elif kwargs["type"] == "fbws":  # 封板未遂
@@ -1084,33 +1113,33 @@ class Pipe:
             ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
             y1 = []
             y2 = []
-            x = []
+            x_ticks = []
             xt = []
             for item in dt:
                 t, tl = cls._em_a_stock_int_time(item["t"])
                 xt.append(tl)
-                x.append(t)
+                x_ticks.append(t)
                 y1.append(item["c"])  # 炸板数
                 y2.append(item["zbp"])  # 炸板率
             cls._em_a_stock_time_axis(ax)
-            ax.plot(x, y1, "green")
+            ax.plot(x_ticks, y1, "green")
             texts.append(ax.set_ylabel("炸板数", loc="top"))
-            ax.text(x[-1], y1[-1], "炸板数{}".format(y1[-1]), color="green")
+            ax.text(x_ticks[-1], y1[-1], "炸板数{}".format(y1[-1]), color="green")
             ax2 = ax.twinx()
-            ax2.plot(x, y2, "black")
+            ax2.plot(x_ticks, y2, "black")
             texts.append(ax2.set_ylabel("炸板率", loc="top"))
-            ax2.text(x[-1], y2[-1], "炸板率{:.2f}%".format(y2[-1]), color="green")
+            ax2.text(x_ticks[-1], y2[-1], "炸板率{:.2f}%".format(y2[-1]), color="green")
             texts.append(ax.set_title(f"封板未遂\t{xt[-1]}"))
 
         elif kwargs["type"] == "gbqx":  # 股吧情绪
             fig = plt.figure(figsize=(11, 5.6), dpi=100)
             ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
-            x = []
-            y = []
+            x_ticks = []
+            y_cfg_list = []
             for item in dt:
-                x.append(datetime.strptime(item["name"], "%H:%M"))
-                y.append(item["val"])
-            ax.plot(x, y, "gray")
+                x_ticks.append(datetime.strptime(item["name"], "%H:%M"))
+                y_cfg_list.append(item["val"])
+            ax.plot(x_ticks, y_cfg_list, "gray")
             now = datetime.now()
             xticks = []
             xtick_labels = []
@@ -1152,61 +1181,65 @@ class Pipe:
                 else:
                     up_nums.append(a)
                     down_nums.append(b)
-            x = [i for (i, _) in enumerate(up_nums)]
-            y_up = [0] * len(x)
-            y_down = [0] * len(x)
+            x_ticks = [i for (i, _) in enumerate(up_nums)]
+            y_up = [0] * len(x_ticks)
+            y_down = [0] * len(x_ticks)
             for item in dt:
                 t = str(item["t"])
                 if t in up_nums:
                     y_up[up_nums.index(t)] = int(item["ct"])
                 elif t in down_nums:
                     y_down[down_nums.index(t)] = int(item["ct"])
-            ax.set_xticks(x)
+            ax.set_xticks(x_ticks)
             ax.set_xticklabels(xtick_labels)
             ax.set_position((0.05, 0.1, 0.9, 0.8))
             ax.set_ylim(0, np.max(np.add(y_up, y_down)) + 100)
-            bar_down = ax.bar(x, y_down, width=0.5, color="green")
+            bar_down = ax.bar(x_ticks, y_down, width=0.5, color="green")
             ax.bar_label(bar_down, padding=3, color="white")
-            bar_up = ax.bar(x, y_up, width=0.5, color="red", bottom=y_down)
+            bar_up = ax.bar(x_ticks, y_up, width=0.5, color="red", bottom=y_down)
             ax.bar_label(bar_up, labels=y_up, padding=16, color="red")
             texts.append(ax.set_title("盘口异动对比（情绪指标）"))
 
         elif kwargs["type"] == "fst":  # 分时图
             fig = plt.figure(figsize=(11, 5.6), dpi=100)
-            ax: list[plt.Axes] = (
+            ax: tuple[Axes] = (
                 fig.add_axes((0.06, 0.35, 0.88, 0.6)),
                 fig.add_axes((0.06, 0.05, 0.88, 0.25)),
             )
-            x_data_n: list[int] = []
+            x_ticks: list[int] = []
             y_close = []
             y_volume = []
             y_average = []
             y_percent = []
             pre_close = float(meta["close"])
-            time_points = None
+            time_ranges = None
 
+            close_type = '1500'
             for item in dt:
                 [time, open, close, high, low, vol, amount, avg] = item.split(",")
-                diff, time_points = cls.time_diff(datetime.strptime(time, "%Y-%m-%d %H:%M"), time_points)
-                x_data_n.append(diff)
+                diff, time_ranges = cls.time_diff(datetime.strptime(time, "%Y-%m-%d %H:%M"), time_ranges)
+                x_ticks.append(diff)
                 y_close.append(float(close))
                 y_volume.append(int(vol))
                 y_average.append(float(avg))
                 y_percent.append(round((float(close) - pre_close) / pre_close, 4))
-
-            cls._em_a_stock_time_axis(ax[0])
-            ax[0].plot(x_data_n, y_close, color="red")
-            ax[0].plot(x_data_n, y_average, color="orange")
-
-            texts.append(
-                ax[0].text(
-                    0,
-                    ax[0].get_ylim()[1],
-                    f"{meta.get('code', '')}",
-                    horizontalalignment="left",
-                    verticalalignment="bottom",
-                )
-            )
+                if diff > 240:
+                    close_type = '1530'
+            # x ticks
+            cls._em_a_stock_time_axis(ax[0], close_type=close_type)
+            # plot close
+            ax[0].plot(x_ticks, y_close, color="red")
+            # plot average
+            ax[0].plot(x_ticks, y_average, color="orange")
+            # y limit
+            close_gap = max(abs(pre_close - min(y_close)), abs(pre_close - max(y_close)))
+            close_lim = [pre_close - close_gap, pre_close + close_gap]
+            ax[0].set_ylim(ymin=close_lim[0], ymax=close_lim[1])
+            # y ticks
+            ...
+            # y fill
+            ax[0].fill_between([x_ticks[0], x_ticks[-1]], pre_close, close_lim[1], color="red", alpha=0.1)
+            ax[0].fill_between([x_ticks[0], x_ticks[-1]], close_lim[0], pre_close, color="green", alpha=0.1)
 
             ax[0].text(
                 ax[0].get_xlim()[1],
@@ -1218,17 +1251,21 @@ class Pipe:
                 fontsize="x-large",
                 fontweight="bold",
             )
-
             ax[0].annotate(
                 y_close[-1],
-                (x_data_n[-1], y_close[-1]),
+                (x_ticks[-1], y_close[-1]),
                 color=indicate(y_close[-1], y_close[-2]),
                 fontsize="large",
             )
 
+            ax2 = ax[0].twinx()
+            ax2.set_ylim(ax[0].get_ylim())
+            ax2.set_yticks(ax[0].get_yticks())
+            ax2.yaxis.set_major_formatter(lambda e, pos: cls.discount(e, pre_close, fix=0))
+
             cls._em_a_stock_time_axis(ax[1], no_labels=True)
             ax[1].bar(
-                x_data_n,
+                x_ticks,
                 y_volume,
                 color=[
                     "red" if y_close[i] > y_close[i - 1] else "lightgray" if y_close[i] == y_close[i - 1] else "green"
@@ -1236,16 +1273,47 @@ class Pipe:
                 ],
             )
 
-            ax2 = ax[0].twinx()
-            ax2.set_ylim(ax[0].get_ylim())
-            ax2.set_yticks(ax[0].get_yticks())
+            texts.append(ax[0].set_title(f"{meta.get('code', '')} {meta.get('name', '')}-分时图"))
 
-            #            for tick in ax[0].yaxis.get_major_ticks():
-            #                tick.label1.set_color(indicate(tick, pre_close))
+        elif kwargs["type"] == 'zjlx':  # 资金流向
+            fig = plt.figure(figsize=(11, 5.6), dpi=100)
+            ax = fig.add_axes((0.05, 0.05, 0.9, 0.9))
+            x_ticks, x_labels = [], []
+            # time, net-in, s-in, m-in, l-in, xl-in
+            # "2023-11-16 09:31,10613431.0,-2271535.0,-8311644.0,-8383833.0,18997264.0"
+            y_cfg_list = [
+                ([], '净流入', 'magenta', True),
+                ([], '小单', 'green', False),
+                ([], '中单', 'cyan', False),
+                ([], '大单', '#ff0000', True),
+                ([], '超大单', '#880000', True),
+            ]
+            y_lim = None
+            for item in dt['klines']:
+                item = item.split(',')
+                time = cls._em_a_stock_time(item[0])
+                x_ticks.append(time[0])
+                x_labels.append(time[1])
+                values = [float(v) for v in item[1:]]
+                y_lim = [min(values), max(values)] if y_lim is None else [min(y_lim[0], min(values)), max(y_lim[1], max(values))]
+                for i, v in enumerate(values):
+                    y_cfg_list[i][0].append(v)
 
-            ax2.yaxis.set_major_formatter(lambda e, pos: cls.discount(e, pre_close))
+            cls._em_a_stock_time_axis(ax)
 
-            texts.append(ax[0].set_title(f"{meta.get('name', '')}-分时图"))
+            y_abs_max = max(abs(y_lim[0]), abs(y_lim[1])) * 1.05
+            ax.set_ylim(-y_abs_max, y_abs_max)
+            ax.yaxis.set_major_formatter(FuncFormatter(lambda v, pos: cls.number(v, type='cn', fixed=0)))
+
+            ax.fill_between([x_ticks[0], x_ticks[-1]], 0, y_abs_max, color="red", alpha=0.1)
+            ax.fill_between([x_ticks[0], x_ticks[-1]], -y_abs_max, 0, color="green", alpha=0.1)
+
+            for y_cfg in y_cfg_list:
+                ax.plot(x_ticks, y_cfg[0], y_cfg[2])
+                if y_cfg[3]:
+                    texts.append(ax.text(x_ticks[-1], y_cfg[0][-1], cls.number(y_cfg[0][-1], type='cn')))
+
+            texts.append(ax.set_title(f"资金流向\t{dt['name']}{dt['code']}"))
 
         else:
             fig = None
@@ -1253,8 +1321,8 @@ class Pipe:
 
         if fig:
             global STORAGE_FILE
-            global SHOULD_STORE
-            if STORAGE_FILE and SHOULD_STORE:
+            global PERSIST
+            if STORAGE_FILE and PERSIST:
                 fig.savefig(STORAGE_FILE + "." + kwargs["type"] + str(random.randint(101, 999)) + ".png")
 
             global IMGCAT
@@ -1467,6 +1535,9 @@ class Parser:
             widths.append([len(str(i + 1))])
             for j, child in enumerate(children):
                 "index" in child["pipes"] and child["pipes"].remove("index")
+                if child.get("label", None) in ['链接', '地址']:
+                    child["pipes"].append("underline")
+                    child["pipes"].append("dim")
                 text = str(cls.applyPipes(cls.retrieve(record["__"], child, ""), child["pipes"], record))
                 bodies[-1].append(text)
                 widths[-1].append(Unicode.simpleWidth(trim_ansi(text)))
@@ -1486,8 +1557,8 @@ class Parser:
         records = cls.getValue(data, tokens)
         # print(json.dumps(records, indent=2))
         # flatted = cls.flatTokens(tokens)
-        global SHOULD_STORE
-        if file and SHOULD_STORE:
+        global PERSIST
+        if file and PERSIST:
             global STORAGE_FILE
             STORAGE_FILE = file
             with open(file, "w") as f:

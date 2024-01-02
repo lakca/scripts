@@ -62,8 +62,8 @@ def search(keyword, count=20):
 
 
 def generate_url(url, symbol, name):
-    url = re.sub(r'(sz|sh|bj)[0-9]{6}(?=[^0-9])', symbol, url, re.IGNORECASE)
-    url = re.sub(r'(?<=[^0-9])[0-9]{6}(?=[^0-9])', re.search(r'[0-9]+', symbol).group(0), url)
+    url = re.sub(r'\b(sz|sh|bj|bk)[0-9]{4,6}\b', symbol, url, flags=re.IGNORECASE)
+    url = re.sub(r'\b[0-9]{6}\b', re.search(r'[0-9]+', symbol).group(0), url)
     if name:
         url = url.replace('紫光国微', name)
     return url
@@ -77,6 +77,7 @@ SINGLE_LINKS = {
         '主要高管': 'https://emweb.securities.eastmoney.com/pc_hsf10/pages/index.html?type=web&code=SZ002049&color=b#/gsgg',
         '数据中心': 'https://data.eastmoney.com/stockdata/002049.html',
         '资金流向': ('https://data.eastmoney.com/zjlx/002049.html', 1),
+        '板块资金流向': ('https://data.eastmoney.com/bkzj/BK1031.html', 1),
         '千股千评': 'https://data.eastmoney.com/stockcomment/002049.html',
         '公告': 'https://data.eastmoney.com/notices/stock/002049.html',
         '个股日历': ('https://data.eastmoney.com/stockcalendar/002049.html', 1),
@@ -232,7 +233,7 @@ DATA_LINKS = {
             '个股资金流': ('http://data.eastmoney.com/zjlx/detail.html', 1),
             '主力排名': 'http://data.eastmoney.com/zjlx/list.html',
             '板块资金': 'http://data.eastmoney.com/bkzj/',
-            '行业资金流': 'http://data.eastmoney.com/bkzj/hy.html',
+            '行业资金流': ('http://data.eastmoney.com/bkzj/hy.html', 1),
             '概念资金流': ('http://data.eastmoney.com/bkzj/gn.html', 1),
             '地域资金流': ('http://data.eastmoney.com/bkzj/dy.html', 1),
             '资金流监测': 'http://data.eastmoney.com/bkzj/jlr.html',

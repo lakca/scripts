@@ -30,8 +30,7 @@ def soft_get_filename(dest, file, index, ext, extensions, force):
                 _name = _name + f'-{index}'
             filename = path.join(dest, _name + ext)
             while not force and path.exists(filename):
-                filename = path.join(
-                    dest, _name + f'.{str(int(time.time()))}' + ext)
+                filename = path.join(dest, _name + f'.{str(int(time.time()))}' + ext)
                 time.sleep(1)
         return filename
     else:
@@ -72,7 +71,8 @@ def resolveIOArgs(args):
 
 
 if '-h' in argv:
-    print("""
+    print(
+        """
     image.py
 
         \033[2m# 截屏并保存到文件\033[0m
@@ -90,7 +90,8 @@ if '-h' in argv:
 
         \033[2m# （从剪切板或文件）解码图片base64\033[0m
         d64 [at <destination>] <files...>
-    """)
+    """
+    )
     exit(0)
 
 if op == 'paste':
@@ -100,7 +101,7 @@ if op == 'paste':
         print(f"\x1b[31m同名文件{file}已存在，强制替换请使用--force参数\x1b[0m")
         exit(0)
     img.save(file)
-    print('保存', file)
+    print(file)
     if args and 'open' in args:
         subprocess.Popen(['open', file])
 
@@ -114,7 +115,7 @@ elif op == 'shot':
         bbox[3] = bbox[1] + bbox[3]
     img = ImageGrab.grab(bbox)
     img.save(file)
-    print('保存', file)
+    print(file)
     if open:
         subprocess.Popen(['open', file])
 
@@ -141,8 +142,7 @@ elif op == 'to':
         # if not force:
         #     to = check_filename(to)
 
-        to = soft_get_filename(dest=dest, file=file, index=i,
-                               ext=ext, extensions=EXTENSIONS, force=force)
+        to = soft_get_filename(dest=dest, file=file, index=i, ext=ext, extensions=EXTENSIONS, force=force)
         img = Image.open(file)
         if modes:
             for mode in modes:
@@ -151,27 +151,21 @@ elif op == 'to':
                 if mode == 'gray':
                     img = img.convert(mode='L')
                 elif mode == 'enhance':
-                    img = ImageEnhance.Contrast(img).enhance(
-                        float(params[0]) if params else 1.3)
+                    img = ImageEnhance.Contrast(img).enhance(float(params[0]) if params else 1.3)
                 elif mode == 'soften':
-                    img = ImageEnhance.Contrast(img).enhance(
-                        float(params[0]) if params else 0.7)
+                    img = ImageEnhance.Contrast(img).enhance(float(params[0]) if params else 0.7)
                 elif mode == 'brighten':
-                    img = ImageEnhance.Brightness(img).enhance(
-                        float(params[0]) if params else 1.3)
+                    img = ImageEnhance.Brightness(img).enhance(float(params[0]) if params else 1.3)
                 elif mode == 'darken':
-                    img = ImageEnhance.Brightness(img).enhance(
-                        float(params[0]) if params else 0.7)
+                    img = ImageEnhance.Brightness(img).enhance(float(params[0]) if params else 0.7)
                 elif mode == 'sharpen':
-                    img = ImageEnhance.Sharpness(img).enhance(
-                        float(params[0]) if params else 1.3)
+                    img = ImageEnhance.Sharpness(img).enhance(float(params[0]) if params else 1.3)
                 elif mode == 'blur':
-                    img = ImageEnhance.Sharpness(img).enhance(
-                        float(params[0]) if params else 0.7)
+                    img = ImageEnhance.Sharpness(img).enhance(float(params[0]) if params else 0.7)
                 else:
                     print(f'未知模式: {mode}')
         img.save(to)
-        print('保存', f'\033[31m{to}\033[0m')
+        print(f'\033[31m{to}\033[0m')
 
 elif op == '64':
     dest, force, files, ext = resolveIOArgs(args)
@@ -181,14 +175,12 @@ elif op == '64':
         text = 'data:image/png;base64,'
         buffered = io.BytesIO()
         img.save(buffered, format=img.format)
-        text = f"data:image/{img.format.lower()};base64," + \
-            str(b64encode(buffered.getvalue()), 'utf8')
+        text = f"data:image/{img.format.lower()};base64," + str(b64encode(buffered.getvalue()), 'utf8')
         return text
-    texts = [encodeBase64(Image.open(file)) for file in files] if files else [
-        encodeBase64(ImageGrab.grabclipboard())]
+
+    texts = [encodeBase64(Image.open(file)) for file in files] if files else [encodeBase64(ImageGrab.grabclipboard())]
     if dest == 'pb':
-        subprocess.Popen('pbcopy', stdin=subprocess.PIPE).communicate(
-            input='\n'.join(texts).encode())
+        subprocess.Popen('pbcopy', stdin=subprocess.PIPE).communicate(input='\n'.join(texts).encode())
     print('\n'.join(texts))
 
 elif op == 'd64':
@@ -205,10 +197,8 @@ elif op == 'd64':
     if files:
         for i, file in enumerate(files):
             img = decodeBase64(open(file))
-            filename = soft_get_filename(
-                dest=dest, original=file, index=i, ext='.png', extensions=EXTENSIONS)
+            filename = soft_get_filename(dest=dest, original=file, index=i, ext='.png', extensions=EXTENSIONS)
             img.save(filename)
     else:
-        img = decodeBase64(subprocess.Popen(
-            'pbpaste', stdout=subprocess.PIPE).stdout)
+        img = decodeBase64(subprocess.Popen('pbpaste', stdout=subprocess.PIPE).stdout)
         img.save(dest if ext in EXTENSIONS else dest + '.png')

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" class="h-full">
+<html lang="en" class="overflow-x-auto ">
 
 <head>
   <meta charset="UTF-8">
@@ -23,22 +23,17 @@
     [data-col="股票代码"],
     [data-col="股票简称"] {
       position: sticky;
-      left: 72px;
+      left: 63px;
     }
 
     [data-col="股票简称"] {
       position: sticky;
-      left: 185px;
-    }
-
-    [role="list"] {
-      position: sticky;
-      left: 0;
+      left: 176px;
     }
   </style>
 </head>
 
-<body class="h-full overflow-x-auto text-xs">
+<body class="text-xs flex">
   <div id="app">
     <div
       class="fixed z-50 w-10 h-10 top-2 right-2 opacity-0 hover:opacity-90 text-red-600 cursor-pointer transition-all duration-300"
@@ -51,27 +46,31 @@
         </g>
       </svg>
     </div>
-    <div v-if="!neat" class="inline-flex" role="group">
-      <select v-model="orderKind"
-        class="select select-bordered w-full max-w-xs outline-none border-solid border-2 border-indigo-600 rounded-md">
+    <div v-if="!neat" class="bg-white z-20 sticky top-0 left-0 py-4 space-x-2 w-screen" role="group">
+      <select v-model="orderKind" class="select select-bordered outline-none border-solid border rounded-md">
         <option v-for="order in Object.keys(kindOfOrders)" :value="order">{{order}}</option>
       </select>
-      <input class="file-input file-input-ghost w-full max-w-xs" type="file" id="formFile" multiple
-        @change="handleInputFile" />
-      <input class="border-solid border-2 border-indigo-600 rounded-md" type="input" id="search"
-        @change="handleSearch" />
+      <input class="file-input border-solid border" type="file" id="formFile" multiple @change="handleInputFile" />
+      <input class="border-solid border rounded-md" type="input" id="search" @change="handleSearch" />
       <button
-        class="whitespace-nowrap pointer-events-auto ml-8 rounded-md bg-indigo-600 px-3 py-2 text-[0.8125rem] font-semibold leading-5 text-white hover:bg-indigo-500"
+        class="whitespace-nowrap pointer-events-auto rounded-md bg-indigo-600 px-3 py-2 text-[0.8125rem] font-semibold leading-5 text-white hover:bg-indigo-500"
         @click="data=[]">一键清空</button>
+      <label>升序排列</label>
+      <input type="checkbox" id="sortDirection" :checked="sorts[0]"
+        @change="e => sorts = [e.target.checked, sorts[1]]" />
+      <select :value="sorts[1]" @change="e => sorts = [sorts[0], e.target.value]"
+        class="select select-bordered outline-none border-solid border rounded-md">
+        <option v-for="col in columns" :value="col.key">{{col.key}}</option>
+      </select>
     </div>
-    <ul v-if="!neat" role="list" class="divide-y divide-gray-100 rounded-md border border-gray-200">
+    <ul v-if="!neat" role="list"
+      class="w-screen sticky left-0 divide-y divide-gray-100 rounded-md border border-gray-200">
       <li class="flex items-center justify-between py-4 pl-4 pr-5 text-sm leading-6" v-for="(file, i) in data"
         :key="file.name">
         <div class="flex w-0 flex-1 items-center">
-          <input type="checkbox" value="" id="checkboxChecked" :checked="file.checked"
-            @change="file.checked = !file.checked" />
+          <input type="checkbox" value="" :checked="file.checked" @change="file.checked = !file.checked" />
           <div class="ml-4 flex min-w-0 flex-1 gap-2">
-            <span class="truncate font-medium">{{file.name}}</span>
+            <span class="truncate font-medium flex-1">{{file.name}}</span>
             <span class="flex-shrink-0 text-gray-400">{{file.size | convertRadix({ fixed: 2, base: 1024, units: ['B',
               'KB', 'MB'] })}}</span>
           </div>
@@ -80,59 +79,55 @@
           @click="() => data.splice(i, 1)">删除</a>
       </li>
     </ul>
-    <div class="w-full">
-      <table class="min-w-full border text-center dark:border-neutral-500 table-fixed" :data-hover-col="hover[0]"
-        :data-hover-row="hover[1]">
-        <thead class="border-b dark:border-neutral-500 sticky top-0 z-10 bg-gray-100">
-          <tr>
-            <th scope="col" class="border-r px-2 py-4 dark:border-neutral-500 bg-gray-100" :title="col.index_name"
-              :data-col="col.index_name" v-for="(col, colIndex) in realColumns" :key="col.key">
-              <div class="flex justify-center">
-                <div class="w-4 cursor-pointer"
-                  :class="[sorts[0] === true && sorts[1] === col ? 'text-red-500' : 'text-gray-400']"
-                  @click="sorts = sorts[0] === true && sorts[1] === col ? [] : [true, col]">
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-                    viewBox="0 0 20 20">
-                    <g fill="none">
-                      <path
-                        d="M6.03 7.03a.75.75 0 0 1-1.06-1.06l4-4a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1-1.06 1.06l-2.72-2.72v5.44c0 1.947.245 3.321.74 4.366c.486 1.026 1.243 1.8 2.396 2.49a.75.75 0 1 1-.772 1.287c-1.347-.808-2.34-1.785-2.98-3.134c-.63-1.33-.884-2.956-.884-5.009V4.31L6.03 7.03z"
-                        fill="currentColor"></path>
-                    </g>
-                  </svg>
-                </div>
-                <div>{{col.key}}</div>
-                <div class="w-4 cursor-pointer"
-                  :class="[sorts[0] === false && sorts[1] === col ? 'text-red-500' : 'text-gray-400']"
-                  @click="sorts = sorts[0] === false && sorts[1] === col ? [] : [false, col]">
-                  <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
-                    viewBox="0 0 20 20">
-                    <g fill="none">
-                      <path
-                        d="M6.614 3.143a.75.75 0 1 1 .772-1.286c1.347.808 2.34 1.785 2.98 3.135c.63 1.33.884 2.955.884 5.008v5.44l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V10c0-1.947-.245-3.321-.74-4.366c-.486-1.026-1.243-1.799-2.396-2.49z"
-                        fill="currentColor"></path>
-                    </g>
-                  </svg>
-                </div>
+    <table class="min-w-full border text-center dark:border-neutral-500 table-fixed" :data-hover-col="hover[0]"
+      :data-hover-row="hover[1]">
+      <thead class="border-b dark:border-neutral-500 sticky top-0 z-10 bg-gray-100">
+        <tr>
+          <th scope="col" class="border-r px-2 py-4 dark:border-neutral-500 bg-gray-100" :title="col.key"
+            :data-col="col.key" v-for="(col, colIndex) in realColumns" :key="col.key">
+            <div class="flex justify-center">
+              <div class="w-4 cursor-pointer"
+                :class="[sorts[0] === true && sorts[1] === col.key ? 'text-red-500' : 'text-gray-400']"
+                @click="sorts = sorts[0] === true && sorts[1] === col.key ? [] : [true, col.key]">
+                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 20 20">
+                  <g fill="none">
+                    <path
+                      d="M6.03 7.03a.75.75 0 0 1-1.06-1.06l4-4a.75.75 0 0 1 1.06 0l4 4a.75.75 0 0 1-1.06 1.06l-2.72-2.72v5.44c0 1.947.245 3.321.74 4.366c.486 1.026 1.243 1.8 2.396 2.49a.75.75 0 1 1-.772 1.287c-1.347-.808-2.34-1.785-2.98-3.134c-.63-1.33-.884-2.956-.884-5.009V4.31L6.03 7.03z"
+                      fill="currentColor"></path>
+                  </g>
+                </svg>
               </div>
-            </th>
+              <div>{{col.key}}</div>
+              <div class="w-4 cursor-pointer"
+                :class="[sorts[0] === false && sorts[1] === col.key ? 'text-red-500' : 'text-gray-400']"
+                @click="sorts = sorts[0] === false && sorts[1] === col.key ? [] : [false, col.key]">
+                <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 20 20">
+                  <g fill="none">
+                    <path
+                      d="M6.614 3.143a.75.75 0 1 1 .772-1.286c1.347.808 2.34 1.785 2.98 3.135c.63 1.33.884 2.955.884 5.008v5.44l2.72-2.72a.75.75 0 1 1 1.06 1.06l-4 4a.75.75 0 0 1-1.06 0l-4-4a.75.75 0 0 1 1.06-1.06l2.72 2.72V10c0-1.947-.245-3.321-.74-4.366c-.486-1.026-1.243-1.799-2.396-2.49z"
+                      fill="currentColor"></path>
+                  </g>
+                </svg>
+              </div>
+            </div>
+          </th>
+        </tr>
+      </thead>
+      <tbody>
+        <template v-for="(row, rowIndex) in realRows">
+          <tr class="border-b dark:border-neutral-500" :class="{ hover: clickedRow === row['股票代码'] }"
+            :data-row="row['股票代码']" :key="rowIndex" @click="clickedRow = row['股票代码']">
+            <template v-for="col in realColumns">
+              <render-block :key="col.key" component="td" :title="row[col.key]"
+                class="whitespace-nowrap border-r px-6 py-4 dark:border-neutral-500 text-ellipsis bg-white"
+                :class="getCellClasses(col, row)" @mouseover="handleMouseover(col.key, row['股票代码'])"
+                :data-row="row['股票代码']" :data-col="col.key"
+                :render="renderCellInner(col, row, rowIndex)"></render-block>
+            </template>
           </tr>
-        </thead>
-        <tbody>
-          <template v-for="(row, rowIndex) in realRows">
-            <tr class="border-b dark:border-neutral-500" :class="{ hover: clickedRow === row['股票代码'] }"
-              :data-row="row['股票代码']" :key="rowIndex" @click="clickedRow = row['股票代码']">
-              <template v-for="col in realColumns">
-                <render-block :key="col.key" component="td" :title="row[col.index_name]"
-                  class="whitespace-nowrap border-r px-6 py-4 dark:border-neutral-500 text-ellipsis bg-white"
-                  :class="getClasses(col, row)" @mouseover="handleMouseover(col.index_name, row['股票代码'])"
-                  :data-row="row['股票代码']" :data-col="col.index_name"
-                  :render="renderCell(col, row, rowIndex)"></render-block>
-              </template>
-            </tr>
-          </template>
-        </tbody>
-      </table>
-    </div>
+        </template>
+      </tbody>
+    </table>
   </div>
 </body>
 <script>
@@ -150,12 +145,19 @@
         orderKind: '潜伏',
         clickedRow: null,
         kindOfOrders: {
-          '一般': ['索引', '股票代码', '股票简称', '最新价', '集中度90', '最新股东户数', '距离历史最高', '距离历史最低', 'a股市值(不含限售股)', '区间涨跌幅:前复权', '最新户均持股市值', '技术形态', '选股动向', '所属概念'],
-          '潜伏': ['索引', '股票代码', '股票简称', '最新价', '集中度90', '最新股东户数', '距离历史最高', '距离历史最低', 'a股市值(不含限售股)', '区间涨跌幅:前复权', '最新户均持股市值', '所属概念', '技术形态', '选股动向', '前十大股东名称(报告期)', '企业性质'],
+          '一般': [
+            '索引', '股票代码', '股票简称', '最新价', '最新涨跌幅', '集中度90', '最新股东户数', '距离历史最高',
+            '距离历史最低', 'a股市值(不含限售股)', '区间涨跌幅:前复权', '最新户均持股市值', '技术形态', '选股动向',
+            '所属概念'
+          ],
+          '潜伏': [
+            '索引', '股票代码', '股票简称', '最新价', '最新涨跌幅', '集中度90', '最新股东户数',
+            '距离历史最高', '距离历史最低', 'a股市值(不含限售股)', '区间涨跌幅:前复权', '最新户均持股市值',
+            '所属概念', '技术形态', '选股动向', '前十大股东名称(报告期)', '实际控制人类型', '企业性质'
+          ],
           '避险': ['索引', '股票代码', '股票简称', '距离历史最高', '距离历史最低', 'a股市值(不含限售股)', '区间涨跌幅:前复权', '市盈率(pe)', '资产负债率', '股息率', 'PEG', '技术形态', '选股动向'],
         },
-        sorts: [],
-        columnKeys: [],
+        sorts: [true],
         searches: [],
         quotes: {},
       }
@@ -172,11 +174,43 @@
           { key: '当前日期', index_name: '当前日期', },
         ].concat(this.data[0]?.data?.answer?.components[0]?.data?.columns || [])
       },
-      timestamp() {
-        return this.columns.find(e => e.timestamp).timestamp
+      columnsKeyMap() {
+        return Object.fromEntries(this.columns.map(col => [col.key, true]))
+      },
+      columnsIndexNameMap() {
+        return Object.fromEntries(this.columns.map(col => [col.index_name, true]))
+      },
+      filteredColumns() {
+        return this.columns.filter(col => {
+          switch (col.index_name) {
+            case '股票简称':
+              return !this.columnsIndexNameMap['股票代码']
+            case '历史最高价前复权':
+            case '历史最高价日':
+              return !this.columnsIndexNameMap['距离历史最高']
+            case '历史最低价前复权':
+            case '历史最低价日':
+              return !this.columnsIndexNameMap['距离历史最低']
+            case '最新股东户数排名':
+              return !this.columnsIndexNameMap['最新股东户数']
+            case '实际控制人持股比例':
+              return !this.columnsIndexNameMap['实际控制人']
+            case '总股本':
+              return !this.columnsIndexNameMap['a股市值(不含限售股)']
+            case '当前日期':
+            case '所属概念数量':
+              return false
+            default:
+              return true
+          }
+        })
       },
       realColumns() {
-        return this.columns.sort(this.cmp.bind(this))
+        return this.filteredColumns.sort((a, b) => {
+          const ai = this.orders.indexOf(a.index_name)
+          const bi = this.orders.indexOf(b.index_name)
+          return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi)
+        })
       },
       rows() {
         return this.data.reduce((r, v) => v.checked ? r.concat(v.data.answer.components[0].data.datas) : r, [])
@@ -189,27 +223,37 @@
               e['最新价'] = quote['最新价']
               e['最新涨跌幅'] = quote['最新涨跌幅']
               e['当前日期'] = quote['当前日期']
+              e['日内最高价'] = quote['日内最高价']
+              e['日内最高涨幅'] = quote['日内最高涨幅']
+              e['日内最低价'] = quote['日内最低价']
+              e['日内最低涨幅'] = quote['日内最低涨幅']
             }
             if (e && e['最新价'] && e['历史最高价前复权']) e['距离历史最高'] = 100 * (e['最新价'] - e['历史最高价前复权']) / Math.abs(e['历史最高价前复权'])
             if (e && e['最新价'] && e['历史最低价前复权']) e['距离历史最低'] = 100 * (e['最新价'] - e['历史最低价前复权']) / Math.abs(e['历史最低价前复权'])
             return e
           })
       },
-      realRows() {
-        const [flag, col] = this.sorts
+      sortedRows() {
+        const [flag, key] = this.sorts
         return ((this.sorts.length < 2) ? this.rows :
           this.rows.map(e => e).sort((a, b) => {
-            let r = a[col.key] - b[col.key]
-            if (isNaN(r) && a[col.key] != null) r = a[col.key].localeCompare(b[col.key])
+            let r = a[key] - b[key]
+            if (isNaN(r) && a[key] != null) r = a[key].localeCompare(b[key])
             return flag ? r : -r
-          })).filter(e => {
-            for (const s of this.searches) {
-              if (!s(e)) {
-                return false
-              }
+          }))
+      },
+      realRows() {
+        return this.sortedRows.filter(row => {
+          for (const s of this.searches) {
+            if (!s(row)) {
+              return false
             }
-            return true
-          })
+          }
+          return true
+        })
+      },
+      timestamp() {
+        return this.columns.find(e => e.timestamp).timestamp
       },
       codes() {
         return this.realRows.map(e => e.symbol)
@@ -230,19 +274,15 @@
       },
     },
     methods: {
-      cmp(a, b) {
-        const ai = this.orders.indexOf(a.index_name)
-        const bi = this.orders.indexOf(b.index_name)
-        return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi)
-      },
-      getClasses(col, row) {
+      getCellClasses(col, row) {
         const classes = []
+        const key = col.key
         const indexName = col.index_name
-        const value = row[col.key]
+        const value = row[key]
         if (row && this.$options.filters.checkNumber(value)) {
           classes.push('text-right')
         }
-        switch (col.index_name) {
+        switch (indexName) {
           case '所属概念':
           case '选股动向':
           case '技术形态':
@@ -257,23 +297,26 @@
           case '股票简称':
             classes.push(row['最新涨跌幅'] > 0 ? 'text-red-500' : 'text-green-600')
             break
-          case '历史最高价前复权':
-          case '历史最低价前复权':
-            classes.push('text-gray-300')
-            break
         }
         return Object.fromEntries(classes.map(e => [e, true]))
       },
-      getCell(value, options = {}) {
-        const { separator, width, classes, query, href, indicator, digits, date, percent } = options
+      getCellInner(value, options = {}) {
+        const { separator, width, class: classes, query, href, indicator, digits, date, percent, wrapper, oneline, suffix } = options
+        if (wrapper) {
+          return h('div', wrapper, this.getCellInner(value, { ...options, wrapper: null }))
+        }
         let content = value
         if (separator != null) {
-          content = (value || '').split(separator).map(v => this.getCell(v, {  width: null, classes: ['mx-1'],...options, separator: null, }))
+          const items = (value || '').split(separator)
+          content = items.map(v => this.getCellInner(v, { width: null, class: ['mr-1'], ...options, separator: null, })).concat([this.getCellInner(items.length, { class: ['text-gray-500'] })])
         } else {
           let { tag } = options
           const opts = {
             attrs: {},
             class: [].concat(classes || []),
+          }
+          if (oneline) {
+            opts.class.push('block whitespace-nowrap overflow-hidden text-ellipsis')
           }
           if (digits != null) {
             content = (+value).toFixed(digits)
@@ -288,67 +331,77 @@
             opts.class.push(indicator > 0 ? 'text-red-500' : 'text-green-600')
           }
           if (href != null) {
-            opts.class.push('text-blue-600')
+            opts.class.push('text-blue-600 hover:text-rose-600')
             opts.attrs.href = href.replace(/\${v}/, value)
             opts.attrs.target = '_blank'
+            opts.attrs.title = value
             tag = 'a'
           }
           if (tag) {
-            content = h(tag, opts, [content])
+            content = h(tag, opts, [content, suffix])
           } else if (opts.class.length) {
-            content = h('span', opts, [content])
+            content = h('span', opts, [content, suffix])
           }
         }
         return width != null ? h('div', {
           class: [`${width} overflow-hidden text-ellipsis`],
         }, [content]) : content
       },
-      renderCell(col, row, rowIndex) {
+      renderCellInner(col, row, rowIndex) {
+        const key = col.key
         const indexName = col.index_name
-        const value = row[col.key]
+        const value = row[key]
         const current = row['最新价']
         const symbol = row['股票代码']
+        const deadline = ''
         if (value == null) return ''
         switch (indexName) {
           case '索引':
             return [
               row['索引'],
-              this.getCell(rowIndex + 1, { classes: ['block text-gray-400'] }),
+              this.getCellInner(rowIndex + 1, { class: ['block text-gray-400'] }),
             ]
           case '最新股东户数':
             return [
               convertRadix(value, { base: 10000, fixed: 2 }),
-              this.getCell(row['最新股东户数排名'], { classes: ['block text-gray-400'] }),
+              this.getCellInner(row['最新股东户数排名'], { class: ['block text-gray-400'] }),
             ]
           case '最新价': {
             return [
-              this.getCell(row['最新价'], { classes: ['mr-1'] }),
-              this.getCell(row['最新涨跌幅'], { digits: 2, percent: true, indicator: row['最新涨跌幅'] }),
-              this.getCell(row['当前日期'], { date: true, classes: ['block text-gray-400'] }),
+              this.getCellInner(row['最新价'], { class: ['mr-1'] }),
+              this.getCellInner(row['最新涨跌幅'], { digits: 2, percent: true, indicator: row['最新涨跌幅'], class: ['inline-block w-12 mb-2'] }),
+              h('br'),
+              this.getCellInner(row['日内最高价'], { class: ['mr-1'] }),
+              this.getCellInner(row['日内最高涨幅'], { digits: 2, percent: true, indicator: row['日内最高涨幅'], class: ['inline-block w-12'] }),
+              h('br'),
+              this.getCellInner(row['日内最低价'], { class: ['mr-1'] }),
+              this.getCellInner(row['日内最低涨幅'], { digits: 2, percent: true, indicator: row['日内最低涨幅'], class: ['inline-block w-12'] }),
+              h('br'),
+              this.getCellInner(row['当前日期'], { date: true, class: ['text-gray-400'] }),
             ]
           }
           case '最新户均持股数量':
           case '最新户均持股市值':
             return convertRadix(value, { base: 10000, fixed: 2 })
           case '最新户均持股比例':
-            return this.getCell(value, { digits: 3, percent: true })
+            return this.getCellInner(value, { digits: 3, percent: true })
           case '最新涨跌幅':
-            return this.getCell(value, { digits: 2, percent: true, indicator: value })
+            return this.getCellInner(value, { digits: 2, percent: true, indicator: value })
           case '最新dde大单净额':
-            return this.getCell(convertRadix(value, { base: 10000, fixed: 2 }), { indicator: value })
+            return this.getCellInner(convertRadix(value, { base: 10000, fixed: 2 }), { indicator: value })
 
           case '距离历史最高': {
             return [
-              this.getCell(row['历史最高价前复权'], { digits: 2, classes: ['mr-1 text-gray-500'] }),
-              this.getCell(value, { digits: 2, percent: true, indicator: value, classes: ['opacity-1'] }),
-              this.getCell(row['历史最高价日'], { date: true, classes: ['block text-gray-400'] }),
+              this.getCellInner(row['历史最高价前复权'], { digits: 2, class: ['block text-gray-500'] }),
+              this.getCellInner(value, { digits: 2, percent: true, indicator: value, class: ['opacity-1'] }),
+              this.getCellInner(row['历史最高价日'], { date: true, class: ['block text-gray-400'] }),
             ]
           }
           case '距离历史最低': {
             return [
-              this.getCell(row['历史最低价前复权'], { digits: 2, classes: ['mr-1 text-gray-500'] }),
-              this.getCell(value, { digits: 2, percent: true, indicator: value, classes: ['opacity-1'] }),
-              this.getCell(row['历史最低价日'], { date: true, classes: ['block text-gray-400'] }),
+              this.getCellInner(row['历史最低价前复权'], { digits: 2, class: ['block text-gray-500'] }),
+              this.getCellInner(value, { digits: 2, percent: true, indicator: value, class: ['opacity-1'] }),
+              this.getCellInner(row['历史最低价日'], { date: true, class: ['block text-gray-400'] }),
             ]
           }
           case '历史最高价前复权':
@@ -356,50 +409,68 @@
             return convertRadix(value, { base: 10000, fixed: 2 })
           case '历史最高价日':
           case '历史最低价日':
-            return this.getCell(value, { date: true })
+            return this.getCellInner(value, { date: true })
 
-          case '总市值':
           case '总股本':
-          case 'a股市值(不含限售股)':
             return convertRadix(value, { base: 10000, fixed: 2 })
+          case '总市值':
+          case 'a股市值(不含限售股)': {
+            return [
+              convertRadix(value, { base: 10000, fixed: 2 }),
+              h('br'),
+              this.getCellInner(convertRadix(getKeyMatches(row, '总股本', true), { base: 10000, fixed: 2 }), { suffix: '股', class: ['text-gray-500'] })
+            ]
+          }
           case '市盈率(pe)':
             return Math.round(value)
           case '股东人数变动公告日':
           case '新股上市日期':
-            return this.getCell(value, { date: true })
+            return this.getCellInner(value, { date: true })
           case '股票代码':
-            return this.getCell(value, { href: `http://www.iwencai.com/unifiedwap/result?w=${value}&querytype=stock` })
+            return [
+              this.getCellInner(value, { class: ['block'], href: `http://www.iwencai.com/unifiedwap/result?w=${value}&querytype=stock` }),
+              this.getCellInner(row['股票简称'], { href: `https://quote.eastmoney.com/concept/${row.symbol}.html` }),
+            ]
+          case '股票简称':
+            return this.getCellInner(value, { href: `https://quote.eastmoney.com/concept/${row.symbol}.html` })
 
           case '所属概念':
-            return this.getCell(value, { separator: ';', classes: ['block'], href: 'http://www.iwencai.com/unifiedwap/result?w=所属概念是${v}&querytype=stock' })
+            return [
+              this.getCellInner(value, { wrapper: { class: ['w-40 whitespace-normal'] }, separator: ';', href: 'http://www.iwencai.com/unifiedwap/result?w=所属概念是${v}&querytype=stock' }),
+            ]
           case '所属同花顺行业':
-            return this.getCell(value, { separator: '-', href: 'http://www.iwencai.com/unifiedwap/result?w=所属同花顺行业是${v}&querytype=stock' })
+            return this.getCellInner(value, { wrapper: { class: ['w-20 whitespace-normal'] }, separator: '-', oneline: true, href: 'http://www.iwencai.com/unifiedwap/result?w=所属同花顺行业是${v}&querytype=stock' })
           case '股票市场类型':
-            return this.getCell(value, { width: 'w-20' })
+            return this.getCellInner(value, { width: 'w-20' })
 
           case '最终控制人':
           case '实际控制人':
-            return this.getCell(value, { separator: '||', width: 'w-40', href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
+            return [
+              this.getCellInner(value, { separator: '||', class: ['w-20 whitespace-normal'], href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` }),
+              this.getCellInner(getKeyMatches(row, '实际控制人持股比例', true), { percent: true, digits: 2, class: ['text-gray-500'] }),
+            ]
           case '实际控制人持股比例':
           case '最终控制人持股比例':
-            return this.getCell(value, { digits: 3, percent: true })
+            return this.getCellInner(value, { digits: 3, percent: true })
+          case '实际控制人类型':
           case '最终控制人类型':
-            return this.getCell(value, { separator: '||', width: 'w-20', href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
+            return this.getCellInner(value, { wrapper: { class: ['w-20 whitespace-normal'] }, separator: '||', oneline: true, href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
           case '前十大股东名称(报告期)':
-            return this.getCell(value, { separator: ',', classes: ['block'], href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
+            return this.getCellInner(value, { wrapper: { class: ['w-40 whitespace-normal'] }, separator: ',', oneline: true, href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
 
           case '选股动向':
+            return this.getCellInner(value, { wrapper: { class: ['w-40 whitespace-normal'] }, separator: '||', oneline: true, href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
           case '技术形态':
-            return this.getCell(value, { separator: '||', classes: ['block'], href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
+            return this.getCellInner(value, { wrapper: { class: ['w-20 whitespace-normal'] }, separator: '||', oneline: true, href: `http://www.iwencai.com/unifiedwap/result?w=${indexName}是\${v}&querytype=stock` })
 
           case '区间成交量':
           case '区间成交额':
             return convertRadix(value, { base: 10000, fixed: 2 })
           case '区间涨跌':
-            return this.getCell(convertRadix(value, { base: 10000, fixed: 2 }), { indicator: value })
+            return this.getCellInner(convertRadix(value, { base: 10000, fixed: 2 }), { indicator: value })
           case '区间涨跌幅:前复权':
           case '区间振幅':
-            return this.getCell(value, { digits: 2, percent: true, indicator: value })
+            return this.getCellInner(value, { digits: 2, percent: true, indicator: value })
           default:
             return value
         }
@@ -441,7 +512,7 @@
           let styles = ''
           for (const col of v) {
             styles += `
-              table[data-hover-col="${col.index_name}"] tr td[data-col="${col.index_name}"] {
+              table[data-hover-col="${col.key}"] tr td[data-col="${col.key}"] {
                 background-color: rgb(227, 235, 247);
               }`
           }
@@ -476,6 +547,12 @@
                 e['最新价'] = e.price
                 e['最新涨跌幅'] = 100 * (e.price - e.close) / e.close
                 e['当前日期'] = e.date
+                e['日内最新价'] = e.price
+                e['日内最新涨幅'] = 100 * (e.price - e.close) / e.close
+                e['日内最高价'] = e.high
+                e['日内最高涨幅'] = 100 * (e.high - e.close) / e.close
+                e['日内最低价'] = e.low
+                e['日内最低涨幅'] = 100 * (e.low - e.close) / e.close
                 return [e.symbol, e]
               }))
             }
