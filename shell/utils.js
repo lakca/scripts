@@ -17,3 +17,23 @@ function countdown(seconds) {
     }, 1000)
   })
 }
+
+function window_user_defined_properties() {
+  // create an iframe and append to body to load a clean window object
+  const iframe = document.createElement('iframe')
+  iframe.style.display = 'none'
+  document.body.appendChild(iframe)
+  // get the current list of properties on window
+  const currentWindow = Object.getOwnPropertyNames(window)
+  // filter the list against the properties that exist in the clean window
+  const results = currentWindow.filter(function(prop) {
+    // @ts-ignore
+    return !iframe.contentWindow.hasOwnProperty(prop)
+  })
+  // log an array of properties that are different
+  document.body.removeChild(iframe)
+  return {
+    w: Object.fromEntries(results.map(n => [n, window[n]])),
+    k: results
+  }
+}
