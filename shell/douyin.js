@@ -383,6 +383,7 @@ async function main(cmd, input = '') {
         if (arg === '-p' || arg === '-max_page') opts.max_page = argv.shift()
         if (arg === '-n' || arg === '-max_number') opts.max_number = argv.shift()
         if (arg === '-t' || arg === '-max_time') opts.max_time = argv.shift()
+        if (arg === '-s' || arg === '-page_size') opts.page_size = +(argv.shift() || 18)
       }
       await downloadUserHomeList(opts)
     } break
@@ -395,10 +396,11 @@ async function main(cmd, input = '') {
 }
 
 /**
- * @param {string} [defaultValue]
+ * @param {string} [defaultLimit]
+ * @param {number} [defaultPageSize]
  * @returns {Promise<Partial<LimitOpts> & { limit: string }>}
  */
-async function askLimit(defaultValue) {
+async function askLimit(defaultLimit, defaultPageSize) {
   const limit = await ask([
     ['请输入最早时间', '任何可传入Date进行构造的数据', '2020-01-01'],
     ['或毫秒时间戳', '格式同', Date.now()],
@@ -408,10 +410,11 @@ async function askLimit(defaultValue) {
     checker: v => {
       return !!(is_number(v) || /p[0-9]+/i.test(v) || !isNaN(new Date(v).valueOf()))
     },
-    defaultValue,
+    defaultValue: defaultLimit,
     lineno: 1
   })
-  const limitOpts = { limit }
+  const page_size = +ask([['每页的数量', '正整数']], { checker: v => !isNaN(+v) && +v > 0, defaultValue: defaultPageSize })
+  const limitOpts = { limit, page_size }
   if (is_number(limit)) {
     if (limit < 10 ** 10) {
       limitOpts.max_number = Number(limit)
@@ -455,6 +458,7 @@ async function stepByStep() {
   /** @type {DownloadUserHomeListOpts & { limit: any }} */
   const homeOpts = {
     cookie: readFileSync(path.join(destDir, 'cookie.jar')).trim(),
+    page_size: 18,
     ...cache.homeOpts
   }
   if (!listFile) {
@@ -465,7 +469,7 @@ async function stepByStep() {
 
     homeOpts.user_sec_uid = await askUserSecUid(homeOpts.user_sec_uid)
 
-    Object.assign(homeOpts, await askLimit(homeOpts.limit))
+    Object.assign(homeOpts, await askLimit(homeOpts.limit, homeOpts.page_size))
   }
 
   /** @type {CurlOptions} */
@@ -568,6 +572,12 @@ async function downloadFirstCommentLinkFromJSON(opts) {
  * @return downloaded data.
  */
 async function downloadUserHomeList(opts) {
+  if (!opts.cookie) {
+    throw new Error('未指定Cookie')
+  }
+  if (opts.cookie.endsWith('.jar') && !fs.existsSync(opts.cookie)) {
+    throw new Error('Cookie文件不存在')
+  }
   if (fs.existsSync(opts.cookie)) {
     opts.cookie = fs.readFileSync(opts.cookie).toString().trim()
   }
@@ -1071,6 +1081,7 @@ function getXBogus(dataStr, cookie, referer) {
  * @property {number} [max_cursor]
  * @property {string} [max_time] - date string, param of `Date`
  * @property {number} [max_number]
+ * @property {number} [page_size]
  *
  * @typedef GetUserHomeOtherOpts
  * @property {string} cookie
@@ -1086,7 +1097,7 @@ async function getUserHome(opts) {
   if (opts.max_time && !opts.max_cursor) {
     opts.max_cursor = new Date(opts.max_time).getTime()
   }
-  const count = 18
+  const count = opts.page_size || 18
   const resp = []
   try {
     let page = 0

@@ -5,7 +5,7 @@
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <title>URL解析</title>
   <script src="https://cdn.jsdelivr.net/npm/vue@3.2.47/dist/vue.global.prod.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/daisyui@2.51.4/dist/full.css" rel="stylesheet" type="text/css" />
   <script src="https://cdn.tailwindcss.com"></script>
@@ -19,7 +19,7 @@
 </head>
 
 <body class="flex flex-col items-center justify-center">
-  <textarea class="opacity-0" disabled id="hidden-input" ></textarea>
+  <textarea class="opacity-0" disabled id="hidden-input"></textarea>
   <div class="flex items-center">
     <input type="text" placeholder="Type here" class="input input-bordered  w-full" id="paste-input" v-model="url" />
     <button class="btn btn-primary" @click="paste">粘贴</button>
@@ -36,12 +36,16 @@
     <button class="btn btn-primary" @click="copy">复制</button>
     <button class="btn btn-primary" @click="copy2">结构化复制</button>
   </div>
-  <div type="text" contenteditable placeholder="info@site.com" class="w-96 my-0.5 px-2 py-1 border border-gray-200 outline-none" @input="e => this.urlpath = e.target.textContent">{{this.urlpath}}</div>
+  <div type="text" contenteditable placeholder="info@site.com"
+    class="w-96 my-0.5 px-2 py-1 border border-gray-200 outline-none" @input="e => this.urlpath = e.target.textContent">
+    {{this.urlpath}}</div>
   <div class="flex items-center" v-for="(k, i) in Object.keys(this.params)" :key="i">
     <input type="checkbox" class="checkbox checkbox-primary" v-model="this.checked[k]" />
     <label class="input-group">
       <span class="w-56">{{k}}</span>
-      <div type="text" contenteditable placeholder="info@site.com" class="w-96 my-0.5 px-2 py-1 border border-gray-200 outline-none" @input="e => this.params[k] = e.target.textContent">{{this.params[k]}}</div>
+      <div type="text" contenteditable placeholder="info@site.com"
+        class="w-96 my-0.5 px-2 py-1 border border-gray-200 outline-none"
+        @input="e => this.params[k] = e.target.textContent">{{this.params[k]}}</div>
     </label>
   </div>
 </body>
